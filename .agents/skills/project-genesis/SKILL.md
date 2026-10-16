@@ -112,7 +112,7 @@ ROADMAP（`templates/ROADMAP.md`）是团队级的方向：一串有序的能力
 - 汇总本次创世产出的文件清单；
 - 校验链接纪律第 5 条：随机抽查两条决策链，确认可追溯、无断链；
 - 用 aisdlc 技能的 intent 模板起草**第一个意图：项目骨架**。骨架是**空壳加护栏**，不含任何业务能力：目录结构、构建配置、lint/test/build 命令、CI 管道。
-  护栏要同时带上 aisdlc 的机械校验：把 aisdlc 技能 `scripts/` 下 CI 要跑的两个脚本（`aisdlc_index.py`、`aisdlc_check_lane.py`）复制到仓库 `scripts/aisdlc/` 并接入 CI（做法见 aisdlc 的 `references/wiring.md`）。
+  护栏要同时带上 aisdlc 的机械校验，并接入 CI（做法见 aisdlc 的 `references/wiring.md`）。aisdlc 技能已随仓库提交在 `.agents/skills/` 下时，CI 直接引用其 `scripts/` 里的脚本，不要复制；只有技能不随仓库提交时，才把 `aisdlc_index.py`、`aisdlc_check_lane.py` 复制到仓库 `scripts/aisdlc/`。
   评审、评论命令、监控这些让 harness 介入循环的触点**不进骨架**，骨架合并后各自作为独立 intent 逐个接入；
 - 骨架 intent 的"期望结果"里要写一条**合并后动作**：用户在平台上开启主干保护与"流水线必须成功"，并做负向验证（直推主干被拒）。这项没完成，骨架不算关闭。
   理由：交棒话术只存在于本次对话，新窗口里的 agent 看不到；写进 intent，提醒才随仓库走。缺了这一步不会有任何报错，CI 红了照样能合并；

@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 只读：公开仓库上任何人的 PR 都会触发本流水线，不给写权限，也不引用 secret。
+permissions:
+  contents: read
+
+jobs:
+  # 作业名固定为 check：主干保护的必需检查按此名配置。
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.19.0
+      # 环境准备：装上 package.json 锁定版本的 pnpm。不用 corepack：Node 22.19.0 自带的 0.34.0
+      # 装不了 pnpm 12，Node 25 起也不再自带。
+      - run: npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+      # 逻辑都在脚本里，本地与 CI 跑同一份。
+      - run: scripts/check.sh
