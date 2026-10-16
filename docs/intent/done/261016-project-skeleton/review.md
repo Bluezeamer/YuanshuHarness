@@ -77,4 +77,22 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 .agents/skills/ai
 
 - 修复后 PR #1 的 CI 通过（作业 `check`，16 秒）。日志逐步骤核对：前置检查、安装（39 个包）、类型检查、lint、测试（两个包各 1 条）、检查脚本自检（12 项全绿）、构建、aisdlc 校验均实际执行并通过。至此第 1、3 轮的两项“待确认”（runner 上的 python3 与 pnpm、setup-node 22.19.0 下的行为）确认无问题。
 - R7 变异验证：草稿 PR #2（目标分支为骨架分支）在占位模块里引入 `string` 赋给 `number` 的类型错误，CI 在“类型检查”一步变红（`TS2322`），之后的步骤未执行。验证后已关闭 PR 并删除分支，未合并。
-- 仍待办：R8 的变异（让某个 intent 的 `Status` 与所在目录不一致，作业必须变红）未在 CI 上做，本地自检的 `aisdlc` 用例已覆盖同类情形；R10 在合并后由用户配置主干保护并做负向验证。
+- 未做：R8 的 CI 变异（让某个 intent 的 `Status` 与所在目录不一致，作业必须变红）没有在 CI 上做，本地自检的 `aisdlc` 用例覆盖同类情形，不再单开临时 PR。
+
+## 合并后动作（R10）
+
+PR #1 以 squash 方式合并为 `74e5b75`，`main` 上随后触发的 CI 通过。
+
+主干保护：用户在 GitHub 建了 ruleset `protect-main`（ID 25245509，选 ruleset 而非经典分支保护：同一分支可叠加多条、任何有读权限的人可查看、可用只读 API 核对）。agent 用只读 API 逐项核对：
+
+- 生效状态 `active`；绕过名单 `bypass_actors` 为空，即管理员同样受限；目标为默认分支（`main`）。
+- 规则：`deletion`（禁止删除）、`non_fast_forward`（禁止强推）、`pull_request`（必须走 PR，批准数 0）、`required_status_checks`（必需检查 `check`，来源 ID 15368，已核对为 GitHub Actions；未要求分支为最新）。
+- 经典分支保护不存在（查询返回 404），没有叠加其他规则。
+
+负向验证：agent 从 `main` 切出一次性分支，提交一个空提交，执行 `git push origin HEAD:main`，推送被拒：`GH013: Repository rule violations found for refs/heads/main`，原因两条——`Changes must be made through a pull request.` 与 `Required status check "check" is expected.`。该推送使用的账号对仓库有 `admin=true` 权限，因此“对管理员同样生效”得到实证。验证后远程 `main` 仍为 `74e5b75`，一次性分支已删除。
+
+未验证（只记录，不阻塞关闭）：
+- 规则里网页默认带上的参数 `require_extra_approval_for_unattributed_changes: true` 含义未查明；批准数为 0，推测无影响，本次关闭用的 PR 是该规则生效后的第一个 PR，合并时会暴露。
+- 禁止删除与禁止强推只核对了规则配置，没有实际尝试：失败时后果是删除或改写 `main`，不值得以此冒险。
+
+R1–R10 的证明均已具备，除上面列出的“未做”与“未验证”外。
