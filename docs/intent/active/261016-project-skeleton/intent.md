@@ -16,7 +16,7 @@ Why: 不改持久化数据、对外契约、鉴权，选型已有 ADR，故不�
 ## Proposed outcome
 空壳加护栏，不含任何业务能力：
 - 目录结构：补全 `.gitignore`（现有 `tmp/`、`.worktrees/`、`.claude/`、`tests/aisdlc`，再加 `node_modules/`、构建产物）。`LICENSE` 已在创世基线中。
-- pnpm workspace：`packages/server` 与 `packages/web`。Node ≥ 22.19，在 `packageManager` 字段锁定 pnpm 精确版本，本机装任意 ≥10 的 pnpm 即可，它会自动切到锁定版本，不依赖 corepack（见 Decisions needed 1 的修订）；严格类型检查；每个包只有一个占位模块和一条占位测试，用来证明类型检查、lint、测试、构建命令真的能跑。包配置声明 `MIT`。
+- pnpm workspace：`packages/server` 与 `packages/web`。Node ≥ 22.19，在 `packageManager` 字段锁定 pnpm 精确版本，本机装任意 ≥10 的 pnpm 即可，它会自动切到锁定版本，不依赖 corepack（见 Decisions needed 1）；严格类型检查；每个包只有一个占位模块和一条占位测试，用来证明类型检查、lint、测试、构建命令真的能跑。包配置声明 `MIT`。
 - Biome 负责 lint 与格式化，Vitest 负责测试。
 - 统一检查脚本 `scripts/check.sh`：一次跑完类型检查、lint、测试、构建和 aisdlc 校验；本地与 CI 跑同一份。
 - GitHub Actions 工作流：只调用 `scripts/check.sh`，对 PR 和主干 push 触发，使用 GitHub 托管的 runner。
@@ -40,12 +40,11 @@ Why: 不改持久化数据、对外契约、鉴权，选型已有 ADR，故不�
 - aisdlc 没有 GitHub 的落地经验，按其接线原则与触点契约实现，并标明哪些未经验证；完成后问用户愿不愿意沉淀成 `wiring-github.md`。
 
 ## Decisions needed
-1. 包管理器与仓库结构：选 pnpm workspace，`packages/server` 与 `packages/web`，经 corepack 使用。（2026-10-16，bluezeamer 确认）
-   修订（2026-10-16，待 bluezeamer 确认）：不再经 corepack。骨架 PR 首次 CI 失败暴露：Node 22.19.0 自带的 corepack 装不了 pnpm 12，Node 25 起也不再自带 corepack。改为 pnpm ≥10 自己按 `packageManager` 切换到锁定版本；pnpm 仍选 12，仓库结构不变。依据与实测见 plan Deviations。
+1. 包管理器与仓库结构：选 pnpm workspace，`packages/server` 与 `packages/web`；`packageManager` 字段锁定 pnpm 精确版本，本机装任意 ≥10 的 pnpm 即可，它自己切换到锁定版本，不依赖 corepack。（2026-10-16，bluezeamer 确认。原定经 corepack 使用；骨架 PR 首次 CI 暴露其不可行——Node 22.19.0 自带的 corepack 装不了 pnpm 12，Node 25 起也不再自带——同日由 bluezeamer 推翻，改为现方案。依据与实测见 plan Deviations）
 2. lint、格式化、测试：选 Biome 加 Vitest。（2026-10-16，bluezeamer 确认）
 3. 首次提交范围：创世产出（`docs/`、`.agents/`、`LICENSE`、`.gitignore`、项目 AGENTS.md）作为基线直接提交到 main，并打 `genesis-complete` 标签；骨架走 `chore/project-skeleton` 分支，经 PR 合并。源设计文档在 `docs/archive/Yuanshu-harness-design.md`，原样提交。基线直推 main 发生在主干保护开启之前，是创世的一次性例外。（2026-10-16，bluezeamer 确认）
 4. aisdlc 校验脚本：技能已随仓库提交在 `.agents/skills/aisdlc/`，CI 直接引用其中的脚本，不复制到 `scripts/aisdlc/`。同步修改了 project-genesis 与 aisdlc 技能里"一律复制"的措辞，避免下次调用技能时走回头路。（2026-10-16，bluezeamer 确认）
 
 ## Open questions
 - GitHub Actions 里 Python 版本与 aisdlc 脚本的运行方式（`python3 -I`），在 plan 阶段核实。
-- 包管理器经 corepack 的具体用法，在 plan 阶段核实。→ 已核实：不可行，改为不依赖 corepack（见 Decisions needed 1 的修订）。
+- 包管理器经 corepack 的具体用法，在 plan 阶段核实。→ 已核实：不可行，改为不依赖 corepack（见 Decisions needed 1）。
