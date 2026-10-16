@@ -29,3 +29,36 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 .agents/skills/ai
 不用本会话的自评顶替。第 1 轮之后的修复（提交 `e02e242`、`db008b2`）目前只有实现者自己的验证：对 `scripts/check.sh` 的 14 项变异（13 项被抓住，1 项为等价变异）、Node 24 与 Node 22.19.0 干净检出上的完整运行。这些不是独立评审。
 
 待办：由用户另起会话，按 `.agents/skills/aisdlc/references/review.md` 评审上述增量，或在新会话里重试；结果追加到本文件。在此之前，第 1 轮的 3 条"重要"发现只有实现者自证已消失。
+
+后续（实现者补记）：此后又新开两次，同样失败（共五次）。对照测试（只读同一批文件的小任务，分段、重跑）显示失败与内容无关：同一条命令有时通过有时被拒，连不读任何文件的首次请求也会失败，判断为网关随机返回 HTTP 400，约五分之一的请求受影响。评审要连续发十几次请求，整轮跑完的概率很低。改为在失败后恢复同一个评审者（已有进展保留），共恢复 5 次后在第 3 轮完成。
+
+## 第 3 轮（2026-10-16）— 范围：272a63d..db008b2 — 执行：独立评审 subagent（空上下文，只读，临时副本在 tmp/review3/）
+
+> 更正（实现者）：评审者在初稿里把本轮写成"本会话执行，不是新开的空上下文 subagent，独立性弱于 aisdlc 要求"，与事实不符。本轮由实现者新开的空上下文 subagent 执行，只收到填好的评审提示词；因网关随机 400 被恢复 5 次，恢复时实现者只发了"继续"一类的指令，没有传达任何对实现的判断。除这一处更正外，本节发现与核对结论均为评审者原文。
+
+| 级别 | 位置 | 发现 | 处理 |
+| ---- | ---- | ---- | ---- |
+| 重要 | `scripts/check.sh:61-63`（`selfcheck` 步骤） | 自检不覆盖 `selfcheck` 这一步本身。临时副本里把 `selfcheck` 改为 `selfcheck \|\| true`，selfcheck 仍输出"自检通过"。R4 字面是"任一步骤"，spec Proof R4 也未豁免。自检无法自证自己的调用，需要 CI 或脚本外的机制兜住，或在 spec 中写明豁免。待确认：是否接受豁免。 | 接受为豁免（用户同意）：自检以 `CHECK_ROOT` 驱动 `check.sh`，该路径必须跳过自检以避免递归，脚本无法检验自己对自检的调用。已写入 spec Proof R4 的例外，plan Deviations 同步记录，由 PR 上的人工评审兜底 |
+| 建议 | `scripts/check.sh:61` | `CHECK_ROOT` 只要在环境中被导出，整个检查就静默跳过自检，并且把 ROOT 指向别处运行。CI 与本地目前都未设置它（已核对），风险低，但缺少提示。 | 已修：设置了 `CHECK_ROOT` 时 `check.sh` 打印"已设置 CHECK_ROOT，跳过检查脚本自检" |
+| 建议 | `scripts/check.sh`（参数处理已删） | 去掉 `case "$1"` 后，`scripts/check.sh --tests-only` 等旧参数被静默忽略并执行全量检查，不再报"未知参数"。仓库内已无引用（`git grep` 只剩 plan.md 与本文件的历史说明）。 | 不处理：仓库内无引用，这些参数本是实现过程中的临时产物，不做兼容。已记入 plan Deviations |
+| 建议 | `tests/check/selfcheck.sh:7-9` | `WORK="$(mktemp -d)"` 失败时 `WORK` 为空，后续路径会变成 `/ok`、`/install` 等仓库外绝对路径，`mkdir -p` 与 `ln -s` 会在根目录下写入。概率极低（mktemp 基本不会失败），待确认是否值得加 `[[ -n "$WORK" ]] \|\| exit 2`。 | 已修：`mktemp -d` 失败时自检打印原因并以退出码 2 退出，不再继续使用空路径 |
+| 待确认 | `.github/workflows/ci.yml:25` | `corepack enable` 在 GitHub 托管 ubuntu runner 上是否可写入 node 的 bin 目录，以及 setup-node 22.19.0 下的 pnpm 解析，本地无法验证，需 PR 上的 CI 日志确认（与第 1 轮待确认一致，仍未结）。 | 推迟：需骨架 PR 的 CI 日志才能确认，plan 步骤 7 执行 |
+
+### 上轮发现的核对结论（本轮自行复现）
+
+- 第 1 轮"重要" `scripts/check.sh:61`（`typecheck` 无 `\|\| true` 检测）：**已消失**。逐步骤加 `\|\| true` 的变异共 7 项（precheck、install、typecheck、lint、test、build、aisdlc），其中 install、typecheck、lint、test、build、aisdlc 6 项自检均变红；precheck 为等价变异（`die` 直接 `exit`，已在第 1 轮记录）；selfcheck 见本轮"重要"。
+- 第 1 轮"重要" `tests/check/selfcheck.sh:64`（漂移断言 needle 为空）：**已消失**。安装命令加无关参数 `--no-such-flag` 后，自检变红（install 项报缺少 `ERR_PNPM_OUTDATED_LOCKFILE`）。真实漂移下 pnpm 12 输出该错误码（已实测，退出码非零）；加 `--offline` 的变异仍被判为通过，这是正确的（失败原因确为漂移）。`--frozen-lockfile` 被去掉时自检变红。
+- 第 1 轮"重要" README/前置检查/CI 对 corepack 的说明：**已消失（三者一致）**。README:13、16；check.sh:20 提示；ci.yml:25 均指向 `corepack enable`。仅有 node、corepack 时 `check.sh` 报"缺少前置工具：pnpm"，exit 1。CI 上的实际表现见本轮"待确认"。
+- 第 1 轮"建议" `scripts/check.sh:41` 零测试 find 范围：**已消失**。扫描已收窄到 `packages/`，selfcheck 的 notests 用例在根目录放 `stray.test.ts`，仍被判为失败。
+- 第 1 轮"建议" spec Risks 与 R10 补充：**已处理**（spec.md 的 Risks 与 R10 已含 `scripts/`、`tests/check/`、`ci.yml` 与批准规则）。
+- 第 1 轮"建议" R10 必需检查前提：**已处理**（spec.md R10 已写明）。
+- 第 1 轮"建议" pnpm store 位置：**部分处理，未变**。自检已设 `pnpm_config_store_dir`；主脚本在本机仍把 store 写到 `~/projects/.pnpm-store`（仓库外），仓库内未钉死 `storeDir`，交用户决定。本轮 `git status` 干净，未产生仓库内 store。
+- 第 1 轮"待确认" CI 未运行：**仍待确认**，需骨架 PR 的 CI 日志。
+
+### 本轮核对的其他项（无发现）
+
+- 第 5 项：`scripts/check.sh` 全量运行（`pnpm_config_store_dir` 已按要求设置）退出 0，约 5.6 秒，八个步骤均执行，selfcheck 通过。运行后 `git status` 干净。结果可信。
+- 第 4 项受限 PATH：缺 python3、缺 pnpm、缺 node 三个用例的断言字样只能由前置检查的 `die` 输出，前置检查先于任何外部步骤执行，因此不会被其他原因误判为通过。临时目录位于 `mktemp -d`，`trap` 清理；自检期间的 pnpm 调用只使用 `WORK` 下的 store 与夹具，未触碰仓库与仓库外的真实目录（上面 `mktemp` 的边界情况除外）。
+- 第 6 项：`find` 收窄、参数删除、corepack 步骤的回归检查见上表；未发现新的功能回归。
+
+本轮阻塞级：0 条。本轮重要级：1 条（待确认是否豁免）。本轮建议级：3 条。
