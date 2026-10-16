@@ -1,7 +1,7 @@
 # 接线：让 harness 介入循环
 
 要为项目接入 CI、调整平台设置，或让 harness 在评审、命令、监控这些触点上自动介入时读本文件。
-分三处：本文是总图与原则；[wiring-touchpoints.md](wiring-touchpoints.md) 讲每个触点的契约；[wiring-gitlab.md](wiring-gitlab.md) 是 GitLab 上的落地（其他平台暂无经验，见末节）。
+分四处：本文是总图与原则；[wiring-touchpoints.md](wiring-touchpoints.md) 讲每个触点的契约；[wiring-gitlab.md](wiring-gitlab.md) 是 GitLab 上的落地；[wiring-github.md](wiring-github.md) 是 GitHub 上的落地（只覆盖机械校验与主干保护；其他平台暂无经验，见末节）。
 
 ## 接线是什么
 
@@ -118,5 +118,5 @@ CI 评审和 [review.md](review.md) 的本地评审是两层，互不替代：
 
 ## 没有经验的平台
 
-本技能目前只有 GitLab 的落地经验。目标是别的平台时，按本文的原则和 wiring-touchpoints 里的契约，用搜索或已有知识实现，并在交付里标明哪些没经过验证。
+本技能目前有 GitLab 的完整落地经验，GitHub 只有机械校验与主干保护的经验（评审、命令、监控触点没做过）。目标是别的平台、或 GitHub 上没做过的触点时，按本文的原则和 wiring-touchpoints 里的契约，用搜索或已有知识实现，并在交付里标明哪些没经过验证。
 做完后问用户愿不愿意把踩到的坑沉淀成 `wiring-<平台>.md`，供下一次使用。
