@@ -10,9 +10,10 @@
 
 ## 本地检查
 
-需要 Node ≥ 22.19（自带 corepack）和 Python ≥ 3.11；pnpm 由 corepack 按 `package.json` 里锁定的版本提供，不需要全局安装。脚本是 bash，Windows 上用 Git Bash 或 WSL。
+需要 Node ≥ 22.19（自带 corepack）和 Python ≥ 3.11。pnpm 不需要单独安装：运行一次 `corepack enable`，之后 corepack 会按 `package.json` 里锁定的版本提供它。脚本是 bash，Windows 上用 Git Bash 或 WSL。
 
 ```bash
+corepack enable   # 只需一次
 scripts/check.sh
 ```
 

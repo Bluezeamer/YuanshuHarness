@@ -21,7 +21,7 @@ R6. 测试步骤发现零个测试文件时必须失败。`package.json` 与 loc
 R7. `.github/workflows/ci.yml` 在 `pull_request` 与推送到 `main` 时触发，使用 GitHub 托管 runner，权限仅 `contents: read`，不使用 `pull_request_target`，不引用 secret。作业的唯一实质步骤是运行 `scripts/check.sh`。
 R8. aisdlc 校验（`aisdlc_index.py --check`）直接引用仓库内 `.agents/skills/aisdlc/scripts/` 下的脚本，不复制到 `scripts/aisdlc/`。
 R9. `.gitignore` 补充 `node_modules/`、构建产物、覆盖率与 tsbuildinfo。README 含名称、tagline、当前状态，以及本地运行检查的命令。
-R10. 合并后动作：用户在 GitHub 为 `main` 启用保护——要求 PR、要求作业 `check` 通过、禁止强推与删除分支、对管理员同样生效——并做负向验证：直推 `main` 必须被拒。结果记入 `review.md`，之后骨架才能关闭。
+R10. 合并后动作：用户在 GitHub 为 `main` 启用保护——要求 PR、要求作业 `check` 通过、禁止强推与删除分支、对管理员同样生效——并做负向验证：直推 `main` 必须被拒。必需检查只有在作业 `check` 至少成功运行过一次之后才能在设置页选中，所以须在骨架 PR 的 CI 跑完之后配置。不要求他人批准（单人仓库，作者无法批准自己的 PR）。结果记入 `review.md`，之后骨架才能关闭。
 
 ## Proof
 | 需求 | 证明 | 旧实现下应失败 / 变异验证 |
@@ -56,4 +56,5 @@ tests/                               # R5、R6 的自检
 - corepack 在 Node 22 里的可用性和 pnpm 的启动方式，在 plan 阶段核实。
 - 公开仓库的 CI 对任何人的 PR 都会运行；已限定只读权限且不引用 secret。
 - `scripts/check.sh` 是 bash 脚本；Windows 上开发需要 Git Bash 或 WSL。
-- 直接引用 `.agents/skills/aisdlc/scripts/` 意味着 CI 跑的是 PR 分支上的脚本：日后建快车道章程时，`.agents/**` 必须在 `deny` 里，改动该路径须经负责人批准。
+- CI 执行的是 PR 分支上的 `scripts/check.sh`、`tests/check/`、`ci.yml` 与 `.agents/**`，PR 可以同时修改检查本身并让自己通过。工作流只读且不引用 secret，所以后果止于"本次检查被放过"，不会泄露凭据；真正的闸门是人评审 PR。日后建快车道章程时，上述路径必须在 `deny` 里，改动须经负责人批准。
+- 单人仓库不要求他人批准：作者无法批准自己的 PR，要求批准会让合并不可能。

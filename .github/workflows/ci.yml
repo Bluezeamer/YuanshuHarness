@@ -21,5 +21,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.19.0
+      # 环境准备：让 corepack 按 package.json 锁定的版本提供 pnpm。
+      - run: corepack enable
       # 逻辑都在脚本里，本地与 CI 跑同一份。
       - run: scripts/check.sh
