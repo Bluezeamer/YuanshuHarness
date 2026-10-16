@@ -21,3 +21,11 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 .agents/skills/ai
 已核实无问题（实测）：`scripts/check.sh` 全量退出 0（约 2.4 秒）；typecheck、lint（13 个文件）、test、build、aisdlc 校验均通过；自检 5 项通过；vitest 5.0.4 在零测试文件时退出 1；工作流权限为 `contents: read`，无 `pull_request_target`，无 `secrets.`；`.gitignore` 覆盖 R9 要求的项；`LICENSE` 存在；`packageManager` 与运行的 pnpm 版本一致（12.11.2）。
 
 本轮阻塞级：0 条。
+
+## 第 2 轮（2026-10-16）— 范围：272a63d..db008b2 — 未做独立评审
+
+原因：连续三次新开评审者均在读取工件阶段被 API 以 HTTP 400（"缺少必需参数或包含不允许的参数"）终止，没有产出任何结论，也没有向本文件写入任何内容。三次分别是 haiku、sonnet、haiku，第 1 轮以同样方式开启则成功，失败原因未查清。
+
+不用本会话的自评顶替。第 1 轮之后的修复（提交 `e02e242`、`db008b2`）目前只有实现者自己的验证：对 `scripts/check.sh` 的 14 项变异（13 项被抓住，1 项为等价变异）、Node 24 与 Node 22.19.0 干净检出上的完整运行。这些不是独立评审。
+
+待办：由用户另起会话，按 `.agents/skills/aisdlc/references/review.md` 评审上述增量，或在新会话里重试；结果追加到本文件。在此之前，第 1 轮的 3 条"重要"发现只有实现者自证已消失。
