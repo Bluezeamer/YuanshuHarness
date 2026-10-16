@@ -62,3 +62,13 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 .agents/skills/ai
 - 第 6 项：`find` 收窄、参数删除、corepack 步骤的回归检查见上表；未发现新的功能回归。
 
 本轮阻塞级：0 条。本轮重要级：1 条（待确认是否豁免）。本轮建议级：3 条。
+
+## CI 首次运行（实现者补记，非评审）
+
+骨架 PR 的首次 CI 失败（作业 `check`，9 秒）：`Cannot find module .../corepack/v1/pnpm/12.11.2/bin/pnpm.cjs`。第 1、3 轮把“CI 上的 corepack 行为”都列为待确认，结论是评审标对了：这是真实缺陷。
+
+- 原因：Node 22.19.0 自带 corepack 0.34.0，装不了 pnpm 12；corepack ≥0.34.5 才行。另外 Node 25 起官方不再随发行包提供 corepack，而 `engines.node` 的范围包含 Node 25、26。
+- 本地为什么没发现：本机 corepack 缓存里已有 Node 24 自带的新版 corepack 装好的 pnpm。**第 1 轮“处理”列里“在 Node 22.19.0 干净环境验证”的说法因此不成立**，那次验证并不干净。
+- 处理（与本节同一次提交）：去掉对 corepack 的依赖，改为 pnpm ≥10 按 `packageManager` 自动切换；前置检查新增“pnpm 实际版本等于锁定版本”的核对，自检新增用例并通过变异验证（删掉核对后新用例变红）。依据与实测矩阵见 plan Deviations。
+- 验证方式：在“Node 22.19.0、PATH 无 corepack、pnpm 10 引导、全新 HOME、空依赖仓库”的环境里完整跑通 `scripts/check.sh`；CI 里那一行命令经 YAML 解析器取出后原样执行通过。最终以修复提交上 CI 的真实结果为准，见 PR。
+- 这次修复没有再做独立评审：评审者的调用被网关随机 400 反复打断（见第 2 轮的补记），改以上述实测和 CI 结果作为验证。需要时由人评审该提交。

@@ -16,8 +16,7 @@ precheck() {
   step "前置检查"
   local missing=()
   command -v node >/dev/null 2>&1 || missing+=("node（需要 >=22.19）")
-  command -v corepack >/dev/null 2>&1 || missing+=("corepack（随 Node 提供，用来取得锁定版本的 pnpm）")
-  command -v pnpm >/dev/null 2>&1 || missing+=("pnpm（运行一次 \`corepack enable\`，之后会按 package.json 锁定的版本提供）")
+  command -v pnpm >/dev/null 2>&1 || missing+=("pnpm（需要 >=10，例如 \`npm install -g pnpm\`；在本仓库里它会自动切换到 package.json 锁定的版本）")
   command -v python3 >/dev/null 2>&1 || missing+=("python3（需要 >=3.11，aisdlc 校验用）")
   ((${#missing[@]} == 0)) || die "缺少前置工具：${missing[*]}"
 
@@ -25,6 +24,14 @@ precheck() {
     || die "node 版本过低：$(node -v)，需要 >=22.19"
   python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
     || die "python3 版本过低：$(python3 --version)，需要 >=3.11"
+
+  # 不依赖 corepack（Node 25 起不再随发行包提供）：由 pnpm 自己按 packageManager 切换版本，
+  # 过旧的 pnpm 不会切换，所以要核对实际版本。
+  local want have
+  want="$(cd "$ROOT" && node -p "require('./package.json').packageManager.split('@')[1]")"
+  have="$(cd "$ROOT" && pnpm --version)" || die "pnpm 无法运行"
+  [[ "$have" == "$want" ]] \
+    || die "pnpm 版本与 package.json 锁定的不一致：实际 $have，需要 $want（pnpm 需要 >=10 才会自动切换）"
 }
 
 install_deps() {

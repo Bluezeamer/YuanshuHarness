@@ -110,11 +110,18 @@ done
 # R5：缺失的前置工具必须被点名
 base=(bash env dirname cat sed grep sort head tr)
 expect_fail "缺 python3" "缺少前置工具：python3" \
-  env PATH="$(restricted_path nopy "${base[@]}" node corepack pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
+  env PATH="$(restricted_path nopy "${base[@]}" node pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
 expect_fail "缺 pnpm" "缺少前置工具：pnpm" \
-  env PATH="$(restricted_path nopnpm "${base[@]}" node python3 corepack)" CHECK_ROOT="$WORK/ok" "$CHECK"
+  env PATH="$(restricted_path nopnpm "${base[@]}" node python3)" CHECK_ROOT="$WORK/ok" "$CHECK"
 expect_fail "缺 node" "缺少前置工具：node" \
-  env PATH="$(restricted_path nonode "${base[@]}" python3 corepack pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
+  env PATH="$(restricted_path nonode "${base[@]}" python3 pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
+
+# pnpm 实际版本与锁定不一致（例如过旧、不会自动切换的 pnpm）必须失败
+fake="$(restricted_path badpnpm "${base[@]}" node python3)"
+printf '#!/usr/bin/env bash\necho 0.0.1\n' > "$fake/pnpm"
+chmod +x "$fake/pnpm"
+expect_fail "pnpm 版本与锁定不符" "pnpm 版本与 package.json 锁定的不一致" \
+  env PATH="$fake" CHECK_ROOT="$WORK/ok" "$CHECK"
 
 if ((fails > 0)); then
   echo "自检失败：$fails 项"
