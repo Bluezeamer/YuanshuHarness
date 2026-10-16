@@ -5,7 +5,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CHECK="$ROOT/scripts/check.sh"
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d)" || { echo "自检夹具失败：无法创建临时目录"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
 fails=0
 

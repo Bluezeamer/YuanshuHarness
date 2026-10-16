@@ -60,6 +60,8 @@ lint
 run_tests
 if [[ -z "${CHECK_ROOT:-}" ]]; then
   selfcheck
+else
+  printf '\n提示：已设置 CHECK_ROOT，跳过检查脚本自检\n'
 fi
 build
 aisdlc_check

@@ -29,7 +29,7 @@ R10. 合并后动作：用户在 GitHub 为 `main` 启用保护——要求 PR�
 | R1 | `pnpm -r list --depth -1` 列出两个包；`pnpm -v` 等于 `packageManager` 锁定的版本 | 不适用（结构性） |
 | R2 | `pnpm -r typecheck`、`test`、`build` | 变异验证：占位模块里引入类型错误，typecheck 必须变红；把占位断言改错，test 必须变红 |
 | R3 | `pnpm lint` | 变异验证：写入一行违反格式的代码，必须变红 |
-| R4 | 全套检查通过；R5、R6 的自检 | 变异验证：在任一步骤后加 `\|\| true`，R5、R6 的自检必须变红 |
+| R4 | 全套检查通过；R5、R6 的自检 | 变异验证：在任一步骤后加 `\|\| true`，R5、R6 的自检必须变红。例外：调用自检的那一步本身无法被自检覆盖（自检以 `CHECK_ROOT` 驱动 `check.sh`，该路径跳过自检以避免递归），由 PR 上的人工评审兜底，见 Risks |
 | R5 | 自检脚本：用缺少 python3 或 pnpm 的 PATH 运行前置检查，必须非零且输出缺失项 | 变异验证：删掉某一项检查，自检必须变红 |
 | R6 | 自检：空测试目录运行测试步骤必须非零；改 `package.json` 依赖而不更新 lockfile，安装必须非零 | 变异验证：给测试命令加 `--passWithNoTests`，自检必须变红 |
 | R7 | 在 PR 上触发一次，作业成功；向分支推一个带类型错误的提交，作业必须变红；`grep` 工作流确认无 `pull_request_target` 与 `secrets.` | 上述红灯即变异验证 |
