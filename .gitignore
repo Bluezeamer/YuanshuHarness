@@ -1,0 +1,12 @@
+# 临时产物（见 AGENTS.md 的目录约定）
+tmp/
+
+# agent 并发用的 worktree
+.worktrees/
+
+# 本地 agent 配置；技能的唯一来源是 .agents/skills，.claude/skills 是指向它的本地符号链接
+.claude/
+
+# 本地aisdlc评估相关
+tests/aisdlc
+
