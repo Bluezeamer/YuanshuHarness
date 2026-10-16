@@ -1,6 +1,6 @@
 # 触点契约
 
-实现某个触点时读对应小节。总图、原则与顺序见 [wiring.md](wiring.md)；平台上怎么落地见 [wiring-gitlab.md](wiring-gitlab.md)。
+实现某个触点时读对应小节。总图、原则与顺序见 [wiring.md](wiring.md)；平台上怎么落地见 [wiring-gitlab.md](wiring-gitlab.md)、[wiring-github.md](wiring-github.md)。
 标【建议】的是本技能补充、没有实践过的改进；其余来自已跑通的实践。`<harness-run>` 指项目 harness 的无头命令。
 
 - [0. 机械校验](#0-机械校验)

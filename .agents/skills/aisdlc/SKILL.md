@@ -104,5 +104,5 @@ docs/
 | 进入快车道、或建立新章程                 | [references/tune.md](references/tune.md)                                                                       |
 | 任何需要评审的时候（含快车道报告复核）   | [references/review.md](references/review.md)，提示词模板 [assets/reviewer-prompt.md](assets/reviewer-prompt.md) |
 | 归档变更、生成索引、用脚本做越线检查     | [references/automation.md](references/automation.md)                                                           |
-| 接入 CI 与平台、让 harness 介入循环（评审、命令、监控） | [references/wiring.md](references/wiring.md)，触点契约 [wiring-touchpoints.md](references/wiring-touchpoints.md)，GitLab 落地 [wiring-gitlab.md](references/wiring-gitlab.md) |
+| 接入 CI 与平台、让 harness 介入循环（评审、命令、监控） | [references/wiring.md](references/wiring.md)，触点契约 [wiring-touchpoints.md](references/wiring-touchpoints.md)，GitLab 落地 [wiring-gitlab.md](references/wiring-gitlab.md)，GitHub 落地 [wiring-github.md](references/wiring-github.md) |
 | 精简项目的 AGENTS.md                     | [assets/agents-md-snippet.md](assets/agents-md-snippet.md)                                                     |
