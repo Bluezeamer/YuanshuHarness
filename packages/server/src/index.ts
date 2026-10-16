@@ -1,1 +1,1 @@
-export const packageName = "yuanshu-harness-server";
+export const packageName: number = "yuanshu-harness-server";
