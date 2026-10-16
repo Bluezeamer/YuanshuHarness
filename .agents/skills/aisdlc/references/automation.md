@@ -3,8 +3,8 @@
 归档变更、生成索引、使用快车道越线检查时读本文件。把这些接入 CI 与平台，见 [wiring.md](wiring.md)。
 
 脚本在本技能的 `scripts/` 下，只用 Python 标准库（≥3.11），不装依赖。运行方式：`python3 -I <脚本> ...`。
-三个脚本里，`aisdlc_index.py` 和 `aisdlc_check_lane.py` 要在 CI 里跑，而 CI 只有仓库、没有本技能的目录，所以**使用前把这两个复制到项目的 `scripts/aisdlc/`** 并提交；
-本地运行也用这份，保证本地和 CI 跑的是同一个文件。若 aisdlc 本身装在随仓库提交的项目级技能目录里，CI 可直接引用其中的脚本，不必复制。
+三个脚本里，`aisdlc_index.py` 和 `aisdlc_check_lane.py` 要在 CI 里跑，而 CI 只有仓库。aisdlc 装在随仓库提交的项目级技能目录（如 `.agents/skills/aisdlc/`）里时，**CI 直接引用其中的脚本，不要复制**，本地和 CI 跑的是同一个文件；
+只有技能不随仓库提交时，才把这两个复制到项目的 `scripts/aisdlc/` 并提交。下文命令里的 `scripts/aisdlc/` 指脚本所在目录，随上述两种情形取 `.agents/skills/aisdlc/scripts/` 或 `scripts/aisdlc/`。
 `aisdlc_archive.py` 只在本地由实现者关闭变更时运行，留在技能目录里调用，不复制。
 
 | 脚本 | 做什么 | 谁调用 |
