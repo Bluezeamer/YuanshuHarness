@@ -10,3 +10,9 @@ tmp/
 # 本地aisdlc评估相关
 tests/aisdlc
 
+
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
