@@ -1,6 +1,6 @@
 # Intent: 项目骨架
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-16
 Lane: build
 Why: 不改持久化数据、对外契约、鉴权，选型已有 ADR，故不是决策档；CI 接线有"缺前提时静默假绿"的风险，用"缺前提必须失败"和负向验证加固，其余无静默信号，故为标准档加加固。
