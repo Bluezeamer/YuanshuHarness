@@ -20,7 +20,7 @@ Why: 不改持久化数据、对外契约、鉴权，选型已有 ADR，故不�
 - Biome 负责 lint 与格式化，Vitest 负责测试。
 - 统一检查脚本 `scripts/check.sh`：一次跑完类型检查、lint、测试、构建和 aisdlc 校验；本地与 CI 跑同一份。
 - GitHub Actions 工作流：只调用 `scripts/check.sh`，对 PR 和主干 push 触发，使用 GitHub 托管的 runner。
-- `aisdlc_index.py`、`aisdlc_check_lane.py` 复制到 `scripts/aisdlc/` 并接入 CI。
+- aisdlc 的 `aisdlc_index.py --check` 接入 CI，直接引用 `.agents/skills/aisdlc/scripts/` 下的脚本，不复制（见 Decisions needed 4）。
 - 防假绿：缺少工具、脚本、测试时 CI 必须失败，不能跳过。
 - 最小 README：名字、tagline、当前状态、本地如何跑检查。
 - 合并后动作（用户做）：在 GitHub 上为主干开启保护（要求 PR、要求检查通过、禁止强推），并做负向验证：直推主干被拒。没做完，骨架不算关闭。
@@ -43,6 +43,7 @@ Why: 不改持久化数据、对外契约、鉴权，选型已有 ADR，故不�
 1. 包管理器与仓库结构：选 pnpm workspace，`packages/server` 与 `packages/web`，经 corepack 使用。（2026-10-16，bluezeamer 确认）
 2. lint、格式化、测试：选 Biome 加 Vitest。（2026-10-16，bluezeamer 确认）
 3. 首次提交范围：创世产出（`docs/`、`.agents/`、`LICENSE`、`.gitignore`、项目 AGENTS.md）作为基线直接提交到 main，并打 `genesis-complete` 标签；骨架走 `chore/project-skeleton` 分支，经 PR 合并。源设计文档在 `docs/archive/Yuanshu-harness-design.md`，原样提交。基线直推 main 发生在主干保护开启之前，是创世的一次性例外。（2026-10-16，bluezeamer 确认）
+4. aisdlc 校验脚本：技能已随仓库提交在 `.agents/skills/aisdlc/`，CI 直接引用其中的脚本，不复制到 `scripts/aisdlc/`。同步修改了 project-genesis 与 aisdlc 技能里"一律复制"的措辞，避免下次调用技能时走回头路。（2026-10-16，bluezeamer 确认）
 
 ## Open questions
 - GitHub Actions 里 Python 版本与 aisdlc 脚本的运行方式（`python3 -I`），在 plan 阶段核实。
