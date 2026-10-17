@@ -1,0 +1,13 @@
+.git
+node_modules
+**/node_modules
+tmp
+.claude
+.pi
+.worktrees
+.playwright
+.playwright-cli
+**/dist
+packages/server/web
+docs
+tests
