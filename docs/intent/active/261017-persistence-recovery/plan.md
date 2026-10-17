@@ -51,4 +51,9 @@ Date: 2026-10-17
 - **提交粒度**：步骤 2–4（store 层，不接入池）与步骤 5–6（接入）分开提交，store 层问题可独立撤回。
 
 ## Deviations
-无
+- 2026-10-17 步骤 1 探测结论（SDK 1.3.0，一次性探针，已删除）：
+  - (a) 对未加载的会话：`SessionManager.open(file, dir)` 后 `appendSessionInfo(name)` 立即追加写入 JSONL，重新打开能读回名称；不需要创建 AgentSession。
+  - (b) `getBranch()` 返回当前分支的条目，包含 `role:"system"` 的 message 条目，需过滤；user 消息 content 为字符串，assistant 为内容块数组，`messageText` 已能处理两种形状。`session_info` 条目不在 message 之内。
+  - (c) 悬挂工具调用重放时 SDK 自己补 `"No result provided"` 的 tool 结果；`sendCustomMessage({customType, content, display:false}, {deliverAs:"nextTurn"})` 在空闲会话上可用：通知在下一次 prompt 时作为 custom_message 条目写入 JSONL，并随历史进入此后所有请求。因此 R12 的“只出现一次”由“只发送一次”保证，不会重复追加；通知位于历史末尾、本次用户消息之前（不是请求的最后一条），语义仍是“历史末尾的附加通知”，spec 的“末尾”按此理解，不改 Requirements。custom_message 不是 message 条目，不会出现在历史分页里。
+  - (d) better-sqlite3 13.0.3 在 Node 22.19.0（SQLite 3.53.4）与 Node 24.13.1 下均可加载。
+
