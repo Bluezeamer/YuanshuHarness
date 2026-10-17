@@ -13,6 +13,7 @@ Reviewer: 每轮由新开的空上下文评审者执行（见 references/review.
 | R1 | 精确版本 1.3.0，锁文件一致。SDK 传递依赖带安装脚本（`@google/genai`、`protobufjs`），pnpm 12 要求显式声明，已在 `pnpm-workspace.yaml` 用 `allowBuilds` 设为不执行。 | 一致 |
 | R2 | `session.compact()` 能产出摘要；压缩后经 `appendSystemPromptOverride` + `session.reload()` 追加的内容，在随后请求里只出现一次，摘要同在请求中。标志为假时位于开头系统提示词的最末（`<cwd>` 之后的 `<addendum>` 段）；标志为真时是紧挨最新用户消息的中途 system 消息。 | 一致（见 R3 对载体的限定） |
 | R3 系统消息 | 默认（标志未设或为假）：追加的内容**改写开头的系统提示词**，前缀缓存失效，无中途 system 消息。`supportsMidConvoSystemMessages=true`：开头不变，追加内容以中途 system 消息出现在最新用户消息之前。`before_agent_start` 返回 `systemPrompt`：无论标志如何都整体替换开头。 | 机制存在，但见下方"需要人看的发现" |
+| R3 末尾附加 | `before_agent_start` 返回 `message`：内容以 **user** 角色进入请求，开头系统提示词逐字不变，并保留在后续历史里。这是 ADR-0009 的实际路径。 | 一致 |
 | R3 工具 | openai-completions 用的标志名是 `supportsMidConvoToolAdditions`，`...ToolChanges` 属于 anthropic-messages。标志为假：工具集变化体现在顶层 `tools`。标志为真：顶层 `tools` 不变，新增工具走**带 `tools` 字段的非标准中途 system 消息**；移除工具无论标志如何都直接改写顶层 `tools`。 | ADR-0009 与 ROADMAP 写的是 `...ToolChanges`，对 openai-completions 不准确 |
 | R4 | `SessionManager.open(file, sessionDir)` + `createAgentSession({sessionManager})` 重建后 `messages` 与原会话相等，继续对话时历史随请求发出。文档明确：直接赋值 `session.agent.state.messages` 不会替换持久化上下文。 | 一致 |
 | R5 | 默认读取 `cwd` 下的 `AGENTS.md`，请求里出现一次。接管做法：`noContextFiles: true` + `appendSystemPrompt` 自己注入，出现一次；不关自读又注入，出现两次。显式 `agentDir` 时不读取 HOME 下的 AGENTS.md。 | 一致 |
@@ -21,10 +22,11 @@ Reviewer: 每轮由新开的空上下文评审者执行（见 references/review.
 | R8 | 扫描：`<agentDir>/skills`、`<cwd>/.pi/skills`、`<cwd>/.agents/skills`、`~/.agents/skills`；另可 `additionalSkillPaths` 追加、`noSkills` 关闭自动扫描。直接祖先目录的 `.agents/skills` 会被发现；未验证：逐级上溯与在仓库根停止的边界。SDK 没有公开的"列出扫描目录"接口，目录集合只能由正负 fixture 证明。 | 一致 |
 | 其他 | `createAgentSession({noTools:"all"})` 会连扩展注册的工具一起屏蔽，要用扩展工具须不传 `noTools`，改用 `setActiveToolsByName` 选择。 | 无 |
 
-### 需要人看的发现（真实端点，手动一次性实测，未入库）
+### 真实端点上的发现与人的裁决
 
-对本地部署的 Qwen3.8-27B（OpenAI 兼容端点）：默认配置下追加提示词、改工具集都正常；开启 `supportsMidConvoSystemMessages`（含同时开 `supportsMidConvoToolAdditions`）后，端点返回 `400: System message must be at the beginning.`。
-也就是说中途 system 消息要看 provider 是否支持：支持的（该标志的存在即表明）才能用；不支持的只能走"改写开头"（破坏缓存前缀）或"以非 system 消息附加到上下文末尾"。ADR-0009 已写了"否则在上下文末尾附加"的退路，但具体载体（用户角色消息？）未定，也没有验证。是否需要为此补一份 ADR 或在 ADR-0009 的后继里定下来，交给人决定。
+对本地部署的 Qwen3.8-27B（OpenAI 兼容端点）手动一次性实测：默认配置下追加提示词、改工具集都正常；开启 `supportsMidConvoSystemMessages`（含同时开 `supportsMidConvoToolAdditions`）后，端点返回 `400: System message must be at the beginning.`。
+裁决（2026-10-17，bluezeamer）：不需要中途 system 消息；变化以用户消息或工具信息附加到上下文末尾，参考 opencode 的模式切换设计。ADR-0009 的退路本来就是这条，不新增 ADR。
+据此新增用例验证 SDK 的这条路径：`before_agent_start` 返回 `message`，附加内容以 user 角色进入请求，开头系统提示词逐字不变，并保留在后续历史里；变异（改为强制 `systemPrompt`）实测变红。该路径未对真实端点实测，只在 stub 上验证。
 
 ### 变异验证记录
 
@@ -45,6 +47,7 @@ Reviewer: 每轮由新开的空上下文评审者执行（见 references/review.
 | 压缩后承载标记的消息角色期望改为 user（R2，第 1 轮后新增） | 2 条红 |
 | JSONL 补两个空行（R4 对照） | 1 条红 |
 | 去掉某文件对隔离模块的 import（R9） | 1 条红 |
+| 末尾附加路径改为强制 `systemPrompt`（R3） | 1 条红 |
 
 首轮变异时发现 `countIn` 统计的是"包含标记的消息条数"，抓不住"同一条消息里重复两次"，已改为统计出现总次数后重跑。
 

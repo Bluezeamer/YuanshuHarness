@@ -36,5 +36,9 @@ SDK 迭代快，升级版本时也需要一组能自动判断"假设是否还成
 2. **真实模型的使用方式**：CI 与契约用例不调用真实模型，全部对着本地 stub provider；真实端点只做手动冒烟。理由：断言的是"内容到达请求"，与模型无关；协作者提交时 CI 不应消耗模型额度。（2026-10-17，bluezeamer 确认）
 3. **模型口径**：契约只断言"内容到达请求"，不断言"模型听话"；冒烟用本地部署的 Qwen3.8-27B，端点无需 key。（2026-10-17，bluezeamer 确认）
 
+4. **R3 的协议范围**：第一批只覆盖 openai-completions；anthropic-messages 的 `supportsMidConvoToolChanges` 延期到接入该协议时。理由：最终版本能兼容即可，依赖的是 pi 自身基建，目前只是没有对应的 mock。（2026-10-17，bluezeamer 确认）
+5. **中途变化的载体**：不需要中途 system 消息。变化以用户消息或工具信息附加到上下文末尾（参考 opencode 的模式切换设计），开头前缀不动；ADR-0009 的退路本来就是这条，无需新增 ADR。（2026-10-17，bluezeamer 确认）
+6. **忽略 SDK 传递依赖的安装脚本**：`@google/genai` 的 preinstall 是 no-op，`protobufjs` 的 postinstall 只打印版本方案警告，忽略无负面影响。（2026-10-17，bluezeamer 确认）
+
 ## Open questions
 - `supportsMidConvo*` 两个标志在 1.3.0 里的确切含义与默认值，实现阶段读源码与实测确认（实现者）。

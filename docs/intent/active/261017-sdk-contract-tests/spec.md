@@ -15,7 +15,7 @@ Date: 2026-10-17
 
 R1. Server 包必须以精确版本依赖 `@earendil-works/pi-coding-agent`（无 `^`、`~`、范围）；`pnpm-lock.yaml` 与之一致。
 R2. 压缩（compaction）完成后，Server 追加到系统提示词末尾的内容必须出现在随后发往模型的请求里，且只出现一次。以 provider 实际收到的请求体为准，不以 SDK 内部状态为准。
-R3. 必须记录 `supportsMidConvoSystemMessages` 与工具类标志在配置为真、为假时的实际行为：会话中途追加的系统消息、新增与移除的工具是否出现在下一次请求中。第一批只覆盖 openai-completions（标志名为 `supportsMidConvoToolAdditions`）；anthropic-messages 的 `supportsMidConvoToolChanges` 需要另一套 stub，留待接入该协议时再验证。
+R3. 必须记录 `supportsMidConvoSystemMessages` 与工具类标志在配置为真、为假时的实际行为：会话中途追加的系统消息、新增与移除的工具是否出现在下一次请求中。第一批只覆盖 openai-completions（标志名为 `supportsMidConvoToolAdditions`）；anthropic-messages 的 `supportsMidConvoToolChanges` 需要另一套 stub，留待接入该协议时再验证（2026-10-17，bluezeamer 批准延期）。ADR-0009 的实际路径是把变化以用户消息或工具信息附加到上下文末尾、开头前缀不动，本需求也验证这条路径：经 `before_agent_start` 返回 `message` 附加的内容必须以非 system 消息进入请求，开头系统提示词必须逐字不变，且保留在后续历史里。
 R4. 必须能用 SDK 公开接口，从既有 JSONL 重建会话，重建后的 `messages` 与原会话一致，并能继续对话。
 R5. 指定 cwd 与 AGENTS.md 时，同一份 AGENTS.md 内容在请求中必须只出现一次；Server 不得读取 `~/.pi` 下的任何文件（含 AGENTS.md、模型与设置）。
 R6. 单槽位界面（confirm/select/input）必须能被 Server 层接管：SDK 把三类对话框原样委托给 Server 提供的 `uiContext`，`timeout`、`signal` 选项透传，答案回到扩展。先答先赢与超时默认值属于 Server 层的实现，留给 ROADMAP 第 3 条；本需求同时记录 SDK 自身不强制 `timeout` 这一事实。
@@ -29,7 +29,7 @@ R10. 契约用例必须全部能对着本地 stub provider（OpenAI 兼容、返
 |---|---|---|
 | R1 | `sdk-version.test.ts`：读 package.json 与锁文件 | 变异：把版本改为 `^x.y.z`，必须变红 |
 | R2 | stub provider 记录请求体（压缩所需的摘要响应由 stub 预设），压缩后断言标记串出现一次 | 变异：不追加，必须变红；追加两次，必须变红 |
-| R3 | stub：四种组合的请求体断言，结果记入 review.md | 变异：翻转期望值，必须变红 |
+| R3 | stub：四种组合的请求体断言，结果记入 review.md；末尾附加路径的前缀不变断言 | 变异：翻转期望值，必须变红 |
 | R4 | `session-load.test.ts`：先写后载，比对 messages | 变异：截断 JSONL 一行，必须变红 |
 | R5 | `agents-md.test.ts`：捕获构造的系统提示词；并断言 stub 收到的请求体 | 变异：同时开启 SDK 自带读取与手动注入，必须变红（出现两次） |
 | R6 | `ui-dispatch.test.ts`：三类对话框的委托与选项透传；超时不被 SDK 强制 | 变异：让 uiContext 对 confirm 返回相反答案，答案用例必须变红 |

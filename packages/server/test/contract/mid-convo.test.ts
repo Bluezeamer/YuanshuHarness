@@ -148,3 +148,50 @@ describe("R3 before_agent_start 返回 systemPrompt", () => {
     expect(body.messages.slice(1).some((m) => m.role === "system")).toBe(false);
   });
 });
+
+describe("R3 以消息附加到上下文末尾（ADR-0009 的实际路径）", () => {
+  test("before_agent_start 返回 message：开头系统提示词不变，内容以非 system 消息进入请求并留在历史里", async () => {
+    stub.requests.length = 0;
+    const env = makeEnv();
+    writeModels(env, stub.url);
+    let inject = false;
+    const { session } = await openSession(env, {
+      loader: {
+        extensionFactories: [
+          (pi) => {
+            pi.on("before_agent_start", () =>
+              inject
+                ? {
+                    message: {
+                      customType: "mode-switch",
+                      content: MARK,
+                      display: false,
+                    },
+                  }
+                : undefined,
+            );
+          },
+        ],
+      },
+    });
+    await session.prompt("one");
+    inject = true;
+    await session.prompt("two");
+    inject = false;
+    await session.prompt("three");
+    session.dispose();
+
+    const [r1, r2, r3] = stub.requests.map((r) => r.body as Body);
+    expect(textOf(at(r2?.messages ?? [], 0))).toBe(
+      textOf(at(r1?.messages ?? [], 0)),
+    );
+    expect(countIn(r2 as Body, MARK)).toBe(1);
+    const carrier = (r2 as Body).messages.find((m) => textOf(m).includes(MARK));
+    expect(carrier?.role).toBe("user");
+    expect((r2 as Body).messages.indexOf(carrier as never)).toBeGreaterThan(1);
+    expect(countIn(r3 as Body, MARK)).toBe(1);
+    expect(textOf(at(r3?.messages ?? [], 0))).toBe(
+      textOf(at(r1?.messages ?? [], 0)),
+    );
+  });
+});
