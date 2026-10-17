@@ -24,6 +24,7 @@
 |---|---|---|
 | agent 内核 | pi SDK，不 fork，精确锁定版本 | [ADR-0001](adr/0001-pi-sdk-no-fork.md) |
 | 语言与运行时 | TypeScript，Node ≥ 22.19 | [ADR-0013](adr/0013-tech-stack.md) |
+| HTTP 框架 | Fastify 5.x，精确锁定版本 | [ADR-0017](adr/0017-server-web-framework.md) |
 | 前端 | React 加 Tailwind，由 Server 托管 | [ADR-0013](adr/0013-tech-stack.md) |
 | 执行环境 | 薄环境，ssh 接入，Windows 经 Git Bash | [ADR-0002](adr/0002-thin-environment-ssh.md) |
 | 概念模型 | agent 定义、环境、workspace、会话 | [ADR-0003](adr/0003-concept-model.md) |
@@ -69,3 +70,4 @@
 
 ## 演进记录
 - 2026-10-16：创世初版，纳入 ADR-0001 至 ADR-0016。
+- 2026-10-17：纳入 ADR-0017，选定 Server 的 HTTP 框架。
