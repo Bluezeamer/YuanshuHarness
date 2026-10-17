@@ -1,6 +1,6 @@
 # Intent: 契约测试（第一批：本机可验证的 SDK 假设）
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 Lane: build
 Why: 依赖本身已由 ADR-0001 定下，不是新决策；但要验证的全是对第三方 SDK 真实行为的假设，命中"静默"信号，故为标准档加固。若实测推翻了某条 ADR，则停下升到决策档。
@@ -8,7 +8,7 @@ Why: 依赖本身已由 ADR-0001 定下，不是新决策；但要验证的全�
 ## Links
 来源: ROADMAP 第 2 条
 上游: [ROADMAP](../../../ROADMAP.md)、[ADR-0001](../../../genesis/adr/0001-pi-sdk-no-fork.md)、[ADR-0004](../../../genesis/adr/0004-state-storage-recovery.md)、[ADR-0005](../../../genesis/adr/0005-client-protocol.md)、[ADR-0008](../../../genesis/adr/0008-capability-sets.md)、[ADR-0009](../../../genesis/adr/0009-prompt-assembly-injection.md)、[ADR-0015](../../../genesis/adr/0015-model-management.md)
-下游: [spec.md](spec.md)
+下游: [spec.md](spec.md)、[review.md](review.md)、[PR #8](https://github.com/Bluezeamer/YuanshuHarness/pull/8)
 
 ## Problem
 主干（第 3 条起）要建在 pi SDK 的若干行为上，这些行为目前只是 ADR 里的"S0 需验证"。不先验证，错误会在主干成型后才暴露，且代价是返工。

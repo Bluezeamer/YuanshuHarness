@@ -1,6 +1,6 @@
 # Spec: 契约测试（第一批）
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 
 > delta：只写本次相对既有约定新增的内容。背景见各 ADR。
