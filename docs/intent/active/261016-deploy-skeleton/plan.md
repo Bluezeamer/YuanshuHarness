@@ -83,3 +83,7 @@ Date: 2026-10-17
 ## Deviations
 - 2026-10-17：步骤 0 实测后，本机 `docker run` 只能用 `--network host`。因此 spec R13 的「宿主机经映射端口访问」在本机与 CI 上都改为直连容器监听的端口；容器内监听 `0.0.0.0` 的检查仍用容器自己的非回环 IPv4。README 的 `docker run -p` 示例不进镜像冒烟的 host 模式路径，改为在冒烟里按等价参数核对。不触及 spec 的 Requirements 取值，只是验证手段的细节。
 - 2026-10-17：`HEALTHCHECK` 间隔与 plan 一致取 10 秒。
+- 2026-10-17（server 实现时）：spec Proof R3 要求在 `::`、`192.0.2.1` 上真实启动并看警告，这些地址在测试机上不一定能监听（192.0.2.1 不是本机地址，LXD 里 IPv6 也不一定开）。改为：回环判定的完整矩阵用纯函数 `isLoopbackHost` 逐项断言，真实监听只测 `0.0.0.0`（有 warn、仍启动）与 `127.0.0.1`（无 warn）。Requirements 不变。
+- 2026-10-17（server 实现时）：`cli.ts` 的 `execute` 与 `parseConfig` 多接受一个 `cwd` 参数，用来把相对数据目录转成绝对路径而不读 `process.cwd()`，保持纯函数。spec Design 里写的是 `parseConfig(argv, env, home)`，签名多一个参数，行为不变。
+- 2026-10-17（server 变异验证）：两条变异是等价变异，不是测试漏洞：① 静态托管先于 `/healthz` 注册——find-my-way 中静态路径永远优先于通配，与注册顺序无关；真正能遮蔽 `/healthz` 的 `wildcard: false` 已被抓住。② `forceCloseConnections: false`——Node 19 起 `http.Server.close()` 自己会关闭空闲连接，所以不能靠它区分；改为用「stop() 什么都不做」作变异，由「stop 之后连接被拒」的断言抓住。
+- 2026-10-17（server 变异验证）：变异验证暴露两处测试缺口并已补强：① R8 的用例原本创建一个就启动一个，共享模块级状态的实现照样通过，改为两个实例先都创建再启动，并核对各自的数据目录；② R7 的用例只量了时间，没断言「stop 之后不再接收连接」，已补。
