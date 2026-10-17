@@ -1,6 +1,6 @@
 # Intent: 主干（四）最小命令行客户端
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 Lane: build
 Why: 不新增协议、持久化形状或鉴权规则，只是 ADR-0021/0024/0026 的第一个真实消费者，出错时当场可见，revert 一个提交可恢复，所以不是决策档；命中"静默"（序号缺口、重连、乱序、依赖 Node 全局 WebSocket 的真实行为），按标准档加固。
