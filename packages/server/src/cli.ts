@@ -1,3 +1,4 @@
+import { CLIENT_COMMANDS, runClient } from "./client/command.js";
 import { parseConfig } from "./config.js";
 import { createServer } from "./server.js";
 
@@ -7,6 +8,7 @@ export interface Deps {
   cwd: string;
   stdout: { write(text: string): unknown };
   stderr: { write(text: string): unknown };
+  stdin?: NodeJS.ReadableStream;
   // 触发后停止服务并返回 0；真实进程里由 SIGTERM/SIGINT 触发。
   signal: AbortSignal;
   webRoot?: string;
@@ -30,6 +32,16 @@ const EXIT_USAGE = 2;
 
 // 返回退出码，不直接结束进程，便于在进程内测试。
 export async function execute(argv: string[], deps: Deps): Promise<number> {
+  const [first, ...rest] = argv;
+  if ((CLIENT_COMMANDS as readonly string[]).includes(first ?? "")) {
+    return runClient(first as string, rest, {
+      env: deps.env,
+      stdin: deps.stdin ?? process.stdin,
+      stdout: deps.stdout,
+      stderr: deps.stderr,
+      signal: deps.signal,
+    });
+  }
   const parsed = parseConfig(argv, deps.env, deps.home, deps.cwd);
 
   if (parsed.kind === "help") {

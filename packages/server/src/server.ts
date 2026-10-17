@@ -143,6 +143,12 @@ export function createServer(
       req.log.warn({ err }, "websocket 连接错误");
     },
   });
+  // 必须在根作用域同步注册，才排在 @fastify/websocket 默认 preClose 之前；
+  // 它的 client.close() 不带状态码，客户端会看到 1005 而不是 1001。
+  app.addHook("preClose", async function () {
+    for (const client of this.websocketServer?.clients ?? [])
+      client.close(1001, "server_shutdown");
+  });
   app.get("/healthz", async () => ({ status: "ok", version }));
   app.register(fastifyStatic, {
     root: webRoot,

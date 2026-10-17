@@ -57,6 +57,11 @@ echo "== 探测"
 check_health "$BASE" "$VERSION"
 check_placeholder_page "$BASE"
 
+echo "== yuanshu sessions"
+sessions_out="$("$WORK/app/node_modules/.bin/yuanshu" sessions --url "$BASE")" \
+  || die "yuanshu sessions 退出码非 0"
+[[ "$sessions_out" == "没有会话" ]] || die "空数据目录下 sessions 应打印「没有会话」，实际：$sessions_out"
+
 echo "== SIGTERM"
 kill -TERM "$SERVER_PID"
 wait_exit "$SERVER_PID" 5 || die "收到 SIGTERM 后 5 秒内没有退出"
