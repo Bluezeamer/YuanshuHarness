@@ -93,3 +93,20 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 9 项通过。定向 `pool.test.ts -t R16` 与 `sessions.test.ts -t 'R14|R16'` 均在收集阶段因沙箱禁止监听 `127.0.0.1` 报 `listen EPERM`，0 项执行；其余结论由源码、SDK 1.3.0 `_emit` 实现和 `/tmp/session-pool-r6-probe.mjs`、`/tmp/session-entry-r6-probe.mjs` 验证。
 
 本轮阻塞级：4 条。
+
+## 第 7 轮（2026-10-17）— 范围：0f27ff372b57ee0d437735822b8da3ba5f2d3ab5..2121c606048000ae780ad67b96c590efdb35edfd — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 阻塞 | `packages/server/src/session/events.ts:147`、`packages/server/src/session/events.ts:149` | 违反 R16：1 MiB 判断没有计入随后追加的 `truncated`。`/tmp/session-pool-r7-probe.mjs` 构造替换后恰为 1,048,576 bytes 的四个字符串，`sanitizeData` 返回的最终 data 为 1,048,593 bytes，未走 `omitted` 兜底；因此 UTF-8 判断虽已改对，最终线上 data 的字节上限仍不成立。 | |
+| 阻塞 | `packages/server/src/session/events.ts:139`、`packages/server/src/session/pool.ts:139`、`packages/server/src/session/pool.ts:150`、`packages/server/src/session/pool.ts:159` | 违反 R7/R16：`JSON.parse` 后没有验证状态字段类型，`apply` 又对 `text/toolCallId/toolName` 做 `String(...)` 或对 `queue` 强制断言。探针中函数/Symbol `toolCallId` 被线上事件丢弃，快照却出现 `"undefined"`；对象型 `toJSON` 返回值在线上是对象，快照变成 `"[object Object]"`；300 多字符的合法字符串 ID 在线上保持原值、快照只留 256 字符。`message.delta.text` 同理可在事件缺字段时向 partial 累积 `"undefined"`。第 6 轮“函数/Symbol 与事件/状态一致性”发现并未完全消失。 | |
+| 重要 | `packages/server/src/session/pool.ts:196`、`packages/server/src/session/pool.ts:200`、`packages/server/src/session/pool.ts:227` | 违反 R16 的快照整帧 1 MiB 目标：条数与 UTF-16 字符数虽有界，JSON 转义最多会把一个 code unit 扩为 6 bytes；最终 `limit === 0` 又无条件返回。探针用 200 个 256 字符的活动工具与 100 条 1024 字符的队列（均为需 `\u0000` 转义的字符），得到不含历史消息但仍为 1,232,690 bytes 的快照。循环会终止、内存也已有有限上界，但现有约 1 MiB 的整帧断言不成立。 | |
+| 重要 | `packages/server/src/session/events.ts:139`、`packages/server/src/session/events.ts:147` | `sanitizeData` 在判断上限前会完整遍历并生成 JSON 字符串，随后还要扫描 UTF-8 字节；1 MiB 兜底不限制处理过程的 CPU/峰值内存。Node 24 探针中，100 万/500 万个小整数分别同步阻塞约 95/455 ms，后者 RSS 短时增加约 151 MiB，零延迟定时器同量延后；成本近似线性，千万级输入约为秒级，继续放大可先造成长时间事件循环阻塞或 OOM，再得到 71-byte 兜底。未经前置宽度限制的工具参数/结果可触发。 | |
+| 建议 | `packages/server/src/session/pool.ts:121`、`packages/server/src/session/pool.ts:122`、`packages/server/src/session/pool.ts:141` | `emit` 先 `apply`、后递增 seq；若 `apply` 在部分写状态后抛错，SDK 外层 catch 只能阻止外抛，不能回滚状态。直接探针令 `message.ended.text` 的序列化结果在 `String` 转换时报错，确认 partial 已清空而 seq 与广播均未前进。当前 `mapEvent` 会把 `message.ended.text` 归一为字符串，尚未找到这个具体分支由正常 SDK 事件触发的路径；但它说明类型缺口扩大时会留下同 seq 的不同状态，宜让 apply 对已验证形状操作或原子提交。 | |
+| 重要 | `packages/server/src/session/events.test.ts:107`、`packages/server/src/session/events.test.ts:142`、`packages/server/src/session/events.test.ts:177`、`packages/server/src/session/pool.test.ts:401`、`packages/server/src/session/pool.test.ts:418` | 测试没有真正封住上述需求：容量用例未覆盖“判断后追加标记”的精确边界；快照只用无需转义的 ASCII；函数只在 `sanitizeData` 用例中出现且未经过状态累积，Symbol 未覆盖；`toJSON` 一致性只测返回字符串，未测返回对象；长 ID 用例只断言快照数量/字节，不比较事件与状态。因此 `events.test.ts` 14 项全过，仍可由探针复现前述问题。 | |
+
+第 6 轮复核：getter、Proxy、抛错 `toJSON`、循环引用均不会从 SDK 监听器外抛，后续事件仍可继续；BigInt 已转字符串并受截断，嵌套 `toJSON` 返回的长字符串也会经过 replacer 截断。`activeTools`/`queue` 的条数与字符数已有有限上界，快照收紧循环会终止；剩余的字节上限和事件/状态一致性缺口见上表。
+
+验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 14 项通过。`pool.test.ts -t R16` 与 `sessions.test.ts -t 'R14|R16'` 均因沙箱禁止监听 `127.0.0.1`（`listen EPERM`）在收集阶段失败，0 项执行；边界结论由 `/tmp/session-pool-r7-probe.mjs` 在 Node 24.13.1 下复现。
+
+本轮阻塞级：2 条。
