@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
@@ -58,11 +58,11 @@ function isInsideWebRoot(webRoot: string, pathName: string): boolean {
     const real = realpathSync(path.join(webRoot, pathName));
     if (!within(root, real)) return false;
     if (statSync(real).isDirectory()) {
-      const index = path.join(real, "index.html");
-      return !existsSync(index) || within(root, realpathSync(index));
+      return within(root, realpathSync(path.join(real, "index.html")));
     }
     return true;
   } catch (err) {
+    // 没有 index.html 的目录同样落在这里的 ENOENT：放行，由静态托管返回 404。
     const code = (err as NodeJS.ErrnoException).code;
     return code === "ENOENT" || code === "ENOTDIR";
   }

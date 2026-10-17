@@ -1,5 +1,13 @@
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -201,27 +209,59 @@ describe("静态托管（R6）", () => {
 
   // 请求路径本身在根内，库随后才拼上 index.html 去读：index.html 是指向目录外的链接时也必须拒绝。
   test.each([
-    ["子目录", "/idx/", "idx"],
-    ["子目录（不带斜杠）", "/idx", "idx"],
-    ["根目录", "/", ""],
-  ])("%s 的 index.html 是指向目录外的链接时得到 4xx", async (_n, p, dir) => {
-    const dirPath = path.join(webRoot, dir);
-    await mkdir(dirPath, { recursive: true });
-    await rm(path.join(dirPath, "index.html"), { force: true });
+    ["子目录", "/idx/"],
+    ["子目录（不带斜杠）", "/idx"],
+  ])("%s 的 index.html 是指向目录外的链接时得到 4xx", async (_n, p) => {
+    await mkdir(path.join(webRoot, "idx"));
     await symlink(
       path.join(base, "secret.txt"),
-      path.join(dirPath, "index.html"),
+      path.join(webRoot, "idx", "index.html"),
     );
-    const { addr } = await launch().catch(() => ({ addr: undefined }));
-    // 根目录的 index.html 若是外链，assertWebRoot 应当在启动时就拒绝。
-    if (dir === "") {
-      expect(addr).toBeUndefined();
-      return;
-    }
-    const res = await rawGet(addr?.port ?? 0, p);
+    const { addr } = await launch();
+    const res = await rawGet(addr.port, p);
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.status).toBeLessThan(500);
     expect(res.body).not.toContain("TOP-SECRET");
+  });
+
+  test("根目录的 index.html 是指向目录外的链接时启动失败，并说明原因", async () => {
+    await rm(path.join(webRoot, "index.html"));
+    await symlink(
+      path.join(base, "secret.txt"),
+      path.join(webRoot, "index.html"),
+    );
+    const server = createServer(cfg(), {
+      webRoot,
+      logStream: memoryLog().stream,
+    });
+    await expect(server.start()).rejects.toThrow("指向 web 目录之外");
+  });
+
+  test("子目录没有搜索权限时得到 4xx，响应不含服务器路径", async () => {
+    if (process.getuid?.() === 0) throw new Error("权限类测试不能以 root 运行");
+    await mkdir(path.join(webRoot, "priv"));
+    await writeFile(path.join(webRoot, "priv", "index.html"), "P");
+    await chmod(path.join(webRoot, "priv"), 0o000);
+    try {
+      const { addr } = await launch();
+      const res = await rawGet(addr.port, "/priv/");
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+      expect(res.body).not.toContain(base);
+    } finally {
+      await chmod(path.join(webRoot, "priv"), 0o755);
+    }
+  });
+
+  // 不存在的路径必须得到 404，而不是守卫里抛出的 500。注意 allowedPath 拒绝时库也是回 404（callNotFound），所以这里区分不了「放行后 404」与「被拒后 404」，只能防止 500。
+  test.each([
+    ["不存在的文件", "/nope.txt"],
+    ["不存在的目录下的文件", "/nope/x.txt"],
+    ["把文件当目录", "/index.html/foo"],
+    ["没有 index.html 的目录", "/sub/"],
+  ])("%s 得到 404（不是 500）", async (_n, p) => {
+    const { addr } = await launch();
+    expect((await rawGet(addr.port, p)).status).toBe(404);
   });
 
   test("符号链接环得到 4xx，响应不含服务器路径", async () => {
