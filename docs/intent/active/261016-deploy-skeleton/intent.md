@@ -8,7 +8,7 @@ Why: 要选 Web 框架（新的外部依赖），要定下健康端点与启动�
 ## Links
 来源: ROADMAP 第 1 条
 上游: ../../../ROADMAP.md、../../../genesis/adr/0012-delivery-form.md、../../../genesis/adr/0013-tech-stack.md、../../../genesis/adr/0014-hosting-and-ci.md
-下游: 定稿后回填
+下游: [spec.md](spec.md)、plan.md、PR（实现后回填）
 
 ## Problem
 骨架只有占位模块和检查护栏，没有任何可运行的 Server，也没有交付物。ROADMAP 第 2 条起的所有能力既没有可挂载的进程，也没有"装得上、起得来"的交付路径。
@@ -62,10 +62,13 @@ Why: 要选 Web 框架（新的外部依赖），要定下健康端点与启动�
    - 镜像构建方式：多阶段，复用同一份构建产出。
    - **决定：见 [ADR-0019](../../../genesis/adr/0019-release-artifacts.md)。命令 `yuanshu serve`；只发布 server 一个 npm 包；多阶段构建，镜像里装的就是该 npm 包。与上面建议不同的一处：基础镜像选 `node:24-slim`，不是 `node:22-slim`。（2026-10-17，bluezeamer 确认并定稿）**
 4. **数据目录的结构版本号推到第 3 条**（难逆；记录在本 intent，不单独出 ADR）。建议：本 intent 的 Server 只校验数据目录存在且可写，不写任何版本标记。[ADR-0012](../../../genesis/adr/0012-delivery-form.md) 的"影响"一节要求数据目录带版本号，但现在没有数据，设计出来的版本格式无法被验证。
+   - **决定：按建议，记录在 [ADR-0018](../../../genesis/adr/0018-startup-params-and-health-endpoint.md)，本变更不在数据目录留下任何文件（spec R4）。（2026-10-17，bluezeamer 随 G1 确认）**
 5. **传输层（WebSocket 或 SSE）推到第 3 条**（难逆；记录在本 intent）。[ADR-0013](../../../genesis/adr/0013-tech-stack.md) 说留给骨架 intent，本条明确改为留给第 3 条，因为选择取决于 [ADR-0005](../../../genesis/adr/0005-client-protocol.md) 事件流的具体形态（双向与否、重连方式）。第 1 条的框架选型要保证两种都支持。
+   - **决定：按建议，传输层留给第 3 条，已记录在 [ADR-0017](../../../genesis/adr/0017-server-web-framework.md)。（2026-10-17，bluezeamer 随 G1 确认）**
 6. **CI 里是否构建镜像**（易逆，推迟到 spec）。倾向每个 PR 都构建并起容器做健康探测；托管 runner 自带 Docker。
+   - **决定：每个 PR 与主干推送都构建镜像并起容器验证，缺 Docker 则失败，见 [spec](spec.md) R15、R16。（2026-10-17，bluezeamer 随 G3 确认）**
 
 ## Open questions
-- Fastify 当前主版本与 Node 22.19 的兼容、锁定版本：spec 阶段核实。
-- 镜像里 `HEALTHCHECK` 用什么探测（镜像内不一定有 curl）：spec 阶段核实。
+- Fastify 当前主版本与 Node 22.19 的兼容、锁定版本：→ 以实现时的真实安装为准，实际版本记入 plan（见 spec Risks）。
+- 镜像里 `HEALTHCHECK` 用什么探测（镜像内不一定有 curl）：→ 已在 spec R12 确定：用镜像里已有的 Node 探测。
 - 用 `pnpm deploy` 还是复制构建产出来生成 npm 包的内容，才能保证"装到干净目录能跑"：plan 阶段用实验定。
