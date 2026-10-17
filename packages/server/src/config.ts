@@ -66,7 +66,9 @@ function resolve<T>(
     const converted = convert(value);
     if (converted === undefined) {
       return {
-        error: secret ? `${name} ${rule}` : `${name} ${rule}（实际为「${value}」）`,
+        error: secret
+          ? `${name} ${rule}`
+          : `${name} ${rule}（实际为「${value}」）`,
       };
     }
     chosen ??= converted;
