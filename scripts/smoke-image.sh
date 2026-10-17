@@ -73,6 +73,15 @@ tar -tzf "$TARBALL" | sed 's|^package/||' | LC_ALL=C sort > "$WORK/tarball.txt"
 diff -u "$WORK/tarball.txt" "$WORK/installed.txt" > "$WORK/diff.txt" \
   || die "镜像里安装的文件与 tarball 清单不一致：$(cat "$WORK/diff.txt")"
 
+# 令牌只经环境变量传入容器，不出现在命令行（README 示例同样如此）。
+YUANSHU_TOKEN="smoke-$(node -p 'require("node:crypto").randomBytes(24).toString("hex")')"
+export YUANSHU_TOKEN
+
+echo "== 无令牌：容器监听 0.0.0.0 时必须启动失败并指明需要令牌"
+out="$(docker run --rm "${RUN_OPTS[@]}" -e "YUANSHU_PORT=$(free_port)" "$IMAGE" 2>&1)" && rc=0 || rc=$?
+((rc != 0)) || die "未提供 YUANSHU_TOKEN 时容器应当启动失败，实际退出码 0"
+[[ "$out" == *"YUANSHU_TOKEN"* ]] || die "报错里应当指明需要 YUANSHU_TOKEN：$out"
+
 echo "== 运行 README 里的 docker run 示例（命名卷）"
 # 从 README 取出示例命令原样执行，只做三处必要的替换：镜像名、容器名/卷名（带本次后缀以便清理）、
 # 以及把 -p 端口映射换成 host 网络（本环境 bridge 不可用，见文件头）。示例写坏了，这里就会失败。
@@ -83,6 +92,7 @@ README_CMD="$(awk '/<!-- smoke:docker-run -->/{f=1;next} f&&/^```bash/{g=1;next}
 [[ "$README_CMD" == docker\ run\ * ]] || die "README 里没有找到 <!-- smoke:docker-run --> 标记的 docker run 示例"
 [[ "$README_CMD" == *" -p 7420:7420 "* ]] || die "README 示例里应当有 -p 7420:7420"
 [[ "$README_CMD" == *" --name yuanshu "* ]] || die "README 示例里应当有 --name yuanshu"
+[[ "$README_CMD" == *" -e YUANSHU_TOKEN "* || "$README_CMD" == *' -e YUANSHU_TOKEN="$YUANSHU_TOKEN" '* ]] || die "README 示例里应当传入 YUANSHU_TOKEN"
 [[ "$README_CMD" == *" -v yuanshu-data:/data "* ]] || die "README 示例里应当有 -v yuanshu-data:/data"
 [[ "$README_CMD" == *" yuanshu" ]] || die "README 示例应当以镜像名 yuanshu 结尾"
 CMD="${README_CMD//-p 7420:7420/--network host -e YUANSHU_PORT=$PORT}"
@@ -94,6 +104,17 @@ wait_health "$APP" healthy 30 || { docker logs "$APP" >&2 || true; die "30 秒�
 BASE="http://127.0.0.1:$PORT"
 check_health "$BASE" "$VERSION"
 check_placeholder_page "$BASE"
+
+echo "== /healthz 与静态页免认证，/api/v1 要求令牌"
+api_status() { # api_status [令牌]
+  node -e '
+const h = process.argv[2] ? { authorization: `Bearer ${process.argv[2]}` } : {};
+fetch(process.argv[1] + "/api/v1/sessions", { headers: h, signal: AbortSignal.timeout(3000) })
+  .then((r) => console.log(r.status), () => process.exit(1));
+' "$BASE" "${1:-}"
+}
+[[ "$(api_status)" == 401 ]] || die "无令牌访问 /api/v1/sessions 应为 401"
+[[ "$(api_status "$YUANSHU_TOKEN")" == 200 ]] || die "带正确令牌访问 /api/v1/sessions 应为 200"
 
 echo "== 容器监听的是 0.0.0.0（经容器自己的非回环地址访问）"
 docker exec "$APP" node -e '
@@ -124,7 +145,7 @@ echo "== 不可写的挂载目录：启动必须失败并说明原因"
 RO="$WORK/ro-data"
 mkdir "$RO"
 chmod 0555 "$RO"
-out="$(docker run --rm "${RUN_OPTS[@]}" -e "YUANSHU_PORT=$(free_port)" -v "$RO:/data" "$IMAGE" 2>&1)" && rc=0 || rc=$?
+out="$(docker run --rm "${RUN_OPTS[@]}" -e "YUANSHU_PORT=$(free_port)" -e YUANSHU_TOKEN -v "$RO:/data" "$IMAGE" 2>&1)" && rc=0 || rc=$?
 ((rc != 0)) || die "挂载不可写目录时容器应当启动失败，实际退出码 0"
 [[ "$out" == *"/data"* ]] || die "报错里应当指出 /data：$out"
 

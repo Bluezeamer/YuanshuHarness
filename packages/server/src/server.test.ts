@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   chmod,
   mkdir,
@@ -78,6 +78,7 @@ function cfg(over: Partial<Config> = {}): Config {
     host: "127.0.0.1",
     port: 0,
     dataDir: path.join(base, "data"),
+    allowCidrs: [],
     ...over,
   };
 }
@@ -339,18 +340,29 @@ describe("isLoopbackHost（R3）", () => {
   });
 });
 
-describe("非回环警告（R3）", () => {
-  test("监听 0.0.0.0 时输出 warn 且仍启动成功", async () => {
-    const { log, url } = await launch(cfg({ host: "0.0.0.0" }));
-    const warns = log.records().filter((r) => r.level === 40);
-    expect(warns.length).toBeGreaterThan(0);
-    expect(warns.some((r) => r.msg?.includes("认证"))).toBe(true);
+describe("非回环需要令牌", () => {
+  const TOKEN = "t".repeat(40);
+
+  test.each(["0.0.0.0", "::", "::ffff:127.0.0.1", "example.com"])(
+    "监听 %s 且无令牌拒绝启动，且不创建数据目录",
+    async (host) => {
+      await expect(launch(cfg({ host }))).rejects.toThrow(/YUANSHU_TOKEN/);
+      expect(existsSync(path.join(base, "data"))).toBe(false);
+    },
+  );
+
+  test("监听 0.0.0.0 且有令牌时启动成功，日志不含令牌", async () => {
+    const { log, url } = await launch(cfg({ host: "0.0.0.0", token: TOKEN }));
+    const text = JSON.stringify(log.records());
+    expect(text).toContain("认证已启用");
+    expect(text).not.toContain(TOKEN);
     expect((await fetch(`${url}/healthz`)).status).toBe(200);
   });
 
-  test("监听回环地址时没有 warn 及以上的日志", async () => {
+  test("监听回环地址无令牌：放行，日志注明未启用，没有 warn", async () => {
     const { log } = await launch(cfg({ host: "127.0.0.1" }));
     expect(log.records().filter((r) => r.level >= 40)).toEqual([]);
+    expect(JSON.stringify(log.records())).toContain("认证未启用");
   });
 });
 

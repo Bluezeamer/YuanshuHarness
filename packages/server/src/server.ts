@@ -11,6 +11,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
+import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
@@ -25,6 +26,8 @@ export interface ServerOptions {
   logStream?: { write(msg: string): void };
   // 未提供时会话创建返回 501（真实模型接入在后续能力里）。
   sessionFactory?: SessionFactory;
+  // 仅供测试注入限流的时钟与数值。
+  authLimiter?: Partial<RateLimitOptions>;
   // 仅供测试缩短心跳与背压阈值。
   tuning?: Partial<
     Pick<
@@ -46,6 +49,8 @@ export interface YuanshuServer {
   start(): Promise<Address>;
   stop(): Promise<void>;
 }
+
+const WS_PROTOCOL = "yuanshu.v1";
 
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -127,7 +132,12 @@ export function createServer(
 
   let db: Db | null = null;
   app.register(fastifyWebsocket, {
-    options: { maxPayload: DEFAULTS.maxPayloadBytes },
+    options: {
+      maxPayload: DEFAULTS.maxPayloadBytes,
+      // ws 默认回显客户端的第一个子协议，会把 bearer.<令牌> 原样写回响应头，所以只选 yuanshu.v1。
+      handleProtocols: (protocols) =>
+        protocols.has(WS_PROTOCOL) ? WS_PROTOCOL : false,
+    },
     errorHandler: (err, _socket, req) => {
       // ws 对超限、协议错误会自行发关闭帧（如 1009），这里只记录，不再强杀。
       req.log.warn({ err }, "websocket 连接错误");
@@ -146,6 +156,12 @@ export function createServer(
 
   return {
     async start() {
+      // 先于任何副作用：非回环监听必须有令牌。错误信息不含令牌值。
+      if (!isLoopbackHost(config.host) && config.token === undefined) {
+        throw new Error(
+          `监听在非回环地址 ${config.host} 必须配置访问令牌：请使用 --token 或环境变量 YUANSHU_TOKEN`,
+        );
+      }
       // 顺序固定：前端缺失时不创建数据目录，数据目录不可用时不监听。
       await assertWebRoot(webRoot);
       await prepareDataDir(config.dataDir);
@@ -162,17 +178,28 @@ export function createServer(
           store,
           sessionDir,
         });
-        app.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
+        const { hook } = createAuthHook({
+          ...(config.token === undefined ? {} : { token: config.token }),
+          allowCidrs: config.allowCidrs,
+          ...(options.authLimiter ? { limiter: options.authLimiter } : {}),
+        });
+        // 认证只包住 /api/v1；/healthz 与静态资源在作用域之外。
+        app.register(async (scope) => {
+          scope.addHook("onRequest", hook);
+          scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
+        });
       } catch (err) {
         db.close();
         db = null;
         throw err;
       }
-      if (!isLoopbackHost(config.host)) {
-        app.log.warn(
-          `监听在非回环地址 ${config.host}，认证尚未生效，能访问该地址的人都可以访问本服务`,
-        );
-      }
+      app.log.info(
+        config.token === undefined && config.allowCidrs.length === 0
+          ? "认证未启用（仅回环监听）"
+          : config.token === undefined
+            ? `认证未启用令牌（仅回环监听），来源网段 ${config.allowCidrs.length} 条`
+            : `认证已启用，来源网段 ${config.allowCidrs.length} 条`,
+      );
       try {
         await app.listen({ host: config.host, port: config.port });
       } catch (err) {

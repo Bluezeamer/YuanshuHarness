@@ -45,9 +45,28 @@ afterEach(async () => {
   await rm(base, { recursive: true, force: true });
 });
 
+// R13：设 YUANSHU_TEST_TOKEN 时整组用例带令牌重跑，行为必须与回环无令牌一致。
+const TOKEN = process.env.YUANSHU_TEST_TOKEN;
+const authInit = (init: RequestInit = {}): RequestInit =>
+  TOKEN
+    ? {
+        ...init,
+        headers: {
+          ...(init.headers as Record<string, string>),
+          authorization: `Bearer ${TOKEN}`,
+        },
+      }
+    : init;
+
 async function launch(withFactory = true) {
   const server = createServer(
-    { host: "127.0.0.1", port: 0, dataDir },
+    {
+      host: "127.0.0.1",
+      port: 0,
+      dataDir,
+      allowCidrs: [],
+      ...(TOKEN ? { token: TOKEN } : {}),
+    },
     {
       webRoot,
       ...(withFactory ? { sessionFactory: stubSessionFactory(stub) } : {}),
@@ -68,7 +87,7 @@ async function launch(withFactory = true) {
 type Srv = Awaited<ReturnType<typeof launch>>;
 
 const api = (s: Srv, p: string, init?: RequestInit) =>
-  fetch(`${s.http}/api/v1/sessions${p}`, init);
+  fetch(`${s.http}/api/v1/sessions${p}`, authInit(init));
 const json = (body: unknown): RequestInit => ({
   method: "PATCH",
   headers: { "content-type": "application/json" },
@@ -79,7 +98,10 @@ async function chat(s: Srv, text: string, id?: string): Promise<string> {
     id ??
     ((await (await api(s, "", { method: "POST" })).json()) as { id: string })
       .id;
-  const c = await TestClient.connect(`${s.ws}/api/v1/sessions/${sid}/stream`);
+  const c = await TestClient.connect(
+    `${s.ws}/api/v1/sessions/${sid}/stream`,
+    TOKEN ? { token: TOKEN } : {},
+  );
   clients.push(c);
   const before = c.types().filter((t) => t === "run.ended").length;
   await c.command("send_message", { text });
@@ -105,14 +127,17 @@ describe("R4 / 启动与锁", () => {
     expect((await api(b, "", { method: "POST" })).status).toBe(501);
     const hist = await api(b, `/${id}/messages`);
     expect(hist.status).toBe(200);
-    const stream = await fetch(`${b.http}/api/v1/sessions/${id}/stream`);
+    const stream = await fetch(
+      `${b.http}/api/v1/sessions/${id}/stream`,
+      authInit(),
+    );
     expect(stream.status).toBe(500);
   });
 
   test("R3 同一数据目录的第二个 Server 启动失败，不影响第一个；停止后可再启动", async () => {
     const a = await launch();
     const second = createServer(
-      { host: "127.0.0.1", port: 0, dataDir },
+      { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
       { webRoot },
     );
     await expect(second.start()).rejects.toThrow(/数据库|另一个/);
@@ -128,7 +153,7 @@ describe("R4 / 启动与锁", () => {
     db.pragma("user_version = 99");
     db.close();
     const s = createServer(
-      { host: "127.0.0.1", port: 0, dataDir },
+      { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
       { webRoot },
     );
     await expect(s.start()).rejects.toThrow(/99/);
@@ -149,7 +174,10 @@ describe("重启恢复（端到端）", () => {
       sessions: Array<{ id: string; running: boolean }>;
     };
     expect(list.sessions.map((s) => s.id)).toContain(id);
-    const c = await TestClient.connect(`${b.ws}/api/v1/sessions/${id}/stream`);
+    const c = await TestClient.connect(
+      `${b.ws}/api/v1/sessions/${id}/stream`,
+      TOKEN ? { token: TOKEN } : {},
+    );
     clients.push(c);
     await waitFor(() => c.frames.length > 0, "snapshot");
     expect(c.frames[0]?.type).toBe("snapshot");
@@ -193,11 +221,15 @@ describe("重启恢复（端到端）", () => {
       "garbage\n",
     );
     const b = await launch();
-    const res = await fetch(`${b.http}/api/v1/sessions/${bad}/stream`);
+    const res = await fetch(
+      `${b.http}/api/v1/sessions/${bad}/stream`,
+      authInit(),
+    );
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "session_load_failed" });
     const c = await TestClient.connect(
       `${b.ws}/api/v1/sessions/${good}/stream`,
+      TOKEN ? { token: TOKEN } : {},
     );
     clients.push(c);
     await waitFor(() => c.frames.length > 0, "snapshot");
@@ -253,7 +285,10 @@ describe("R13-R17 REST", () => {
   test("DELETE：运行中 409；空闲 204，连接以 1001 关闭，之后 404；未加载的会话也能删", async () => {
     const a = await launch();
     const id = await chat(a, "x");
-    const c = await TestClient.connect(`${a.ws}/api/v1/sessions/${id}/stream`);
+    const c = await TestClient.connect(
+      `${a.ws}/api/v1/sessions/${id}/stream`,
+      TOKEN ? { token: TOKEN } : {},
+    );
     clients.push(c);
     await waitFor(() => c.frames.length > 0, "snapshot");
     stub.mode.delayMs = 1500;
