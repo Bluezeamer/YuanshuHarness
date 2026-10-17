@@ -1,6 +1,6 @@
 # Spec: 访问认证（令牌、来源网段、限流）
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 
 > 写成 delta：参数名、携带方式、拒绝码、启动检查已在 [ADR-0026](../../../genesis/adr/0026-access-token-and-source-network.md)，此处只链接，补的是 ADR 留给 spec 的细节（限流数值、回环判定、实现边界）。
