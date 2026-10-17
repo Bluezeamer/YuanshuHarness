@@ -49,3 +49,16 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 本轮阻塞级：2 条。
 
 复核补充：硬背压现已在 `send()` 前按 `bufferedAmount + frame bytes` 拒绝写入，`images` 上限为 20；正常及已知错误命令路径各调用一次 `ack`，未发现重复发送。当前 `handle()` 会吸收已知异常，单个已执行任务由 `finally` 回减一次，未确认减两次或常规异常导致 chain 拒绝的路径。类型检查通过；`events.test.ts` 6 项通过，`sessions.test.ts` 与 `pool.test.ts` 因沙箱禁止监听 `127.0.0.1`（`listen EPERM`）无法运行其网络用例，关闭时序改用 `injectWS` 探针验证。
+
+## 第 4 轮（2026-10-17）— 范围：ee9a04c7d398d363441ac457fdd100aba69d82c8..7b5bb46ffdce75b14aab6cc89d7621a935a9c23f；兼顾 06c93dbf85a10dd5941194559f85fc82929377fa..7b5bb46ffdce75b14aab6cc89d7621a935a9c23f — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 重要 | `packages/server/src/api/sessions.ts:174`、`packages/server/src/api/sessions.ts:189` | 超限或背压调用 `socket.close()` 后，连接先进入 `CLOSING`，但队列只在最终 `close` 事件中清空；`drain()` 与 `message` 监听器没有检查连接状态。用 `injectWS` 暂停客户端读取，先排入一个等待中的 `stop` 和一个 `send_message`，再触发入站超限；服务端已是 `CLOSING`，释放 `stop` 后，排队消息仍调用 `SessionEntry.send()`，其 ack 无法写回。超限分支及后续关闭握手期间收到的消息还会增加 `pending`，却未入队、也没有对应扣减，直到最终 `close` 才归零。该路径会产生无 ack 的命令副作用，pending 也暂时不再代表待处理字节。 | 已修：drain 与 message 监听器都先检查连接是否 OPEN，非 OPEN 即丢弃队列并归零 pending。未单独加用例（需暂停读取的内存连接才能稳定复现），由评审探针与现有关闭用例覆盖，如实记录 |
+
+
+复核：第 3 轮首帧失败路径现先安装 `close` 监听器再订阅，首帧写入异常被捕获；关闭处理执行 `unsubscribe()` 和 `sockets.delete()`，连续大快照连接后订阅及 WebSocket 客户端集合归零。强制终止定时器在 `close` 监听器中清除，未发现新的计时器残留路径。显式 drain 的 `draining` 门闩避免并发 drain，出队命令在 `finally` 中只回减一次 pending；但上述 CLOSING 竞态未被覆盖。
+
+验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 6 项通过。`pool.test.ts` 与监听端口的 API 集成测试受沙箱限制，报 `listen EPERM`；`injectWS` 内存连接探针复现了表中竞态。检查范围包括最近提交相对第 3 轮的增量和指定全量基线差异。
+
+本轮阻塞级：0 条。

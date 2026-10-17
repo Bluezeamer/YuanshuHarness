@@ -176,6 +176,11 @@ export async function sessionsApi(
       draining = true;
       try {
         for (let m = queue.shift(); m; m = queue.shift()) {
+          if (socket.readyState !== OPEN) {
+            queue.length = 0;
+            pending = 0;
+            break;
+          }
           try {
             await handle(m.raw, m.isBinary);
           } finally {
@@ -187,6 +192,7 @@ export async function sessionsApi(
       }
     }
     socket.on("message", (raw: RawData, isBinary: boolean) => {
+      if (socket.readyState !== OPEN) return;
       const size = rawSize(raw);
       pending += size;
       if (pending > opts.maxPendingBytes) {
