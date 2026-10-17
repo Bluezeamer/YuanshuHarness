@@ -33,7 +33,7 @@
 | 传输层 | 每会话一条 WebSocket，REST 管会话的创建与查询 | [ADR-0020](adr/0020-transport-websocket.md) |
 | 会话线上协议 | `/api/v1` 路径版本化；Server 自定义薄事件类型；UUIDv7 会话标识；`send_message`/`stop`/`resync` 命令，缺口靠 `resync` 重发快照 | [ADR-0021](adr/0021-session-wire-protocol.md) |
 | SQLite 驱动 | `better-sqlite3`，精确锁定版本，预编译随包携带 | [ADR-0022](adr/0022-sqlite-driver.md) |
-| 数据目录布局与版本 | `yuanshu.db` 加 `sessions/<id>.jsonl`；`PRAGMA user_version`，高于代码版本拒绝启动，迁移前备份；JSONL 为准，索引可重建 | [ADR-0023](adr/0023-data-dir-layout-and-versioning.md) |
+| 数据目录布局与版本 | `yuanshu.db` 加 `sessions/<id>.jsonl`；`PRAGMA user_version`，高于代码版本拒绝启动，迁移前备份；JSONL 为准，索引可重建 | [ADR-0025](adr/0025-data-dir-layout-and-versioning-revised.md) |
 | 会话管理 REST | 改名、删除（运行中拒绝）、游标分页历史、单条全文 | [ADR-0024](adr/0024-session-rest-and-history.md) |
 | 权限 | 三档，规则共用，模型审批，Codex 为蓝本 | [ADR-0006](adr/0006-permission-tiers.md) |
 | 凭据 | 占位符引用，Server 持有并替换 | [ADR-0007](adr/0007-private-variables.md) |
