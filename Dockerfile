@@ -21,7 +21,6 @@ RUN npm install -g --omit=dev --no-audit --no-fund /tmp/*.tgz \
  && mkdir /data \
  && chown node:node /data
 ENV YUANSHU_HOST=0.0.0.0 YUANSHU_DATA_DIR=/data
-USER node
 EXPOSE 7420
 # 镜像里没有 curl 与 wget，用现成的 node 探测；端口取自 YUANSHU_PORT。
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
