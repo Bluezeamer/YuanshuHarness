@@ -15,10 +15,10 @@ Date: 2026-10-17
 
 R1. Server 包必须以精确版本依赖 `@earendil-works/pi-coding-agent`（无 `^`、`~`、范围）；`pnpm-lock.yaml` 与之一致。
 R2. 压缩（compaction）完成后，Server 追加到系统提示词末尾的内容必须出现在随后发往模型的请求里，且只出现一次。以 provider 实际收到的请求体为准，不以 SDK 内部状态为准。
-R3. 必须记录 `supportsMidConvoSystemMessages` 与 `supportsMidConvoToolChanges` 在配置为真、为假时的实际行为：会话中途追加的系统消息、变更的工具集是否出现在下一次请求中。
+R3. 必须记录 `supportsMidConvoSystemMessages` 与工具类标志在配置为真、为假时的实际行为：会话中途追加的系统消息、新增与移除的工具是否出现在下一次请求中。第一批只覆盖 openai-completions（标志名为 `supportsMidConvoToolAdditions`）；anthropic-messages 的 `supportsMidConvoToolChanges` 需要另一套 stub，留待接入该协议时再验证。
 R4. 必须能用 SDK 公开接口，从既有 JSONL 重建会话，重建后的 `messages` 与原会话一致，并能继续对话。
 R5. 指定 cwd 与 AGENTS.md 时，同一份 AGENTS.md 内容在请求中必须只出现一次；Server 不得读取 `~/.pi` 下的任何文件（含 AGENTS.md、模型与设置）。
-R6. 单槽位界面（confirm/select/input）必须能被 Server 层接管：一次请求可分发给多个接收方，先答先赢、其余收到取消；无人回答时按超时返回默认值。
+R6. 单槽位界面（confirm/select/input）必须能被 Server 层接管：SDK 把三类对话框原样委托给 Server 提供的 `uiContext`，`timeout`、`signal` 选项透传，答案回到扩展。先答先赢与超时默认值属于 Server 层的实现，留给 ROADMAP 第 3 条；本需求同时记录 SDK 自身不强制 `timeout` 这一事实。
 R7. 必须能指定模型配置所在目录，不落到默认的 `~/.pi`；API key 必须能由 Server 在运行时提供（不是文件里的明文），请求中使用的是运行时提供的值。
 R8. 必须列出 SDK 实际扫描的 skill 目录集合；在临时目录布置 skill，断言"扫描目录内被发现、扫描目录外不被发现"。
 R9. 任何测试不得读写真实的 `~/.pi`（用临时目录与显式路径隔离）；端点与密钥只经环境变量传入，不得出现在入库文件与测试输出里。
@@ -32,10 +32,10 @@ R10. 契约用例必须全部能对着本地 stub provider（OpenAI 兼容、返
 | R3 | stub：四种组合的请求体断言，结果记入 review.md | 变异：翻转期望值，必须变红 |
 | R4 | `session-load.test.ts`：先写后载，比对 messages | 变异：截断 JSONL 一行，必须变红 |
 | R5 | `agents-md.test.ts`：捕获构造的系统提示词；并断言 stub 收到的请求体 | 变异：同时开启 SDK 自带读取与手动注入，必须变红（出现两次） |
-| R6 | `ui-dispatch.test.ts`：两个接收方抢答、超时、取消 | 变异：去掉"先答先赢"，必须变红 |
+| R6 | `ui-dispatch.test.ts`：三类对话框的委托与选项透传；超时不被 SDK 强制 | 变异：让 uiContext 对 confirm 返回相反答案，答案用例必须变红 |
 | R7 | `model-config.test.ts`：临时配置目录 + 运行时 key | 变异：把 key 写成明文并让用例要求"文件内无 key"，必须变红 |
 | R8 | `skills-dirs.test.ts` | 变异：把 skill 放到扫描目录外，断言"发现"必须变红 |
-| R9 | `isolation.test.ts`：断言测试前后真实 `~/.pi` 的 mtime 不变；输出 grep 端点地址 | 变异：让一个用例读默认目录，必须变红 |
+| R9 | `isolation.test.ts`：HOME 与 SDK 默认配置目录指向临时目录；每个测试文件首条 import 是隔离模块；源码不含内网 IP 与密钥形态 | 变异：去掉某文件的隔离 import，必须变红 |
 | R10 | `scripts/check.sh` 日志含契约用例；`contract-live.sh` 无环境变量时退出码非零；live 冒烟对 Qwen 端点手动跑一次 | 是（脚本不存在） |
 
 ## Design

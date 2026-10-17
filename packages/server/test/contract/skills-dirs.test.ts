@@ -40,14 +40,18 @@ test("R8 扫描目录内被发现：<agentDir>/skills、<cwd>/.pi/skills、<cwd>
   skill(join(env.cwd, ".agents", "skills"), "in-cwd-agents");
   skill(join(fakeHome, ".agents", "skills"), "in-home-agents");
   const names = await discovered(env);
-  expect(names).toEqual(
-    expect.arrayContaining([
-      "in-agent-dir",
-      "in-cwd-agents",
-      "in-cwd-pi",
-      "in-home-agents",
-    ]),
-  );
+  expect(names).toEqual([
+    "in-agent-dir",
+    "in-cwd-agents",
+    "in-cwd-pi",
+    "in-home-agents",
+  ]);
+});
+
+test("R8 .agents/skills 向祖先目录上溯（记录现状）", async () => {
+  const env = makeEnv();
+  skill(join(env.root, ".agents", "skills"), "in-ancestor-agents");
+  expect(await discovered(env)).toContain("in-ancestor-agents");
 });
 
 test("R8 扫描目录外不被发现", async () => {

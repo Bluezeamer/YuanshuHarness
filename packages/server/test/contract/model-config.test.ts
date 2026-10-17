@@ -22,7 +22,10 @@ function allFileText(dir: string): string {
 test("R7 运行时提供 key：models.json 不含 apiKey，请求用的是运行时提供的值，磁盘上不落明文", async () => {
   stub.requests.length = 0;
   const env = makeEnv();
-  writeModels(env, stub.url, {}, undefined as never);
+  writeModels(env, stub.url, {}, null);
+  expect(readFileSync(join(env.agentDir, "models.json"), "utf8")).not.toContain(
+    "apiKey",
+  );
   const { session, modelRuntime } = await openSession(env);
   await modelRuntime.setRuntimeApiKey("stub", "runtime-secret-123");
   await session.prompt("hi");

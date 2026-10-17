@@ -26,7 +26,7 @@ type Body = {
 
 async function run(
   compat: Record<string, boolean>,
-  change: "append" | "tools",
+  change: "append" | "tools" | "untools",
 ) {
   stub.requests.length = 0;
   const env = makeEnv();
@@ -45,13 +45,13 @@ async function run(
     },
   });
   await session.bindExtensions({});
-  session.setActiveToolsByName(["t1"]);
+  session.setActiveToolsByName(change === "untools" ? ["t1", "t2"] : ["t1"]);
   await session.prompt("one");
   if (change === "append") {
     mark = MARK;
     await session.reload();
   } else {
-    session.setActiveToolsByName(["t1", "t2"]);
+    session.setActiveToolsByName(change === "untools" ? ["t1"] : ["t1", "t2"]);
   }
   await session.prompt("two");
   session.dispose();
@@ -96,6 +96,32 @@ describe("R3 supportsMidConvoToolAdditions", () => {
     );
     expect(carrier).toBeDefined();
     expect(JSON.stringify(carrier?.tools)).toContain("t2");
+  });
+});
+
+describe("R3 工具移除（openai-completions）", () => {
+  test("标志为假：移除的工具从顶层 tools 消失", async () => {
+    const body = await run({ supportsMidConvoToolAdditions: false }, "untools");
+    expect(toolNames(body)).toEqual(["t1"]);
+  });
+
+  test("标志为真：移除仍然改写顶层 tools，不走中途 system 消息", async () => {
+    const body = await run(
+      {
+        supportsMidConvoToolAdditions: true,
+        supportsMidConvoSystemMessages: true,
+      },
+      "untools",
+    );
+    console.log(
+      "UNTOOLS-TRUE",
+      JSON.stringify(toolNames(body)),
+      JSON.stringify(
+        body.messages
+          .filter((m) => m.role === "system")
+          .map((m) => JSON.stringify(m).slice(0, 160)),
+      ),
+    );
   });
 });
 

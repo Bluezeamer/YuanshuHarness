@@ -103,7 +103,7 @@ export function writeModels(
   env: Env,
   baseUrl: string,
   extra: Record<string, unknown> = {},
-  apiKey = "stub-key",
+  apiKey: string | null = "stub-key",
 ): void {
   writeFileSync(
     join(env.agentDir, "models.json"),
@@ -112,7 +112,7 @@ export function writeModels(
         stub: {
           baseUrl,
           api: "openai-completions",
-          apiKey,
+          ...(apiKey === null ? {} : { apiKey }),
           models: [{ id: "stub-model", ...extra }],
         },
       },

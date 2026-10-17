@@ -6,6 +6,7 @@ import {
   makeEnv,
   openSession,
   startStub,
+  textOf,
   writeModels,
 } from "./harness.js";
 
@@ -44,6 +45,8 @@ for (const midConvo of [false, true]) {
       messages: Array<{ role: string; content?: unknown }>;
     };
     expect(countIn(last, MARK)).toBe(1);
+    const carrier = last.messages.find((m) => textOf(m).includes(MARK));
+    expect(carrier?.role).toBe("system");
     expect(JSON.stringify(last.messages)).toContain(
       result.summary.slice(0, 20),
     );
