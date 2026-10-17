@@ -395,4 +395,17 @@ describe("R14 删除", () => {
     ).toBe(true);
     t.data.close(true);
   });
+
+  test("加载失败时删除：不被失败的加载拦住，损坏的会话也能删掉", async () => {
+    const t = start();
+    const { id } = await converse(t.pool, ["x"]);
+    writeFileSync(findSessionFile(t.data.sessionDir, id) ?? "", "坏的\n");
+    const n = restart(t);
+    const loading = n.pool.acquire(id);
+    const removing = n.pool.remove(id);
+    await expect(loading).rejects.toThrow("会话文件头无效");
+    expect(await removing).toBe("ok");
+    expect(findSessionFile(n.data.sessionDir, id)).toBeNull();
+    n.data.close(true);
+  });
 });
