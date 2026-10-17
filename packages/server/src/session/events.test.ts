@@ -186,6 +186,17 @@ describe("R16 有界", () => {
     });
   });
 
+  test("含 truncated 标记的最终 data 也不超过 FRAME_DATA_MAX（边界）", () => {
+    const part = "a".repeat(262_144);
+    const r = sanitizeData({ a: part, b: part, c: part, d: part }, 262_144);
+    expect(bytes(r)).toBeLessThanOrEqual(FRAME_DATA_MAX);
+    const edge = sanitizeData(
+      { a: part, b: part, c: part, d: "x".repeat(262_144) + "y".repeat(1) },
+      262_144,
+    );
+    expect(bytes(edge)).toBeLessThanOrEqual(FRAME_DATA_MAX);
+  });
+
   test("队列条目数与长度有界", () => {
     const e = mapEvent({
       type: "queue_update",
@@ -194,6 +205,6 @@ describe("R16 有界", () => {
     } as never);
     const q = e?.data.queue as string[];
     expect(q).toHaveLength(100);
-    expect(q[0]?.length).toBe(1024);
+    expect(q[0]?.length).toBe(512);
   });
 });

@@ -415,6 +415,71 @@ describe("R16 SDK 载荷异常与快照有界", () => {
     ]);
   });
 
+  test("函数/Symbol/对象型 toJSON/超长的工具 id：事件与快照说的是同一件事，不出现 undefined 或 [object Object]", () => {
+    const { entry, emit } = fake();
+    const c = collector();
+    entry.subscribe(c);
+    emit({
+      type: "tool_execution_start",
+      toolCallId: () => 1,
+      toolName: "n",
+      args: {},
+    });
+    emit({
+      type: "tool_execution_start",
+      toolCallId: Symbol("s"),
+      toolName: "n",
+      args: {},
+    });
+    emit({
+      type: "tool_execution_start",
+      toolCallId: { toJSON: () => ({ a: 1 }) },
+      toolName: "n",
+      args: {},
+    });
+    emit({
+      type: "tool_execution_start",
+      toolCallId: "L".repeat(300),
+      toolName: "n",
+      args: {},
+    });
+    emit({
+      type: "tool_execution_start",
+      toolCallId: "ok",
+      toolName: "n",
+      args: {},
+    });
+    const late = collector();
+    entry.subscribe(late);
+    expect(late.frames[0]?.data.activeTools).toEqual([
+      { toolCallId: "ok", toolName: "n" },
+    ]);
+    expect(JSON.stringify(late.frames[0])).not.toMatch(
+      /undefined|\[object Object\]/,
+    );
+  });
+
+  test("转义放大后的最坏快照仍不超过 1 MiB", () => {
+    const { entry, emit } = fake();
+    for (let i = 0; i < 100; i++)
+      emit({
+        type: "tool_execution_start",
+        toolCallId: `${"\u0000".repeat(250)}${i}`.slice(0, 256),
+        toolName: "\u0000".repeat(256),
+        args: {},
+      });
+    emit({
+      type: "queue_update",
+      steering: Array.from({ length: 100 }, () => "\u0000".repeat(512)),
+      followUp: [],
+    });
+    const c = collector();
+    entry.subscribe(c);
+    expect(Buffer.byteLength(JSON.stringify(c.frames[0]))).toBeLessThanOrEqual(
+      1024 * 1024,
+    );
+  });
+
   test("活动工具超大 id/name、过多条目与超长 queue：快照仍然有界且字段齐全", () => {
     const { entry, emit } = fake();
     for (let i = 0; i < 400; i++)

@@ -133,31 +133,43 @@ export class SessionEntry {
       case "message.delta":
         if (
           data.kind === "text" &&
+          typeof data.text === "string" &&
           this.partial &&
           this.partial.text.length < EVENT_STRING_MAX
         )
-          this.partial.text += String(data.text);
+          this.partial.text += data.text;
         break;
       case "message.ended":
         if (data.role === "assistant") this.partial = null;
-        this.recent.push({
-          role: data.role as ChatMessage["role"],
-          text: String(data.text ?? ""),
-        });
-        if (this.recent.length > WINDOW) this.recent.shift();
+        if (
+          (data.role === "user" || data.role === "assistant") &&
+          typeof data.text === "string"
+        ) {
+          this.recent.push({ role: data.role, text: data.text });
+          if (this.recent.length > WINDOW) this.recent.shift();
+        }
         break;
       case "tool.started":
-        if (this.activeTools.size < MAX_ACTIVE_TOOLS)
-          this.activeTools.set(
-            cut(String(data.toolCallId), MAX_ID),
-            cut(String(data.toolName), MAX_ID),
-          );
+        // 只登记事件里原样可见、且长度合规的工具：快照与事件说的是同一个 id。
+        if (
+          typeof data.toolCallId === "string" &&
+          typeof data.toolName === "string" &&
+          data.toolCallId.length <= MAX_ID &&
+          data.toolName.length <= MAX_ID &&
+          this.activeTools.size < MAX_ACTIVE_TOOLS
+        )
+          this.activeTools.set(data.toolCallId, data.toolName);
         break;
       case "tool.ended":
-        this.activeTools.delete(cut(String(data.toolCallId), MAX_ID));
+        if (typeof data.toolCallId === "string")
+          this.activeTools.delete(data.toolCallId);
         break;
       case "queue.updated":
-        this.queue = data.queue as string[];
+        if (
+          Array.isArray(data.queue) &&
+          data.queue.every((q) => typeof q === "string")
+        )
+          this.queue = data.queue;
         break;
       case "run.ended":
         this.partial = null;

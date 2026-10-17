@@ -112,10 +112,12 @@ export const SNAPSHOT_MESSAGE_MAX = 32 * 1024;
 const MAX_DEPTH = 8;
 
 export const FRAME_DATA_MAX = 1024 * 1024;
+// 留出信封与 truncated 标记的余量，使最终线上 data 不超过 FRAME_DATA_MAX。
+const DATA_BUDGET = FRAME_DATA_MAX - 1024;
 export const MAX_ID = 256;
 export const MAX_QUEUE_ITEMS = 100;
-export const MAX_QUEUE_ITEM = 1024;
-export const MAX_ACTIVE_TOOLS = 200;
+export const MAX_QUEUE_ITEM = 512;
+export const MAX_ACTIVE_TOOLS = 100;
 
 // 按 UTF-16 截断，但不留下被切开的代理对。
 export function cut(v: string, max: number): string {
@@ -144,7 +146,7 @@ export function sanitizeData(
       }
       return v;
     });
-    if (text !== undefined && Buffer.byteLength(text) <= FRAME_DATA_MAX) {
+    if (text !== undefined && Buffer.byteLength(text) <= DATA_BUDGET) {
       const data = JSON.parse(text) as Record<string, unknown>;
       return truncated ? { ...data, truncated: true } : data;
     }
