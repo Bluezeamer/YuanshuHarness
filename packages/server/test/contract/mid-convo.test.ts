@@ -113,14 +113,9 @@ describe("R3 工具移除（openai-completions）", () => {
       },
       "untools",
     );
-    console.log(
-      "UNTOOLS-TRUE",
-      JSON.stringify(toolNames(body)),
-      JSON.stringify(
-        body.messages
-          .filter((m) => m.role === "system")
-          .map((m) => JSON.stringify(m).slice(0, 160)),
-      ),
+    expect(toolNames(body)).toEqual(["t1"]);
+    expect(body.messages.some((m) => m.role === "system" && "tools" in m)).toBe(
+      false,
     );
   });
 });

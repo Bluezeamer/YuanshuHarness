@@ -1,5 +1,5 @@
 import "./isolate.js";
-import { afterAll, expect, test } from "vitest";
+import { afterAll, expect, test, vi } from "vitest";
 import { at, makeEnv, openSession, startStub, writeModels } from "./harness.js";
 
 // R6：单槽位界面（confirm/select/input）被 SDK 原样委托给 Server 提供的 uiContext。
@@ -78,7 +78,7 @@ test("R6 confirm 到达 Server 的 uiContext，timeout/signal 原样透传，答
   session.dispose();
   expect(at(calls, 0).title).toBe("Run rm?");
   expect(at(calls, 0).opts?.timeout).toBe(1234);
-  expect(at(calls, 0).opts?.signal).toBeInstanceOf(AbortSignal);
+  expect(at(calls, 0).opts?.signal).toBe(ac.signal);
   expect(answer).toBe(true);
 });
 
@@ -97,17 +97,19 @@ test("R6 select 与 input 同样被接管，答案回到扩展", async () => {
 });
 
 test("R6 SDK 不自行强制 timeout：uiContext 不返回时扩展会一直等（超时必须由 Server 实现）", async () => {
-  const { ui } = makeUi({ hang: true });
+  const { ui, calls } = makeUi({ hang: true });
   let finished = false;
   const session = await askVia(ui, async (ctx) => {
     await ctx.ui.confirm("Nobody?", "m", { timeout: 30 });
     finished = true;
   });
   const pending = session.prompt("/ask").then(() => "done");
+  await vi.waitFor(() => expect(calls).toHaveLength(1));
   const raced = await Promise.race([
     pending,
     new Promise<string>((r) => setTimeout(() => r("still-waiting"), 400)),
   ]);
   expect(raced).toBe("still-waiting");
   expect(finished).toBe(false);
+  session.dispose();
 });

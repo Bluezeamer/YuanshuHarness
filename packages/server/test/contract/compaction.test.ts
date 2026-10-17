@@ -47,6 +47,18 @@ for (const midConvo of [false, true]) {
     expect(countIn(last, MARK)).toBe(1);
     const carrier = last.messages.find((m) => textOf(m).includes(MARK));
     expect(carrier?.role).toBe("system");
+    if (midConvo) {
+      // 中途 system 消息：紧挨在最新用户消息之前，即整段上下文的尾部
+      expect(last.messages.indexOf(carrier as never)).toBe(
+        last.messages.length - 2,
+      );
+    } else {
+      // 开头的系统提示词：追加内容在 <addendum> 段，位于整个提示词的最末尾
+      expect(last.messages.indexOf(carrier as never)).toBe(0);
+      expect(textOf(carrier as never)).toMatch(
+        new RegExp(`</cwd>\\n\\n<addendum>\\n${MARK}\\n</addendum>$`),
+      );
+    }
     expect(JSON.stringify(last.messages)).toContain(
       result.summary.slice(0, 20),
     );

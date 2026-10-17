@@ -1,5 +1,5 @@
 import "./isolate.js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { expect, test } from "vitest";
@@ -40,6 +40,7 @@ test("R8 扫描目录内被发现：<agentDir>/skills、<cwd>/.pi/skills、<cwd>
   skill(join(env.cwd, ".agents", "skills"), "in-cwd-agents");
   skill(join(fakeHome, ".agents", "skills"), "in-home-agents");
   const names = await discovered(env);
+  rmSync(join(fakeHome, ".agents"), { recursive: true, force: true });
   expect(names).toEqual([
     "in-agent-dir",
     "in-cwd-agents",

@@ -20,7 +20,7 @@ R4. 必须能用 SDK 公开接口，从既有 JSONL 重建会话，重建后的 
 R5. 指定 cwd 与 AGENTS.md 时，同一份 AGENTS.md 内容在请求中必须只出现一次；Server 不得读取 `~/.pi` 下的任何文件（含 AGENTS.md、模型与设置）。
 R6. 单槽位界面（confirm/select/input）必须能被 Server 层接管：SDK 把三类对话框原样委托给 Server 提供的 `uiContext`，`timeout`、`signal` 选项透传，答案回到扩展。先答先赢与超时默认值属于 Server 层的实现，留给 ROADMAP 第 3 条；本需求同时记录 SDK 自身不强制 `timeout` 这一事实。
 R7. 必须能指定模型配置所在目录，不落到默认的 `~/.pi`；API key 必须能由 Server 在运行时提供（不是文件里的明文），请求中使用的是运行时提供的值。
-R8. 必须列出 SDK 实际扫描的 skill 目录集合；在临时目录布置 skill，断言"扫描目录内被发现、扫描目录外不被发现"。
+R8. 必须确定 SDK 实际扫描的 skill 目录（SDK 没有公开的列目录接口，以正负 fixture 为证）：在临时目录布置 skill，断言"扫描目录内被发现、扫描目录外不被发现"，并记录追加目录与关闭自动扫描的行为。
 R9. 任何测试不得读写真实的 `~/.pi`（用临时目录与显式路径隔离）；端点与密钥只经环境变量传入，不得出现在入库文件与测试输出里。
 R10. 契约用例必须全部能对着本地 stub provider（OpenAI 兼容、返回预设响应）运行，进 `scripts/check.sh` 与 CI，不需要真实模型。另设一个手动冒烟 `scripts/contract-live.sh`：对真实端点跑一次最小会话，缺少环境变量时必须以非零状态失败；它不进 CI。
 
