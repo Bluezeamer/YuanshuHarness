@@ -58,3 +58,9 @@ Date: 2026-10-17
   - 快照的全部状态（最近窗口、`partial`、`activeTools`、`queue`、`running`）由池自己从同一条事件流累积，不读 `session.messages`，这样快照与 `seq` 构造上一致；窗口初始为空，持久化 intent 加载历史时再从 JSONL 播种。
   - 探测发现：模型配置的 `input` 不含 `image` 时，SDK 把图片悄悄换成"(image omitted: model does not support images)"，不报错。已在 `send` 里拒绝并补进 spec R9；这是静默类问题，评审时重点复核。
   - 变异验证已做（改坏后对应用例变红，还原后全绿）：广播先于状态更新、吞掉 `run.failed`、排队改直插、不拒绝不支持的图片、`dispose` 不清订阅、快照不含 `partial`。
+- 2026-10-17 步骤 5/6：
+  - `@fastify/websocket` 锁 11.3.4；测试用的 `ws` 8.22.0 与 `@types/ws` 8.18.2 作为 devDependencies 精确锁定（前者原本只是传递依赖）。
+  - 服务停止顺序实现为 Fastify 的 `preClose` 钩子：先关全部 WebSocket，再 `pool.dispose()`，然后 HTTP 关闭；`@fastify/websocket` 自带的 preClose 也会关连接，所以客户端看到的关闭码是 1005 而非 1001，测试不断言具体码。
+  - R14 的实测发现：背压只检查"写入前的积压"，所以一个本身很大的帧（例如全文很长的 `message.ended`）会让紧接着的下一帧触发关闭，健康的客户端也一样。单个回复远小于 4 MiB 的正常使用不受影响；测试用多轮累积 700KB 的回复来区分快慢连接。评审时复核这一取舍。
+  - 变异验证（API 层）：去背压检查、关闭不清订阅、不要求 id、resync 不回快照、心跳不断开、停止时不释放池、升级前不查会话，均有用例变红。"停止时不释放池"最初无人发现，已补 R15 断言（会话 dispose 次数）。
+  - 手动：用 Node 内置全局 `WebSocket` 对着真实 `createServer` 跑完整会话，序号 0（快照）、1..7 连续，`ack` 不占序号。`scripts/check.sh` 全绿。

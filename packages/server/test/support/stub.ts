@@ -22,7 +22,7 @@ export interface Stub {
   url: string;
   requests: RecordedRequest[];
   // 每个请求到达时读取，测试可随时改。
-  mode: { delayMs: number; status: number };
+  mode: { delayMs: number; status: number; chunkBytes: number };
   close(): Promise<void>;
 }
 
@@ -31,7 +31,7 @@ export async function startStub(
   reply: (n: number) => string = (n) => `stub-reply-${n}`,
 ): Promise<Stub> {
   const requests: RecordedRequest[] = [];
-  const mode = { delayMs: 0, status: 200 };
+  const mode = { delayMs: 0, status: 200, chunkBytes: 0 };
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (c) => chunks.push(c));
@@ -63,13 +63,22 @@ export async function startStub(
         ],
       });
       // 首个 chunk 先发出，其余延迟：让测试能在"生成中途"观察会话。
-      setTimeout(() => {
-        send({
-          ...base,
-          choices: [
-            { index: 0, delta: { content: text }, finish_reason: null },
-          ],
-        });
+      setTimeout(async () => {
+        // chunkBytes>0 时把文本切成多个增量，模拟真实的流式输出。
+        const size = mode.chunkBytes > 0 ? mode.chunkBytes : text.length || 1;
+        for (let i = 0; i < Math.max(text.length, 1); i += size) {
+          send({
+            ...base,
+            choices: [
+              {
+                index: 0,
+                delta: { content: text.slice(i, i + size) },
+                finish_reason: null,
+              },
+            ],
+          });
+          if (mode.chunkBytes > 0) await new Promise((r) => setTimeout(r, 2));
+        }
         send({
           ...base,
           choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
