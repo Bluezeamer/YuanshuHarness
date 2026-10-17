@@ -110,3 +110,15 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 14 项通过。`pool.test.ts -t R16` 与 `sessions.test.ts -t 'R14|R16'` 均因沙箱禁止监听 `127.0.0.1`（`listen EPERM`）在收集阶段失败，0 项执行；边界结论由 `/tmp/session-pool-r7-probe.mjs` 在 Node 24.13.1 下复现。
 
 本轮阻塞级：2 条。
+
+## 第 8 轮（2026-10-17，快速终审）— 范围：2121c606048000ae780ad67b96c590efdb35edfd..60310da50898068b9ef78475d969b3ea828c61f9 — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| — | — | 本轮无明确阻塞 | |
+
+复核：第 7 轮两条阻塞均已消失。事件容量判断预留 1 KiB 后，追加 `truncated` 标记不会越过 1 MiB；状态累积仅接收事件中类型正确且长度合规的字段，不再强制转换，活动工具与队列上限也使最坏转义快照保持在 1 MiB 内。未发现本增量引入新的明确阻塞。
+
+验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 16 项通过；独立运行时探针确认边界事件走 `omitted` 兜底、异常工具 id 不进入快照、100 个活动工具加 100 条最坏转义队列的快照为 614,680 bytes。`pool.test.ts -t R16` 因沙箱禁止监听 `127.0.0.1`（`listen EPERM`）在收集阶段失败，0 项执行。
+
+本轮阻塞级：0 条。
