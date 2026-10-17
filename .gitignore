@@ -7,6 +7,9 @@ tmp/
 # 本地 agent 配置；技能的唯一来源是 .agents/skills，.claude/skills 是指向它的本地符号链接
 .claude/
 
+# pi运行产生的临时文件
+.pi/
+
 # 本地aisdlc评估相关
 tests/aisdlc
 
@@ -16,3 +19,11 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# 排除playwright-cli相关配置和目录
+.playwright-cli/
+.playwright/
+.agents/skills/playwright-cli/
+
+# server 包里的 web 产物：构建时从 packages/web/dist 复制而来
+packages/server/web/
