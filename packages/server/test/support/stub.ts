@@ -199,3 +199,26 @@ export function stubSessionFactory(
     return session;
   };
 }
+
+// 在给定目录里建一个已持久化的会话：按 id 创建、依次发送 prompts，返回 JSONL 路径。
+export async function persistSession(
+  stub: { url: string },
+  sessionDir: string,
+  id: string,
+  prompts: string[],
+  name?: string,
+): Promise<string> {
+  const env = makeEnv();
+  writeModels(env, stub.url);
+  const manager = SessionManager.create(env.cwd, sessionDir, { id });
+  const { session } = await openSession(env, {
+    sessionManager: manager,
+    retry: false,
+  });
+  if (name) manager.appendSessionInfo(name);
+  for (const p of prompts) await session.prompt(p);
+  const file = manager.getSessionFile();
+  session.dispose();
+  if (!file) throw new Error("会话没有落盘");
+  return file;
+}
