@@ -19,3 +19,18 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 已执行且通过（无发现）：`pnpm lint`、`pnpm -r typecheck`、`pnpm -r test`（server 118、web 1）、`scripts/smoke-package.sh`（约 2 秒）、`scripts/smoke-image.sh`（约 80 秒，`docker stop` 用时 4.4 秒、退出码 0）、`bash tests/check/selfcheck.sh`。镜像冒烟后 `docker ps -a --filter name=yuanshu-smoke`、卷、镜像标签均无遗留。另用真实进程构造了穿越、编码、点文件、大小写、`//healthz`、`/healthz/`、NUL、非法 UTF-8、HEAD/OPTIONS/POST、Range 请求，均符合 R5/R6（穿越与点文件 403，`/healthz` 不被遮蔽，`/sub/` 404）；构造了 `parseConfig` 的前导零、`+80`、`8e1`、`0x50`、空白主机、小写 `yuanshu_port` 等输入，行为与 R2 一致。实验脚本在 `tmp/review/`。
 
 本轮阻塞级：0 条。
+
+## 第 2 轮（2026-10-17）— 范围：d5e61ba...HEAD — 执行：新开空上下文 subagent
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 重要 | `packages/server/src/server.ts:47-56,85`（`allowedPath` / `isInsideWebRoot`） | 符号链接修复被"目录索引"路径绕过。`@fastify/static` 把请求路径 `/sub/` 或 `/sub` 先传给 `allowedPath`，此时 `realpathSync(webRoot/sub/)` 解析到目录本身，在根内，放行；之后库内部才拼上 `index.html` 去读，这一步不再经过 `allowedPath`。所以 web 目录内任意子目录里的 `index.html` 若是指向目录外的符号链接，就被原样提供。web 根目录自己的 `index.html`（`/`）同理，且 `assertWebRoot` 用的是 `stat`（跟随链接）。复现：`tmp/review/sl.mjs`（用 `createServer` + `webRoot`），web 目录内 `sub/index.html -> 目录外 secret.txt`，`GET /sub/` 返回 200 `SECRET`；`idxdir/index.html -> 目录外文件`，`GET /idxdir/` 与 `GET /idxdir` 均 200 且为目录外内容；而直接 `GET /sub/index.html` 为 404（正确）。新增测试只覆盖"链接指向文件 / 目录"，没有"index.html 本身是链接"，所以没抓到。可利用性仍受"需有人先往 web 目录放链接"限制，但这正是本次修复声称堵住的 R6 路径。 | 已修 `609b3ce`：`isInsideWebRoot` 对目录请求把 `index.html` 也 `realpath` 后检查；`assertWebRoot` 同样检查根目录的 `index.html` 是否在根内。新增 3 条用例（子目录、子目录不带斜杠、根目录），修前红修后绿；去掉目录索引检查、去掉 `assertWebRoot` 的检查，各自被对应用例抓住。 |
+| 建议 | `packages/server/src/server.ts:52-54` | `catch { return true }` 在 `ELOOP`（符号链接环）时同样放行：`GET /loop1`（`loop1 -> loop2 -> loop1`）返回 500，响应体含服务器绝对路径：`ELOOP: too many symbolic links encountered, stat '/…/w3/loop1'`。这是路径信息泄露（R6 只要求 4xx，且不应泄露文件系统布局）。悬空链接返回 404，正常。建议只对 `ENOENT`/`ENOTDIR` 放行，其余错误拒绝（返回 404/403）。该守卫"先不存在、使用时才出现"的 TOCTOU 窗口依赖攻击者对 web 目录有写权限，库自身注释也声明了同样假设，不单列。 | 已修 `609b3ce`：`catch` 只对 `ENOENT`/`ENOTDIR` 放行，其余（含 `ELOOP`）拒绝。新增符号链接环用例，断言 4xx 且响应不含服务器路径；改回「任何错误都放行」被抓住。 |
+| 待确认 | `packages/server/src/server.ts:70`（`forceCloseConnections: true`）；`spec.md` R7 | 真实进程 + SIGTERM 实测：连上不发、请求头半截、请求体没发完、慢速 POST（每 0.5 秒 1 字节）、暂停读取的大文件下载，退出耗时 0.007–0.11 秒，退出码 0，原 `重要` 项确实消失。但副作用：正在流式响应的合法请求会被直接截断。复现：把 300 MB 文件放进 web 目录，客户端读到约 7 MB 时发 SIGTERM，客户端得到 `ECONNRESET`，进程 0.109 秒退出。R7 只要求"5 秒内以 0 退出、停止接收新连接"，没有要求排空在途请求，所以不算违规；但 `docker stop` 期间的合法下载 / 未来的长请求会被腰斩。是否接受（或改为"先 `close()` 排空一个宽限期，再强制断开"）请裁决；缺的是产品口径，不是证据。没有对应测试断言"在途请求被截断"是有意行为。 | 推迟，待 bluezeamer 裁决：是否在强制断开前留一段排空宽限期。现状满足 R7 字面要求（5 秒内以 0 退出），代价是关停瞬间会截断正在流式传输的合法响应。改为「先 `server.close()` 停止接收，等在途请求至多 N 秒，超时再 `closeAllConnections()`」成本不大，但会让有长连接时的每次停止多等 N 秒，且需要定 N。本服务是单用户单部署、当前无长耗时响应，我倾向保持现状，等第 3 条出现事件流（长连接）时再定。 |
+| 建议 | `packages/server/src/server.test.ts:186-212` | 新增符号链接测试都是"链接指向文件 / 目录"，没有断言"index.html 是指向目录外的链接"（对应上面的重要项）、符号链接环、web 根本身是符号链接。我另行验证：web 根是符号链接时（`wlink -> w3`）正常工作，内部链接可访问，外部链接 404，无副作用。 | 已修 `609b3ce`：补了 index.html 链接（三种）与符号链接环用例；「web 根本身是符号链接」评审者已另行验证正常，未再加用例。 |
+
+上轮阻塞/重要项核对：第 1 轮唯一的"重要"项（R7 半开连接让 `stop()` 不退出）确实消失——`bin.js` 真实进程实测 `idle`/`partial`/`body`/`none` 分别 0.007/0.007/0.009/0.007 秒，退出码 0，对照上轮 75/12/72.7 秒。第 1 轮的符号链接建议项对"链接指向文件 / 目录"部分确实消失（`/link.txt`、`/odir/…`、编码变体 `/%6Cink.txt`、大小写变体均 404；链式链接指向内部可访问；悬空链接 404；`realpathSync` 每请求约 0.4 ms，3000 层深路径约 0.7 ms，未见可滥用的阻塞），但经目录索引仍可绕过，见上面的"重要"。
+
+已执行且通过：`pnpm lint`、`pnpm -r typecheck`、`pnpm -r test`（server 124、web 1）、`scripts/smoke-package.sh`、`bash tests/check/selfcheck.sh`、`scripts/smoke-image.sh`（约 94 秒，`docker stop` 4.4 秒）。冒烟后 `docker ps -a --filter name=yuanshu-smoke`、卷、镜像均无遗留。另验证 `//healthz` 403、`/healthz/` 404、`/HEALTHZ` 404、`/%2e%2e/secret` 403，`/healthz` 不被遮蔽。临时在被 git 忽略的 `packages/server/web/` 放过 300 MB 测试文件，已删除。
+
+本轮阻塞级：0 条。
