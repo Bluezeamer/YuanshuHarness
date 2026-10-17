@@ -14,10 +14,16 @@ import {
 } from "vitest";
 import WebSocket from "ws";
 import { expectContiguous, waitFor } from "../../test/support/frames.js";
-import { startStub, stubSessionFactory } from "../../test/support/stub.js";
+import {
+  startStub,
+  stubSessionFactory,
+  type TestData,
+  testData,
+  testPool,
+} from "../../test/support/stub.js";
 import { TestClient } from "../../test/support/ws-client.js";
 import { createServer, type YuanshuServer } from "../server.js";
-import { SessionPool } from "../session/pool.js";
+import type { SessionPool } from "../session/pool.js";
 import { DEFAULTS, sessionsApi } from "./sessions.js";
 
 const stub = await startStub((n) => `reply-${n}`);
@@ -25,6 +31,7 @@ afterAll(() => stub.close());
 
 let app: FastifyInstance;
 let pool: SessionPool;
+let data: TestData | undefined;
 let base: string;
 const clients: TestClient[] = [];
 
@@ -34,7 +41,9 @@ async function boot(
   backend: { url: string } = stub,
   modelExtra: Record<string, unknown> = {},
 ) {
-  pool = new SessionPool(stubSessionFactory(backend, modelExtra));
+  data?.close();
+  data = testData();
+  pool = testPool(stubSessionFactory(backend, modelExtra), data).pool;
   app = Fastify({ logger: false });
   await app.register(fastifyWebsocket, {
     options: { maxPayload: DEFAULTS.maxPayloadBytes },
@@ -73,6 +82,8 @@ afterEach(async () => {
   stub.requests.length = 0;
   await app?.close();
   pool?.dispose();
+  data?.close();
+  data = undefined;
   await rm(base, { recursive: true, force: true });
 });
 
@@ -450,8 +461,8 @@ describe("R15 服务停止", () => {
       { host: "127.0.0.1", port: 0, dataDir },
       {
         webRoot,
-        sessionFactory: async () => {
-          const session = await inner();
+        sessionFactory: async (o) => {
+          const session = await inner(o);
           const dispose = session.dispose.bind(session);
           session.dispose = () => {
             disposed++;

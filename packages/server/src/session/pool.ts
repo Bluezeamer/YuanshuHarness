@@ -1,8 +1,21 @@
 import { randomBytes } from "node:crypto";
-import type {
-  AgentSession,
-  AgentSessionEvent,
+import { unlinkSync } from "node:fs";
+import {
+  type AgentSession,
+  type AgentSessionEvent,
+  SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import {
+  type ChatEntry,
+  hasDanglingToolCall,
+  readMessages,
+} from "../store/history.js";
+import {
+  findSessionFile,
+  readHeader,
+  type SessionStore,
+  UUID_RE,
+} from "../store/sessions.js";
 import {
   type ChatMessage,
   cut,
@@ -15,16 +28,26 @@ import {
   sanitizeData,
 } from "./events.js";
 
-export type SessionFactory = () => Promise<AgentSession>;
+export interface FactoryOptions {
+  id: string;
+  sessionDir: string;
+  // 恢复已有会话时给出其 JSONL 路径；新建时缺省。
+  file?: string;
+}
+export type SessionFactory = (opts: FactoryOptions) => Promise<AgentSession>;
 
 export interface Subscriber {
   // 收到的是已序列化的一帧；抛错表示该订阅者已不可用，会被移除。
   send(frame: string): void;
+  // 会话被删除或池关闭时调用，让连接层关闭对应连接。
+  close?(): void;
 }
 
 export interface SessionInfo {
   id: string;
+  name: string | null;
   createdAt: string;
+  updatedAt: string;
   running: boolean;
 }
 
@@ -35,7 +58,7 @@ export interface ImageInput {
 
 export class PoolError extends Error {
   constructor(
-    readonly code: "bad_request" | "disposed",
+    readonly code: "bad_request" | "disposed" | "load_failed" | "delete_failed",
     message: string,
   ) {
     super(message);
@@ -57,10 +80,27 @@ function uuidv7(): string {
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
+export interface EntryOptions {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // 恢复时用 JSONL 里最近的消息播种窗口。
+  seed?: ChatMessage[];
+  // 恢复时发现悬挂的工具调用：下一次发送前先附加“上次被中断”的通知。
+  interrupted?: boolean;
+  // 每次运行结束后调用（持久化索引）；抛错不影响事件流。
+  onRunEnded?: (entry: SessionEntry) => void;
+}
+
+const INTERRUPTED_NOTICE =
+  "上一次运行被中断（服务重启），其中的工具调用没有得到结果。是否重做由你判断。";
+
 export class SessionEntry {
-  readonly id = uuidv7();
-  readonly createdAt = new Date().toISOString();
+  readonly id: string;
+  readonly createdAt: string;
+  updatedAt: string;
   running = false;
+  private interrupted: boolean;
 
   private seq = 0;
   private readonly subscribers = new Set<Subscriber>();
@@ -73,7 +113,15 @@ export class SessionEntry {
   private readonly unsubscribeSdk: () => void;
   private disposed = false;
 
-  constructor(private readonly session: AgentSession) {
+  constructor(
+    private readonly session: AgentSession,
+    private readonly opts: EntryOptions = {},
+  ) {
+    this.id = opts.id ?? uuidv7();
+    this.createdAt = opts.createdAt ?? new Date().toISOString();
+    this.updatedAt = opts.updatedAt ?? this.createdAt;
+    this.interrupted = opts.interrupted === true;
+    this.recent.push(...(opts.seed ?? []).slice(-WINDOW));
     this.unsubscribeSdk = session.subscribe((e) => {
       try {
         this.onSdkEvent(e);
@@ -109,10 +157,33 @@ export class SessionEntry {
       this.running = false;
     }
     this.emit(mapped.type, mapped.data);
+    if (mapped.type === "run.ended") {
+      this.updatedAt = new Date().toISOString();
+      try {
+        this.opts.onRunEnded?.(this);
+      } catch {
+        // 索引写入失败不得影响事件流；下次启动对账会补齐。
+      }
+    }
+  }
+
+  get name(): string | null {
+    return this.session.sessionManager.getSessionName() ?? null;
+  }
+
+  rename(name: string): void {
+    if (this.disposed) throw new PoolError("disposed", "会话已关闭");
+    this.session.sessionManager.appendSessionInfo(name);
   }
 
   get info(): SessionInfo {
-    return { id: this.id, createdAt: this.createdAt, running: this.running };
+    return {
+      id: this.id,
+      name: this.name,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      running: this.running,
+    };
   }
 
   // 先改状态，再分配序号并广播：序号 N 的快照就是事件 N 之后的状态。
@@ -270,14 +341,25 @@ export class SessionEntry {
     // 模型不支持图片时 SDK 会把图片悄悄换成一句占位文字，必须在这里拒绝。
     if (images.length && !this.session.model?.input.includes("image"))
       throw new PoolError("bad_request", "当前模型不支持图片输入");
-    this.session
-      .prompt(text, {
+    const notice = this.interrupted;
+    this.interrupted = false;
+    (async () => {
+      if (notice)
+        await this.session.sendCustomMessage(
+          {
+            customType: "yuanshu.interrupted",
+            content: INTERRUPTED_NOTICE,
+            display: false,
+          },
+          { deliverAs: "nextTurn" },
+        );
+      await this.session.prompt(text, {
         streamingBehavior: "steer",
         ...(images.length
           ? { images: images.map((i) => ({ type: "image" as const, ...i })) }
           : {}),
-      })
-      .catch((err) => this.emit("run.failed", { message: reason(err) }));
+      });
+    })().catch((err) => this.emit("run.failed", { message: reason(err) }));
   }
 
   async stop(): Promise<void> {
@@ -289,35 +371,222 @@ export class SessionEntry {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubscribeSdk();
+    for (const sub of this.subscribers) {
+      try {
+        sub.close?.();
+      } catch {}
+    }
     this.subscribers.clear();
     this.session.dispose();
   }
 }
 
+export interface PoolDeps {
+  // 未提供时不能创建或加载会话，但索引、列表、改名、删除、历史仍可用。
+  factory: SessionFactory | null;
+  store: SessionStore;
+  sessionDir: string;
+}
+
+const NAME_MAX = 200;
+
 export class SessionPool {
   private readonly entries = new Map<string, SessionEntry>();
+  private readonly loading = new Map<string, Promise<SessionEntry | null>>();
   private disposed = false;
 
-  constructor(private readonly factory: SessionFactory) {}
+  constructor(private readonly deps: PoolDeps) {}
+
+  get canCreate(): boolean {
+    return this.deps.factory !== null;
+  }
+
+  private entryOptions(): Pick<EntryOptions, "onRunEnded"> {
+    return { onRunEnded: (e) => this.persist(e) };
+  }
+
+  // 会话一旦有了 JSONL 就进索引；之后每次运行结束更新 updated_at 与名称缓存。
+  private persist(e: SessionEntry): void {
+    if (!findSessionFile(this.deps.sessionDir, e.id)) return;
+    this.deps.store.upsert({
+      id: e.id,
+      name: e.name,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    });
+  }
 
   async create(): Promise<SessionInfo> {
     if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
-    const session = await this.factory();
+    const factory = this.deps.factory;
+    if (!factory) throw new PoolError("load_failed", "没有会话后端");
+    const id = uuidv7();
+    const session = await factory({
+      id,
+      sessionDir: this.deps.sessionDir,
+    });
     if (this.disposed) {
       session.dispose();
       throw new PoolError("disposed", "会话池已关闭");
     }
-    const entry = new SessionEntry(session);
-    this.entries.set(entry.id, entry);
+    const entry = new SessionEntry(session, { id, ...this.entryOptions() });
+    this.entries.set(id, entry);
     return entry.info;
   }
 
+  // 仅查池内已加载的会话。
   get(id: string): SessionEntry | undefined {
     return this.entries.get(id);
   }
 
+  // 按需加载：池内有就用；否则从 JSONL 恢复。并发的首次访问只加载一次。
+  // 返回 null 表示没有这个会话；文件损坏抛 PoolError("load_failed")。
+  async acquire(id: string): Promise<SessionEntry | null> {
+    if (!UUID_RE.test(id)) return null;
+    const resident = this.entries.get(id);
+    if (resident) return resident;
+    const inflight = this.loading.get(id);
+    if (inflight) return inflight;
+    const p = this.load(id).finally(() => this.loading.delete(id));
+    this.loading.set(id, p);
+    return p;
+  }
+
+  private async load(id: string): Promise<SessionEntry | null> {
+    if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
+    const { sessionDir, store, factory } = this.deps;
+    const file = findSessionFile(sessionDir, id);
+    if (!file) return null;
+    let seed: ChatMessage[];
+    let interrupted: boolean;
+    let createdAt: string;
+    try {
+      const header = readHeader(file, id);
+      if (!header) throw new Error("会话文件头无效");
+      createdAt = header.createdAt;
+      seed = readMessages(file, sessionDir, id)
+        .slice(-WINDOW)
+        .map(({ role, text }) => ({ role, text }));
+      interrupted = hasDanglingToolCall(file, sessionDir, id);
+    } catch (err) {
+      throw new PoolError("load_failed", reason(err));
+    }
+    if (!factory) throw new PoolError("load_failed", "没有会话后端");
+    let session: AgentSession;
+    try {
+      session = await factory({ id, sessionDir, file });
+    } catch (err) {
+      throw new PoolError("load_failed", reason(err));
+    }
+    if (this.disposed) {
+      session.dispose();
+      throw new PoolError("disposed", "会话池已关闭");
+    }
+    const row = store.get(id);
+    const entry = new SessionEntry(session, {
+      id,
+      createdAt: row?.createdAt ?? createdAt,
+      updatedAt: row?.updatedAt,
+      seed,
+      interrupted,
+      ...this.entryOptions(),
+    });
+    this.entries.set(id, entry);
+    return entry;
+  }
+
+  // 索引里的会话加上池内尚未持久化的会话；池内的状态（运行中、最新名称）优先。
   list(): SessionInfo[] {
-    return [...this.entries.values()].map((e) => e.info);
+    const out = new Map<string, SessionInfo>();
+    for (const r of this.deps.store.list())
+      out.set(r.id, { ...r, running: false });
+    for (const e of this.entries.values()) out.set(e.id, e.info);
+    return [...out.values()].sort(
+      (a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id),
+    );
+  }
+
+  info(id: string): SessionInfo | null {
+    const e = this.entries.get(id);
+    if (e) return e.info;
+    const r = this.deps.store.get(id);
+    return r ? { ...r, running: false } : null;
+  }
+
+  // 改名：已加载的走池内会话；未加载的只追加 JSONL 并更新索引，不进池。
+  async rename(id: string, nameRaw: string): Promise<SessionInfo | null> {
+    const name = nameRaw.trim();
+    if (name.length < 1 || name.length > NAME_MAX)
+      throw new PoolError("bad_request", `name 需要 1 到 ${NAME_MAX} 个字符`);
+    if (!UUID_RE.test(id)) return null;
+    const { store, sessionDir } = this.deps;
+    const resident = this.entries.get(id);
+    if (resident) {
+      resident.rename(name);
+      if (store.get(id)) store.rename(id, name);
+      return resident.info;
+    }
+    const file = findSessionFile(sessionDir, id);
+    if (!file) return null;
+    try {
+      if (!readHeader(file, id)) throw new Error("会话文件头无效");
+      SessionManager.open(file, sessionDir).appendSessionInfo(name);
+    } catch (err) {
+      throw new PoolError("load_failed", reason(err));
+    }
+    if (!store.get(id)) this.indexFromFile(id, file, name);
+    else store.rename(id, name);
+    return this.info(id);
+  }
+
+  private indexFromFile(id: string, file: string, name: string | null): void {
+    const header = readHeader(file, id);
+    if (!header) return;
+    this.deps.store.upsert({
+      id,
+      name,
+      createdAt: header.createdAt,
+      updatedAt: header.createdAt,
+    });
+  }
+
+  // 某会话的完整历史；会话存在但还没有 JSONL（空会话）时为空数组，不存在为 null。
+  history(id: string): ChatEntry[] | null {
+    if (!UUID_RE.test(id)) return null;
+    const { sessionDir } = this.deps;
+    const file = findSessionFile(sessionDir, id);
+    if (file) {
+      try {
+        return readMessages(file, sessionDir, id);
+      } catch (err) {
+        throw new PoolError("load_failed", reason(err));
+      }
+    }
+    return this.entries.has(id) ? [] : null;
+  }
+
+  // 删除：运行中拒绝；先删文件（失败则什么都不动），再删索引与池内会话。
+  async remove(id: string): Promise<"ok" | "not_found" | "running"> {
+    if (!UUID_RE.test(id)) return "not_found";
+    const { store, sessionDir } = this.deps;
+    const entry = this.entries.get(id);
+    if (entry?.running) return "running";
+    const file = findSessionFile(sessionDir, id);
+    if (!entry && !file && !store.get(id)) return "not_found";
+    if (file) {
+      try {
+        unlinkSync(file);
+      } catch (err) {
+        throw new PoolError("delete_failed", reason(err));
+      }
+    }
+    store.remove(id);
+    if (entry) {
+      this.entries.delete(id);
+      entry.dispose();
+    }
+    return "ok";
   }
 
   dispose(): void {

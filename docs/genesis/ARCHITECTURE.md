@@ -66,6 +66,7 @@
 - 单进程内多会话：禁止进程全局状态（环境变量、工作目录、全局单例）。（[ADR-0013](adr/0013-tech-stack.md)）
 - 序号仅用于快照与实时流的衔接和缺口检测，不保存事件，不用于回放。（[ADR-0005](adr/0005-client-protocol.md)）
 - 会话池独立于 Web 框架，由注入的会话工厂创建会话（`src/session/`）；路由层只做协议编解码（`src/api/`）。快照由池从同一条事件流累积，保证快照与序号一致。模型不支持图片时拒绝带图消息，因为 SDK 会悄悄丢图。（[ADR-0020](adr/0020-transport-websocket.md)、[ADR-0021](adr/0021-session-wire-protocol.md)）
+- 会话按需从 JSONL 加载进池，索引（SQLite）与文件不一致时以文件为准并在启动时对账；运行中的会话不可删除；被打断留下的悬挂工具调用，在下一轮以尾部通知告知模型。（[ADR-0004](adr/0004-state-storage-recovery.md)、[ADR-0024](adr/0024-session-rest-and-history.md)、[ADR-0025](adr/0025-data-dir-layout-and-versioning-revised.md)）
 - 超时、出错、拿不准一律不默认放行；敏感路径不吃 cwd 放行；子进程不继承 Server 的环境。（[ADR-0006](adr/0006-permission-tiers.md)）
 - 凭据真值只在启动进程时出现，不经环境变量；sudo 开 shell 类动作始终人工审批。（[ADR-0007](adr/0007-private-variables.md)）
 - 输出脱敏不在基建内，只预留变换槽位。（[ADR-0006](adr/0006-permission-tiers.md)）
@@ -85,3 +86,4 @@
 - 2026-10-17：会话池与事件流落地（ROADMAP 第 3 条第一块），边界与约定补会话池的实现约束。
 - 2026-10-17：纳入 ADR-0022 至 ADR-0024，定 SQLite 驱动、数据目录布局与结构版本号、会话管理与历史拉取的 REST 契约。
 - 2026-10-17：ADR-0025 取代 ADR-0023，仅改会话文件名约定（SDK 固定生成 `<时间>_<id>.jsonl`）。
+- 2026-10-17：持久化与恢复落地（ROADMAP 第 3 条第二块），边界与约定补按需加载与对账。

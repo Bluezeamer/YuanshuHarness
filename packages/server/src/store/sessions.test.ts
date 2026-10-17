@@ -125,10 +125,10 @@ describe("R6/R7 对账", () => {
     store.upsert({ id: B, name: null, createdAt: "2", updatedAt: "2" });
     expect(store.list().map((r) => r.id)).toEqual([B, A]);
     store.touch(A, "3");
-    store.rename(B, "nb", "4");
+    store.rename(B, "nb");
     expect(store.list().map((r) => [r.id, r.name])).toEqual([
-      [B, "nb"],
       [A, null],
+      [B, "nb"],
     ]);
   });
 });

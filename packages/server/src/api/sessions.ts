@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { RawData, WebSocket } from "ws";
 import {
   type ImageInput,
@@ -6,6 +6,7 @@ import {
   type SessionEntry,
   type SessionPool,
 } from "../session/pool.js";
+import { pageMessages } from "../store/history.js";
 
 export interface SessionsApiOptions {
   pool: SessionPool | null;
@@ -63,8 +64,16 @@ export async function sessionsApi(
   const { pool } = opts;
   const sockets = new Set<WebSocket>();
 
+  const loadFailed = (err: unknown, reply: FastifyReply) => {
+    if (err instanceof PoolError && err.code === "load_failed") {
+      app.log.error({ err }, "加载会话失败");
+      return reply.code(500).send({ error: "session_load_failed" });
+    }
+    throw err;
+  };
+
   app.post("/api/v1/sessions", async (_req, reply) => {
-    if (!pool) {
+    if (!pool?.canCreate) {
       return reply.code(501).send({ error: "no_session_backend" });
     }
     try {
@@ -83,9 +92,79 @@ export async function sessionsApi(
   app.get<{ Params: { id: string } }>(
     "/api/v1/sessions/:id",
     async (req, reply) => {
-      const entry = pool?.get(req.params.id);
-      if (!entry) return reply.code(404).send({ error: "not_found" });
-      return entry.info;
+      const info = pool?.info(req.params.id);
+      if (!info) return reply.code(404).send({ error: "not_found" });
+      return info;
+    },
+  );
+
+  app.patch<{ Params: { id: string }; Body: unknown }>(
+    "/api/v1/sessions/:id",
+    async (req, reply) => {
+      const name = (req.body as { name?: unknown } | null)?.name;
+      if (typeof name !== "string")
+        return reply.code(400).send({ error: "bad_request" });
+      try {
+        const info = await pool?.rename(req.params.id, name);
+        if (!info) return reply.code(404).send({ error: "not_found" });
+        return info;
+      } catch (err) {
+        if (err instanceof PoolError && err.code === "bad_request")
+          return reply.code(400).send({ error: "bad_request" });
+        return loadFailed(err, reply);
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id",
+    async (req, reply) => {
+      try {
+        const r = await pool?.remove(req.params.id);
+        if (!r || r === "not_found")
+          return reply.code(404).send({ error: "not_found" });
+        if (r === "running")
+          return reply.code(409).send({ error: "session_running" });
+        return reply.code(204).send();
+      } catch (err) {
+        if (err instanceof PoolError && err.code === "delete_failed") {
+          app.log.error({ err }, "删除会话文件失败");
+          return reply.code(500).send({ error: "session_delete_failed" });
+        }
+        throw err;
+      }
+    },
+  );
+
+  app.get<{
+    Params: { id: string };
+    Querystring: { before?: string; limit?: string };
+  }>("/api/v1/sessions/:id/messages", async (req, reply) => {
+    try {
+      const all = pool?.history(req.params.id);
+      if (!all) return reply.code(404).send({ error: "not_found" });
+      const page = pageMessages(all, req.query.before, req.query.limit);
+      if (!page.ok) return reply.code(400).send({ error: "bad_request" });
+      return { messages: page.messages, nextBefore: page.nextBefore };
+    } catch (err) {
+      return loadFailed(err, reply);
+    }
+  });
+
+  app.get<{ Params: { id: string; index: string } }>(
+    "/api/v1/sessions/:id/messages/:index",
+    async (req, reply) => {
+      if (!/^(0|[1-9][0-9]*)$/.test(req.params.index))
+        return reply.code(400).send({ error: "bad_request" });
+      try {
+        const all = pool?.history(req.params.id);
+        if (!all) return reply.code(404).send({ error: "not_found" });
+        const m = all[Number(req.params.index)];
+        if (!m) return reply.code(404).send({ error: "not_found" });
+        return m;
+      } catch (err) {
+        return loadFailed(err, reply);
+      }
     },
   );
 
@@ -93,10 +172,14 @@ export async function sessionsApi(
     "/api/v1/sessions/:id/stream",
     {
       websocket: true,
-      // 升级之前拒绝：不存在的会话得到普通 404，而不是先握手再关闭。
+      // 升级之前加载并拒绝：不存在的会话得到普通 404，加载失败得到 500，而不是先握手再关闭。
       preValidation: async (req, reply) => {
-        if (!pool?.get(req.params.id))
-          return reply.code(404).send({ error: "not_found" });
+        try {
+          if (!(await pool?.acquire(req.params.id)))
+            return reply.code(404).send({ error: "not_found" });
+        } catch (err) {
+          return loadFailed(err, reply);
+        }
       },
     },
     (socket, req) => {
@@ -126,7 +209,10 @@ export async function sessionsApi(
       }
       socket.send(text);
     };
-    const subscriber = { send: writeRaw };
+    const subscriber = {
+      send: writeRaw,
+      close: () => socket.close(1001, "session_deleted"),
+    };
     let unsubscribe = () => {};
 
     const ack = (id: unknown, error?: AckError): void => {

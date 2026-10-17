@@ -413,12 +413,12 @@ describe("生命周期（R7）", () => {
 });
 
 describe("数据目录（R4）", () => {
-  test("启动并停止之后，数据目录里没有任何文件", async () => {
+  test("启动并停止之后，数据目录里只有数据库与 sessions 目录", async () => {
     const dataDir = path.join(base, "data");
     const { server } = await launch(cfg({ dataDir }));
     await server.stop();
     const { readdir } = await import("node:fs/promises");
-    expect(await readdir(dataDir)).toEqual([]);
+    expect(await readdir(dataDir)).toEqual(["sessions", "yuanshu.db"]);
   });
 });
 

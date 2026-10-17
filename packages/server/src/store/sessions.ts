@@ -107,10 +107,9 @@ export class SessionStore {
       .run(updatedAt, id);
   }
 
-  rename(id: string, name: string, updatedAt: string): void {
-    this.db
-      .prepare("UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?")
-      .run(name, updatedAt, id);
+  // 改名不算活动，不改 updated_at。
+  rename(id: string, name: string): void {
+    this.db.prepare("UPDATE sessions SET name = ? WHERE id = ?").run(name, id);
   }
 
   remove(id: string): boolean {

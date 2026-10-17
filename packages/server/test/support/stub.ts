@@ -1,5 +1,12 @@
 import "../contract/isolate.js";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -11,6 +18,9 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { type SessionFactory, SessionPool } from "../../src/session/pool.js";
+import { openDatabase } from "../../src/store/db.js";
+import { SessionStore } from "../../src/store/sessions.js";
 
 export interface RecordedRequest {
   path: string;
@@ -187,16 +197,60 @@ export async function openSession(
   return { session, modelRuntime, resourceLoader };
 }
 
-// 每次调用建一个全新的隔离会话，对着给定的 stub；关闭重试，避免失败用例等退避。
+// 每次调用按传入的 id 与目录新建（或按 file 恢复）一个隔离会话，对着给定的 stub；
+// 关闭重试，避免失败用例等退避。
 export function stubSessionFactory(
   stub: { url: string },
   modelExtra: Record<string, unknown> = {},
-) {
-  return async () => {
+): SessionFactory {
+  return async ({ id, sessionDir, file }) => {
     const env = makeEnv();
     writeModels(env, stub.url, modelExtra);
-    const { session } = await openSession(env, { retry: false });
+    const manager = file
+      ? SessionManager.open(file, sessionDir)
+      : SessionManager.create(env.cwd, sessionDir, { id });
+    const { session } = await openSession(env, {
+      sessionManager: manager,
+      retry: false,
+    });
     return session;
+  };
+}
+
+// 一个临时数据目录：已迁移的数据库、索引与 sessions 目录。close() 释放并删除。
+export function testData(existingDir?: string) {
+  const dir = existingDir ?? mkdtempSync(join(tmpdir(), "yuanshu-data-"));
+  const sessionDir = join(dir, "sessions");
+  mkdirSync(sessionDir, { recursive: true });
+  const db = openDatabase(dir);
+  const store = new SessionStore(db);
+  return {
+    dir,
+    sessionDir,
+    db,
+    store,
+    close(remove = true) {
+      try {
+        db.close();
+      } catch {}
+      if (remove) rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+export type TestData = ReturnType<typeof testData>;
+
+export function testPool(
+  factory: SessionFactory,
+  data: TestData = testData(),
+): { pool: SessionPool; data: TestData } {
+  return {
+    pool: new SessionPool({
+      factory,
+      store: data.store,
+      sessionDir: data.sessionDir,
+    }),
+    data,
   };
 }
 
@@ -221,4 +275,34 @@ export async function persistSession(
   session.dispose();
   if (!file) throw new Error("会话没有落盘");
   return file;
+}
+
+// 给会话 JSONL 末尾追加一条带工具调用、没有结果的助手消息，模拟运行中被打断。
+export function appendDanglingToolCall(file: string, callId = "call_x"): void {
+  const lines = readFileSync(file, "utf8").trim().split("\n");
+  const last = JSON.parse(lines[lines.length - 1] as string) as { id: string };
+  const entry = {
+    type: "message",
+    id: "dangle01",
+    parentId: last.id,
+    timestamp: new Date().toISOString(),
+    message: {
+      role: "assistant",
+      content: [{ type: "toolCall", id: callId, name: "t", arguments: {} }],
+      api: "openai-completions",
+      provider: "stub",
+      model: "stub-model",
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+    },
+  };
+  appendFileSync(file, `${JSON.stringify(entry)}\n`);
 }
