@@ -68,11 +68,10 @@ Date: 2026-10-17
 15. **合并与关闭。** 你评审并合并；之后另开小 PR 把 intent 关闭并整夹移入 `done/`，与上一轮相同。
 
 ## 实测记录
-（步骤 0、1、11 完成后填写）
 - `node:24-slim` 对应的具体标签与 Debian 代号（2026-10-17 实测）：`node:24.22.0-bookworm-slim`，Debian 12（bookworm），Node v24.22.0，`node` 用户 uid/gid 1000，镜像内没有 curl 与 wget。`24.22.0-bookworm-slim` 与 `24-slim` 的镜像 ID 相同（`sha256:a5f4366e…`）。
 - 本机 bridge 与 host 网络的实测结果，以及据此选定的模式：LXD 容器里，默认 bridge 网络 `docker run` 失败，报 `open sysctl net.ipv4.ip_unprivileged_port_start file: reopen fd 8: permission denied`（runc 无法给容器设置 sysctl）；`--network host` 正常。`docker build` 在默认网络下正常。**选定：`docker run` 一律加 `--network host`，不走端口映射；`docker build` 不加。**
-- 锁定的依赖版本：
-- 完整检查的关键输出：
+- 锁定的依赖版本（2026-10-17，`pnpm add --save-exact`，pnpm 的供应链策略未拦）：`fastify` 5.12.7、`@fastify/static` 10.1.6、`@types/node` 22.20.5。与 pi 调研的版本一致。
+- 完整检查（`scripts/check.sh`，本机 LXD，Node 24.13.1 加 pnpm 12.11.2 加 Docker 29.9.1，有构建缓存）：退出码 0，用时约 82 秒。前置检查、冻结锁文件安装、类型检查、lint、测试（server 118 条、web 1 条）、检查脚本自检、构建、装包冒烟（版本 0.0.0）、镜像冒烟（版本 0.0.0）、aisdlc 校验全部通过。镜像冒烟单独约 72–90 秒。冷缓存与 GitHub 托管 runner 上的耗时未知，待 PR 的首次 CI 验证。
 
 ## Rollback
 - 这次变更没有任何持久化数据，也没有发布到外部：不发布 npm，不推镜像，不创建数据目录以外的状态。所以退回只需要 `git revert` 合并提交，没有迁移顺序，也没有双写窗口。
@@ -87,5 +86,6 @@ Date: 2026-10-17
 - 2026-10-17（server 实现时）：`cli.ts` 的 `execute` 与 `parseConfig` 多接受一个 `cwd` 参数，用来把相对数据目录转成绝对路径而不读 `process.cwd()`，保持纯函数。spec Design 里写的是 `parseConfig(argv, env, home)`，签名多一个参数，行为不变。
 - 2026-10-17（装包冒烟实现时）：① spec Risks 写「tarball 本阶段不含 `LICENSE`」不对：`pnpm pack` 会把仓库根的 `LICENSE`（MIT）带进 tarball，实测清单为 `dist/`、`web/index.html`、`LICENSE`、`package.json`。因此首次发布前不必再补 LICENSE；该处属 Risks 的事实更正，不改 Requirements。② spec Proof R11 称「把安装目录放进仓库树内并删掉一个运行时依赖声明，冒烟会误绿」，实测**没有复现**：`@fastify/static` 移到 `devDependencies` 后即使安装目录在仓库内，仍报 `ERR_MODULE_NOT_FOUND` 而变红——pnpm 不会把依赖提升到仓库根的 `node_modules`，从外部目录向上解析不到。「安装目录必须在仓库目录树外」的断言保留，但它现在是对其他提升依赖的布局（如 npm workspaces 或日后改 `public-hoist-pattern`）的保险，而不是已被证明的必要条件；Requirements 不变。③ web 包 `build` 由 `tsc` 发射改为复制 `public/` 到 `dist/`，并删除孤儿的 `packages/web/tsconfig.build.json`，与 Files that change 一致。
 - 2026-10-17（镜像冒烟实现时）：① **spec R13 要求「`docker stop` 在 5 秒内完成」，实测该判据不稳**：本机 `docker stop` 用时 0.8–4.5 秒不等，而 server 自身在有空闲 keep-alive 连接时的关闭耗时是 0.00 秒，多出的时间在 Docker 一侧（容器启动本身在本机就要 7 秒以上，是 LXD 环境的固有开销）。冒烟脚本的门槛放宽为 8 秒，进程本身的 5 秒要求由退出码保证（Docker 10 秒后强杀，退出码变 137，已验证 `ENTRYPOINT` 改 shell 形式时被抓住）。**这触及 spec R13 的数值，需要你在评审时确认是否同步改 spec。** ② 「镜像内容」检查由 5 次 `docker run` 合并为 1 次，整个镜像冒烟从约 2 分钟降到约 72 秒；不是镜像下载慢（基础镜像在本地，冷构建全程约 40 秒），不需要换镜像源。③ 清理逻辑最初用数组登记容器名，但登记发生在 `$(...)` 子 shell 里，父 shell 看不到，导致每次运行遗留容器；改为按带本次后缀的固定名字清理，成功与失败路径都已验证零遗留（容器、卷、镜像、临时目录）。④ tarball 清单与镜像内清单的比较两边都固定 `LC_ALL=C` 排序，否则大写文件名的位置不同会误报。⑤ 为让清单可比，Dockerfile 里多一个 `tarball` 阶段（`FROM scratch`），仅用于把 tarball 导出到宿主机，不进最终镜像。
+- 2026-10-17（接线检查时）：① README 里的 `docker run` 示例用 `<!-- smoke:docker-run -->` 标记，镜像冒烟从 README 提取它真实执行，只替换镜像名、容器名、卷名，并把 `-p 7420:7420` 换成 `--network host -e YUANSHU_PORT=<空闲端口>`（本环境 bridge 不可用）。示例被改坏时冒烟变红，已变异验证。② 自检里新增「缺 docker」「docker 守护进程不可用」两个用例，以及两个冒烟步骤失败时整体必须失败的用例；已对删除 docker 检查、冒烟步骤加 `|| true`、不调用冒烟五种变异逐一验证会变红。③ CI 只改了 `timeout-minutes`（15 到 20），未登录或推送任何镜像仓库。
 - 2026-10-17（server 变异验证）：两条变异是等价变异，不是测试漏洞：① 静态托管先于 `/healthz` 注册——find-my-way 中静态路径永远优先于通配，与注册顺序无关；真正能遮蔽 `/healthz` 的 `wildcard: false` 已被抓住。② `forceCloseConnections: false`——Node 19 起 `http.Server.close()` 自己会关闭空闲连接，所以不能靠它区分；改为用「stop() 什么都不做」作变异，由「stop 之后连接被拒」的断言抓住。
 - 2026-10-17（server 变异验证）：变异验证暴露两处测试缺口并已补强：① R8 的用例原本创建一个就启动一个，共享模块级状态的实现照样通过，改为两个实例先都创建再启动，并核对各自的数据目录；② R7 的用例只量了时间，没断言「stop 之后不再接收连接」，已补。

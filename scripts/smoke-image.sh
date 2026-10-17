@@ -73,11 +73,23 @@ tar -tzf "$TARBALL" | sed 's|^package/||' | LC_ALL=C sort > "$WORK/tarball.txt"
 diff -u "$WORK/tarball.txt" "$WORK/installed.txt" > "$WORK/diff.txt" \
   || die "镜像里安装的文件与 tarball 清单不一致：$(cat "$WORK/diff.txt")"
 
-echo "== 运行（命名卷 + host 网络）"
+echo "== 运行 README 里的 docker run 示例（命名卷）"
+# 从 README 取出示例命令原样执行，只做三处必要的替换：镜像名、容器名/卷名（带本次后缀以便清理）、
+# 以及把 -p 端口映射换成 host 网络（本环境 bridge 不可用，见文件头）。示例写坏了，这里就会失败。
 PORT="$(free_port)"
 VOL="$(cname data)"
 APP="$(cname app)"
-docker run -d "${RUN_OPTS[@]}" --name "$APP" -e "YUANSHU_PORT=$PORT" -v "$VOL:/data" "$IMAGE" >/dev/null
+README_CMD="$(awk '/<!-- smoke:docker-run -->/{f=1;next} f&&/^```bash/{g=1;next} g&&/^```/{exit} g{print}' "$REPO/README.md")"
+[[ "$README_CMD" == docker\ run\ * ]] || die "README 里没有找到 <!-- smoke:docker-run --> 标记的 docker run 示例"
+[[ "$README_CMD" == *" -p 7420:7420 "* ]] || die "README 示例里应当有 -p 7420:7420"
+[[ "$README_CMD" == *" --name yuanshu "* ]] || die "README 示例里应当有 --name yuanshu"
+[[ "$README_CMD" == *" -v yuanshu-data:/data "* ]] || die "README 示例里应当有 -v yuanshu-data:/data"
+[[ "$README_CMD" == *" yuanshu" ]] || die "README 示例应当以镜像名 yuanshu 结尾"
+CMD="${README_CMD//-p 7420:7420/--network host -e YUANSHU_PORT=$PORT}"
+CMD="${CMD//--name yuanshu/--name $APP}"
+CMD="${CMD//yuanshu-data:\/data/$VOL:\/data}"
+CMD="${CMD% yuanshu} $IMAGE"
+eval "$CMD" >/dev/null
 wait_health "$APP" healthy 30 || { docker logs "$APP" >&2 || true; die "30 秒内容器没有变为 healthy（当前 $(health_status "$APP")）"; }
 BASE="http://127.0.0.1:$PORT"
 check_health "$BASE" "$VERSION"

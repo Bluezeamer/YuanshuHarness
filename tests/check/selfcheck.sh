@@ -61,13 +61,20 @@ restricted_path() {
 PM="$(sed -n 's/.*"packageManager": "\([^"]*\)".*/\1/p' "$ROOT/package.json")"
 
 # make_stub <目录> [坏掉的步骤]
-# 坏掉的步骤：install | typecheck | lint | test | build | aisdlc | notests；留空则全部正常。
+# 坏掉的步骤：install | typecheck | lint | test | build | smokepkg | smokeimg | aisdlc | notests；留空则全部正常。
 make_stub() {
   local dir="$1" bad="${2:-}"
   local c_typecheck=true c_lint=true c_test=true c_build=true
   [[ "$bad" =~ ^(typecheck|lint|test|build)$ ]] && printf -v "c_$bad" 'echo STUB-FAIL-%s; exit 1' "$bad"
 
-  mkdir -p "$dir/packages/a" "$dir/docs/intent/active"
+  mkdir -p "$dir/packages/a" "$dir/docs/intent/active" "$dir/scripts"
+  # 冒烟脚本的桩：check.sh 按 CHECK_ROOT 调用，所以临时工程里放自己的版本
+  local sp="echo STUB-SMOKE-PACKAGE-RAN" si="echo STUB-SMOKE-IMAGE-RAN"
+  [[ "$bad" == smokepkg ]] && sp="echo STUB-FAIL-smokepkg; exit 1"
+  [[ "$bad" == smokeimg ]] && si="echo STUB-FAIL-smokeimg; exit 1"
+  printf '#!/usr/bin/env bash\n%s\n' "$sp" > "$dir/scripts/smoke-package.sh"
+  printf '#!/usr/bin/env bash\n%s\n' "$si" > "$dir/scripts/smoke-image.sh"
+  chmod +x "$dir/scripts/smoke-package.sh" "$dir/scripts/smoke-image.sh"
   [[ "$bad" == notests ]] || touch "$dir/packages/a/stub.test.ts"
   # 包目录之外的测试文件不得被计入
   [[ "$bad" == notests ]] && touch "$dir/stray.test.ts"
@@ -100,6 +107,8 @@ for pair in \
   "lint:STUB-FAIL-lint" \
   "test:STUB-FAIL-test" \
   "build:STUB-FAIL-build" \
+  "smokepkg:STUB-FAIL-smokepkg" \
+  "smokeimg:STUB-FAIL-smokeimg" \
   "aisdlc:校验未通过" \
   "notests:没有找到任何测试文件"; do
   step_name="${pair%%:*}"
@@ -108,13 +117,23 @@ for pair in \
 done
 
 # R5：缺失的前置工具必须被点名
-base=(bash env dirname cat sed grep sort head tr)
+base=(bash env dirname cat sed grep sort head tr docker)
 expect_fail "缺 python3" "缺少前置工具：python3" \
   env PATH="$(restricted_path nopy "${base[@]}" node pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
 expect_fail "缺 pnpm" "缺少前置工具：pnpm" \
   env PATH="$(restricted_path nopnpm "${base[@]}" node python3)" CHECK_ROOT="$WORK/ok" "$CHECK"
 expect_fail "缺 node" "缺少前置工具：node" \
   env PATH="$(restricted_path nonode "${base[@]}" python3 pnpm)" CHECK_ROOT="$WORK/ok" "$CHECK"
+
+# R15：缺 docker、守护进程不可用，都必须失败并点名；也不得因此被"跳过"
+nodocker_base=(bash env dirname cat sed grep sort head tr)
+expect_fail "缺 docker" "缺少前置工具：docker" \
+  env PATH="$(restricted_path nodocker "${nodocker_base[@]}" node pnpm python3)" CHECK_ROOT="$WORK/ok" "$CHECK"
+brokendocker="$(restricted_path brokendocker "${nodocker_base[@]}" node pnpm python3)"
+printf '#!/usr/bin/env bash\necho "Cannot connect to the Docker daemon" >&2\nexit 1\n' > "$brokendocker/docker"
+chmod +x "$brokendocker/docker"
+expect_fail "docker 守护进程不可用" "docker 守护进程不可用" \
+  env PATH="$brokendocker" CHECK_ROOT="$WORK/ok" "$CHECK"
 
 # pnpm 实际版本与锁定不一致（例如过旧、不会自动切换的 pnpm）必须失败
 fake="$(restricted_path badpnpm "${base[@]}" node python3)"

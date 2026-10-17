@@ -18,12 +18,15 @@ precheck() {
   command -v node >/dev/null 2>&1 || missing+=("node（需要 >=22.19）")
   command -v pnpm >/dev/null 2>&1 || missing+=("pnpm（需要 >=10，例如 \`npm install -g pnpm\`；在本仓库里它会自动切换到 package.json 锁定的版本）")
   command -v python3 >/dev/null 2>&1 || missing+=("python3（需要 >=3.11，aisdlc 校验用）")
+  command -v docker >/dev/null 2>&1 || missing+=("docker（镜像冒烟用，没有跳过开关）")
   ((${#missing[@]} == 0)) || die "缺少前置工具：${missing[*]}"
 
   node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=19)?0:1)' \
     || die "node 版本过低：$(node -v)，需要 >=22.19"
   python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
     || die "python3 版本过低：$(python3 --version)，需要 >=3.11"
+  docker info >/dev/null 2>&1 \
+    || die "docker 守护进程不可用：docker info 失败（守护进程没有启动，或当前用户没有权限）"
 
   # 不依赖 corepack（Node 25 起不再随发行包提供）：由 pnpm 自己按 packageManager 切换版本，
   # 过旧的 pnpm 不会切换，所以要核对实际版本。
@@ -54,6 +57,8 @@ run_tests() {
 # 自检会以 CHECK_ROOT 指向临时工程，反过来驱动本脚本；那一层不再自检，避免递归。
 selfcheck() { step "检查脚本自检"; bash "$REPO/tests/check/selfcheck.sh"; }
 build() { step "构建"; (cd "$ROOT" && pnpm build); }
+smoke_package() { step "装包冒烟"; (cd "$ROOT" && scripts/smoke-package.sh); }
+smoke_image() { step "镜像冒烟"; (cd "$ROOT" && scripts/smoke-image.sh); }
 
 aisdlc_check() {
   step "aisdlc 校验"
@@ -71,5 +76,7 @@ else
   printf '\n提示：已设置 CHECK_ROOT，跳过检查脚本自检\n'
 fi
 build
+smoke_package
+smoke_image
 aisdlc_check
 printf '\n全部检查通过\n'
