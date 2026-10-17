@@ -35,4 +35,6 @@ Date: 2026-10-17
 8. 评审：新开空上下文 subagent，命中静默信号，多轮到无阻塞；变异结果写进 `review.md`。
 
 ## Deviations
+- 2026-10-17 R8 集成测试暴露服务端缺陷：`Server.stop()` 时客户端收到 1005 而非 1001。`sessions.ts` 的 `preClose` 钩子写了 `close(1001, "server_shutdown")`，但 `@fastify/websocket` 默认的 `preClose` 先执行，调用不带状态码的 `client.close()`。在 `server.ts` 根作用域同步注册一个更早的 `preClose`，先发 1001。这是让实现符合 ADR-0021 既有约定，没有协议变化；去掉该钩子时 R8 用例变红（1005），即变异验证。
+- 2026-10-17 步骤 5 的变异验证发现原有 R7 用例抓不到"等新快照期间重复发 resync"，补了一个让 `resync` 延迟到达 Server 的用例（实时帧先于新快照到达），去掉"等待快照时丢帧"后该用例变红。
 - 2026-10-17 步骤 1 探测结论：升级被拒拿不到状态码，所以 R3 在 `attach` 上靠预检实现。这是实现路径，不改 Requirements；Risks 里的"改用 `ws`"评估为不需要，不新增依赖。

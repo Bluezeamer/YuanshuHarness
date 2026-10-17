@@ -12,6 +12,7 @@ process.exitCode = await execute(process.argv.slice(2), {
   env: process.env,
   home: homedir(),
   cwd: process.cwd(),
+  stdin: process.stdin,
   stdout: process.stdout,
   stderr: process.stderr,
   signal: controller.signal,
