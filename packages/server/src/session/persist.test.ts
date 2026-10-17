@@ -123,9 +123,10 @@ describe("R6/R8/R15 索引与列表", () => {
 describe("R9/R10/R11 按需加载与恢复", () => {
   test("重启后列表在、未访问不进池；访问后快照含最近消息，继续对话时历史随请求发出", async () => {
     let calls = 0;
-    const counting: SessionFactory = (o) => (
-      calls++, stubSessionFactory(stub)(o)
-    );
+    const counting: SessionFactory = (o) => {
+      calls++;
+      return stubSessionFactory(stub)(o);
+    };
     const t = start(undefined, counting);
     const { id } = await converse(t.pool, ["MARK-first", "second"]);
     const callsBefore = calls;
@@ -182,9 +183,10 @@ describe("R9/R10/R11 按需加载与恢复", () => {
 
   test("R11 并发 20 次首次访问同一会话：工厂只调用一次，得到同一个会话", async () => {
     let calls = 0;
-    const counting: SessionFactory = (o) => (
-      calls++, stubSessionFactory(stub)(o)
-    );
+    const counting: SessionFactory = (o) => {
+      calls++;
+      return stubSessionFactory(stub)(o);
+    };
     const t = start(undefined, counting);
     const { id } = await converse(t.pool, ["x"]);
     const n = restart(t, counting);

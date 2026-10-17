@@ -109,7 +109,6 @@ export function mapEvent(e: AgentSessionEvent): ServerEvent | null {
 
 export const EVENT_STRING_MAX = 256 * 1024;
 export const SNAPSHOT_MESSAGE_MAX = 32 * 1024;
-const MAX_DEPTH = 8;
 
 export const FRAME_DATA_MAX = 1024 * 1024;
 // 留出信封与 truncated 标记的余量，使最终线上 data 不超过 FRAME_DATA_MAX。

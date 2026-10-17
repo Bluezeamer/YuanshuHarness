@@ -19,7 +19,10 @@ afterEach(async () => {
   }
   await rm(dir, { recursive: true, force: true });
 });
-const track = <T extends { close(): void }>(d: T) => (open.push(d), d);
+const track = <T extends { close(): void }>(d: T) => {
+  open.push(d);
+  return d;
+};
 const baks = () => readdirSync(dir).filter((f) => f.includes(".bak-"));
 const version = (d: Database.Database) =>
   d.pragma("user_version", { simple: true });

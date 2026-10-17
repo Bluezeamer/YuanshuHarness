@@ -96,7 +96,7 @@ describe("R16 有界", () => {
   const bytes = (v: unknown) => Buffer.byteLength(JSON.stringify(v));
 
   test("字符串截断不切开代理对", () => {
-    expect(cut("a".repeat(9) + "😀", 10)).toBe("a".repeat(9));
+    expect(cut(`${"a".repeat(9)}😀`, 10)).toBe("a".repeat(9));
   });
 
   test("长字符串被截断并在顶层标记", () => {

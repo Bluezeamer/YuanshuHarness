@@ -35,8 +35,7 @@ export function collector(onFrame?: (f: Frame) => void) {
 // 检查序号：第一帧是快照，其后严格 +1。
 export function expectContiguous(frames: Frame[]): void {
   const [first, ...rest] = frames;
-  if (!first || first.type !== "snapshot")
-    throw new Error("第一帧必须是 snapshot");
+  if (first?.type !== "snapshot") throw new Error("第一帧必须是 snapshot");
   let prev = first.seq;
   for (const f of rest) {
     if (f.seq !== prev + 1)

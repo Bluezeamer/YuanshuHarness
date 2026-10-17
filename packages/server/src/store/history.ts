@@ -46,7 +46,7 @@ export function hasDanglingToolCall(
     .map((e) => e.message as Record<string, unknown>);
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
-    if (!m || m.role !== "assistant") continue;
+    if (m?.role !== "assistant") continue;
     const calls = (Array.isArray(m.content) ? m.content : []).flatMap(
       (b: { type?: string; id?: string }) =>
         b?.type === "toolCall" && typeof b.id === "string" ? [b.id] : [],
