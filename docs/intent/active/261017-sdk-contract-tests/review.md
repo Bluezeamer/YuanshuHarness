@@ -94,9 +94,9 @@ Reviewer: 每轮由新开的空上下文评审者执行（见 references/review.
 
 | 级别 | 位置 | 发现 | 处理 |
 |---|---|---|---|
-| 重要 | `packages/server/test/contract/mid-convo.test.ts:177-195` | 未断言首个请求不含 `MARK`。因此若标记已作为 user 消息出现在首轮历史、但第二轮没有新注入，`r2`/`r3` 的“出现一次”、user 角色、前缀相等断言仍可能由历史残留满足，不能证明第二轮的 `before_agent_start` 返回值进入请求。应先断言 `countIn(r1, MARK) === 0`，再验证 `r2` 新增且后续保留。 | |
-| 重要 | `packages/server/test/contract/mid-convo.test.ts:189-191` | `indexOf(carrier) > 1` 只证明消息不在开头附近，不证明它附加在上下文末尾；插入到更早的历史位置仍会通过，与 spec R3 的“附加到上下文末尾”要求不符。 | |
-| 重要 | `packages/server/test/live/smoke.ts:73-83,89-101` | 第 3 轮脱敏问题仍存在：`session.prompt` 的内层 catch 会处理并吞掉错误，只替换完整 `baseUrl`，未替换 key 或 host；因此不会进入外层使用 `secrets` 的 catch，错误回显密钥/主机名时仍会写入输出。 | |
-| 建议 | `docs/intent/active/261017-sdk-contract-tests/intent.md:20`、`docs/intent/active/261017-sdk-contract-tests/review.md:17` | 第 4 条裁决已将第一批收窄为 openai-completions 并延期 anthropic-messages，但 intent 的 Proposed outcome 仍把 `supportsMidConvoToolChanges` 写作第一批覆盖项。review 结论又称 ROADMAP 仍把该标志用于 openai-completions；当前 ROADMAP 已区分两个协议，故此处描述过时。 | |
+| 重要 | `packages/server/test/contract/mid-convo.test.ts:177-195` | 未断言首个请求不含 `MARK`。因此若标记已作为 user 消息出现在首轮历史、但第二轮没有新注入，`r2`/`r3` 的“出现一次”、user 角色、前缀相等断言仍可能由历史残留满足，不能证明第二轮的 `before_agent_start` 返回值进入请求。应先断言 `countIn(r1, MARK) === 0`，再验证 `r2` 新增且后续保留。 | 已修：首个请求断言不含标记；变异（一开始就注入）实测变红。 |
+| 重要 | `packages/server/test/contract/mid-convo.test.ts:189-191` | `indexOf(carrier) > 1` 只证明消息不在开头附近，不证明它附加在上下文末尾；插入到更早的历史位置仍会通过，与 spec R3 的“附加到上下文末尾”要求不符。 | 已修：改为断言附加消息是请求里的最后一条（实测位置：system、user、assistant、user、附加的 user）。 |
+| 重要 | `packages/server/test/live/smoke.ts:73-83,89-101` | 第 3 轮脱敏问题仍存在：`session.prompt` 的内层 catch 会处理并吞掉错误，只替换完整 `baseUrl`，未替换 key 或 host；因此不会进入外层使用 `secrets` 的 catch，错误回显密钥/主机名时仍会写入输出。 | 已修：上一轮的替换没有生效（biome 重排了代码），这次直接读文件确认：内层 catch 已删除，所有异常都经统一出口，抹掉端点地址、主机名与 key；已手动验证带 key 的失败路径输出不含端点或 key。 |
+| 建议 | `docs/intent/active/261017-sdk-contract-tests/intent.md:20`、`docs/intent/active/261017-sdk-contract-tests/review.md:17` | 第 4 条裁决已将第一批收窄为 openai-completions 并延期 anthropic-messages，但 intent 的 Proposed outcome 仍把 `supportsMidConvoToolChanges` 写作第一批覆盖项。review 结论又称 ROADMAP 仍把该标志用于 openai-completions；当前 ROADMAP 已区分两个协议，故此处描述过时。 | 已修：intent 的 Proposed outcome 与 review 结论表述已更新，与裁决及 ROADMAP 一致。 |
 
 本轮确认：ROADMAP 对协议范围的改动对应 intent Decisions needed 第 4 条的人批准，未发现超出批准范围的方向调整。第 3 轮脱敏项未完全消失，见上表。按要求未运行测试。
