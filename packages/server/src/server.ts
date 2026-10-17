@@ -1,15 +1,21 @@
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
-import Fastify from "fastify";
+import Fastify, {
+  type FastifyError,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
+import { type Db, openDatabase } from "./store/db.js";
+import { SessionStore } from "./store/sessions.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
 const PACKAGE_ROOT = new URL("../", import.meta.url);
@@ -83,6 +89,20 @@ function isInsideWebRoot(webRoot: string, pathName: string): boolean {
   }
 }
 
+// 未处理的 5xx 默认会把 err.message 原样返回，里面可能带本机文件路径；详情只进日志。
+export function hideServerErrorDetails(
+  err: FastifyError,
+  req: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const status = err.statusCode ?? 500;
+  if (status < 500) return reply.send(err);
+  req.log.error({ err }, "请求处理失败");
+  return reply
+    .code(status)
+    .send({ statusCode: status, error: "Internal Server Error" });
+}
+
 // 每次调用都新建 Fastify 实例，不使用模块级可变状态，同一进程内可并存多个实例。
 export function createServer(
   config: Config,
@@ -103,9 +123,9 @@ export function createServer(
       : { level: "info" },
   });
 
-  const pool = options.sessionFactory
-    ? new SessionPool(options.sessionFactory)
-    : null;
+  app.setErrorHandler(hideServerErrorDetails);
+
+  let db: Db | null = null;
   app.register(fastifyWebsocket, {
     options: { maxPayload: DEFAULTS.maxPayloadBytes },
     errorHandler: (err, _socket, req) => {
@@ -113,7 +133,6 @@ export function createServer(
       req.log.warn({ err }, "websocket 连接错误");
     },
   });
-  app.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
   app.get("/healthz", async () => ({ status: "ok", version }));
   app.register(fastifyStatic, {
     root: webRoot,
@@ -130,6 +149,25 @@ export function createServer(
       // 顺序固定：前端缺失时不创建数据目录，数据目录不可用时不监听。
       await assertWebRoot(webRoot);
       await prepareDataDir(config.dataDir);
+      // 数据库先于监听打开：版本过新或被另一个 Server 占用时直接启动失败。
+      db = openDatabase(config.dataDir);
+      try {
+        const sessionDir = path.join(config.dataDir, "sessions");
+        mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+        const store = new SessionStore(db);
+        const r = store.reconcile(sessionDir, (m) => app.log.warn(m));
+        app.log.info(r, "会话索引对账完成");
+        const pool = new SessionPool({
+          factory: options.sessionFactory ?? null,
+          store,
+          sessionDir,
+        });
+        app.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
+      } catch (err) {
+        db.close();
+        db = null;
+        throw err;
+      }
       if (!isLoopbackHost(config.host)) {
         app.log.warn(
           `监听在非回环地址 ${config.host}，认证尚未生效，能访问该地址的人都可以访问本服务`,
@@ -138,6 +176,8 @@ export function createServer(
       try {
         await app.listen({ host: config.host, port: config.port });
       } catch (err) {
+        db.close();
+        db = null;
         throw new Error(
           `无法监听 ${config.host}:${config.port}（${reason(err)}）`,
         );
@@ -147,6 +187,8 @@ export function createServer(
     },
     async stop() {
       await app.close();
+      db?.close();
+      db = null;
     },
   };
 }

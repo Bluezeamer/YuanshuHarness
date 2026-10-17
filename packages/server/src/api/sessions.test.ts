@@ -14,10 +14,16 @@ import {
 } from "vitest";
 import WebSocket from "ws";
 import { expectContiguous, waitFor } from "../../test/support/frames.js";
-import { startStub, stubSessionFactory } from "../../test/support/stub.js";
+import {
+  startStub,
+  stubSessionFactory,
+  type TestData,
+  testData,
+  testPool,
+} from "../../test/support/stub.js";
 import { TestClient } from "../../test/support/ws-client.js";
 import { createServer, type YuanshuServer } from "../server.js";
-import { SessionPool } from "../session/pool.js";
+import type { SessionPool } from "../session/pool.js";
 import { DEFAULTS, sessionsApi } from "./sessions.js";
 
 const stub = await startStub((n) => `reply-${n}`);
@@ -25,6 +31,7 @@ afterAll(() => stub.close());
 
 let app: FastifyInstance;
 let pool: SessionPool;
+let data: TestData | undefined;
 let base: string;
 const clients: TestClient[] = [];
 
@@ -34,7 +41,9 @@ async function boot(
   backend: { url: string } = stub,
   modelExtra: Record<string, unknown> = {},
 ) {
-  pool = new SessionPool(stubSessionFactory(backend, modelExtra));
+  data?.close();
+  data = testData();
+  pool = testPool(stubSessionFactory(backend, modelExtra), data).pool;
   app = Fastify({ logger: false });
   await app.register(fastifyWebsocket, {
     options: { maxPayload: DEFAULTS.maxPayloadBytes },
@@ -73,6 +82,8 @@ afterEach(async () => {
   stub.requests.length = 0;
   await app?.close();
   pool?.dispose();
+  data?.close();
+  data = undefined;
   await rm(base, { recursive: true, force: true });
 });
 
@@ -244,6 +255,44 @@ describe("R11 非法输入", () => {
     );
     expect(await c.waitClosed()).toBe(1009);
     expect(stub.requests).toHaveLength(0);
+  });
+
+  test("超长 id 被拒绝且不回显；畸形 base64、空 data 被拒绝", async () => {
+    const { http, ws } = await boot({}, undefined, stub, {
+      input: ["text", "image"],
+    });
+    const id = await newSession(http);
+    const c = await connect(ws, id);
+    const raw = async (obj: unknown) => {
+      const n = c.acks.length;
+      c.ws.send(JSON.stringify(obj));
+      await waitFor(() => c.acks.length > n, "ack");
+      return c.acks[n];
+    };
+    const long = await raw({
+      id: "i".repeat(257),
+      type: "send_message",
+      text: "x",
+    });
+    expect(long).toMatchObject({ ok: false, error: { code: "bad_request" } });
+    expect(JSON.stringify(long).length).toBeLessThan(1024);
+    for (const data of ["", "abc", "ab=c", "a===", "@@@@", "AA=A"]) {
+      const ack = await raw({
+        id: "b",
+        type: "send_message",
+        text: "x",
+        images: [{ mimeType: "image/png", data }],
+      });
+      expect(ack, data).toMatchObject({ ok: false });
+    }
+    const longMime = await raw({
+      id: "m",
+      type: "send_message",
+      text: "x",
+      images: [{ mimeType: `image/${"p".repeat(200)}`, data: "AAAA" }],
+    });
+    expect(longMime).toMatchObject({ ok: false });
+    expect(c.closed).toBeNull();
   });
 
   test("接近上限的带图消息可以接受", async () => {
@@ -450,8 +499,8 @@ describe("R15 服务停止", () => {
       { host: "127.0.0.1", port: 0, dataDir },
       {
         webRoot,
-        sessionFactory: async () => {
-          const session = await inner();
+        sessionFactory: async (o) => {
+          const session = await inner(o);
           const dispose = session.dispose.bind(session);
           session.dispose = () => {
             disposed++;

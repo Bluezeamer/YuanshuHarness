@@ -6,22 +6,38 @@ import {
   type Frame,
   waitFor,
 } from "../../test/support/frames.js";
-import { startStub, stubSessionFactory } from "../../test/support/stub.js";
-import { PoolError, SessionEntry, SessionPool } from "./pool.js";
+import {
+  startStub,
+  stubSessionFactory,
+  type TestData,
+  testPool,
+} from "../../test/support/stub.js";
+import { PoolError, SessionEntry, type SessionPool } from "./pool.js";
 
 const stub = await startStub((n) => `reply-${n}`);
 afterAll(() => stub.close());
 
 let pool: SessionPool;
+let data: TestData | undefined;
+function newPool(factory: ReturnType<typeof stubSessionFactory>) {
+  pool?.dispose();
+  data?.close();
+  const t = testPool(factory);
+  pool = t.pool;
+  data = t.data;
+  return pool;
+}
 afterEach(() => {
   pool?.dispose();
+  data?.close();
+  data = undefined;
   stub.mode.delayMs = 0;
   stub.mode.status = 200;
   stub.requests.length = 0;
 });
 
 async function open(modelExtra: Record<string, unknown> = {}) {
-  pool = new SessionPool(stubSessionFactory(stub, modelExtra));
+  newPool(stubSessionFactory(stub, modelExtra));
   const info = await pool.create();
   const entry = pool.get(info.id);
   if (!entry) throw new Error("会话不存在");
@@ -69,7 +85,7 @@ describe("R4/R5 序号与映射", () => {
 
 describe("R1 会话隔离", () => {
   test("A 的事件不会出现在 B 的订阅者上", async () => {
-    pool = new SessionPool(stubSessionFactory(stub));
+    newPool(stubSessionFactory(stub));
     const a = pool.get((await pool.create()).id);
     const b = pool.get((await pool.create()).id);
     if (!a || !b) throw new Error();
@@ -324,7 +340,7 @@ describe("R16 快照形状与有界", () => {
     pool.dispose();
     const big = await startStub(() => "z".repeat(300 * 1024));
     try {
-      pool = new SessionPool(stubSessionFactory(big));
+      newPool(stubSessionFactory(big));
       const e = pool.get((await pool.create()).id);
       if (!e) throw new Error();
       const cc = collector();

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { RawData, WebSocket } from "ws";
 import {
   type ImageInput,
@@ -6,6 +6,7 @@ import {
   type SessionEntry,
   type SessionPool,
 } from "../session/pool.js";
+import { pageMessages } from "../store/history.js";
 
 export interface SessionsApiOptions {
   pool: SessionPool | null;
@@ -27,14 +28,23 @@ type AckError = { code: string; message: string };
 
 const OPEN = 1;
 const MAX_IMAGES = 20;
+// 命令 id 由客户端生成，会被原样回显进 ack，所以必须有界。
+const MAX_CMD_ID_LEN = 256;
+const MAX_MIME_LEN = 128;
 const rawSize = (raw: RawData): number =>
   Array.isArray(raw)
     ? raw.reduce((n, b) => n + b.length, 0)
     : "byteLength" in raw
       ? raw.byteLength
       : 0;
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
-/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+// 图片可达数十 MiB，字符集检查用单个字符类；填充另行检查：只允许在末尾，且至多两个。
+const BASE64_BODY = /^[A-Za-z0-9+/]*$/;
+
+function isBase64(data: string): boolean {
+  if (data.length === 0 || data.length % 4 !== 0) return false;
+  const pad = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return BASE64_BODY.test(pad ? data.slice(0, -pad) : data);
+}
 
 function parseImages(value: unknown): ImageInput[] | null {
   if (value === undefined) return [];
@@ -45,10 +55,10 @@ function parseImages(value: unknown): ImageInput[] | null {
     if (
       !i ||
       typeof i.mimeType !== "string" ||
+      i.mimeType.length > MAX_MIME_LEN ||
       !i.mimeType.startsWith("image/") ||
       typeof i.data !== "string" ||
-      i.data.length % 4 !== 0 ||
-      !BASE64.test(i.data)
+      !isBase64(i.data)
     )
       return null;
     out.push({ mimeType: i.mimeType, data: i.data });
@@ -63,8 +73,16 @@ export async function sessionsApi(
   const { pool } = opts;
   const sockets = new Set<WebSocket>();
 
+  const loadFailed = (err: unknown, reply: FastifyReply) => {
+    if (err instanceof PoolError && err.code === "load_failed") {
+      app.log.error({ err }, "加载会话失败");
+      return reply.code(500).send({ error: "session_load_failed" });
+    }
+    throw err;
+  };
+
   app.post("/api/v1/sessions", async (_req, reply) => {
-    if (!pool) {
+    if (!pool?.canCreate) {
       return reply.code(501).send({ error: "no_session_backend" });
     }
     try {
@@ -83,9 +101,79 @@ export async function sessionsApi(
   app.get<{ Params: { id: string } }>(
     "/api/v1/sessions/:id",
     async (req, reply) => {
-      const entry = pool?.get(req.params.id);
-      if (!entry) return reply.code(404).send({ error: "not_found" });
-      return entry.info;
+      const info = pool?.info(req.params.id);
+      if (!info) return reply.code(404).send({ error: "not_found" });
+      return info;
+    },
+  );
+
+  app.patch<{ Params: { id: string }; Body: unknown }>(
+    "/api/v1/sessions/:id",
+    async (req, reply) => {
+      const name = (req.body as { name?: unknown } | null)?.name;
+      if (typeof name !== "string")
+        return reply.code(400).send({ error: "bad_request" });
+      try {
+        const info = await pool?.rename(req.params.id, name);
+        if (!info) return reply.code(404).send({ error: "not_found" });
+        return info;
+      } catch (err) {
+        if (err instanceof PoolError && err.code === "bad_request")
+          return reply.code(400).send({ error: "bad_request" });
+        return loadFailed(err, reply);
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id",
+    async (req, reply) => {
+      try {
+        const r = await pool?.remove(req.params.id);
+        if (!r || r === "not_found")
+          return reply.code(404).send({ error: "not_found" });
+        if (r === "running")
+          return reply.code(409).send({ error: "session_running" });
+        return reply.code(204).send();
+      } catch (err) {
+        if (err instanceof PoolError && err.code === "delete_failed") {
+          app.log.error({ err }, "删除会话文件失败");
+          return reply.code(500).send({ error: "session_delete_failed" });
+        }
+        throw err;
+      }
+    },
+  );
+
+  app.get<{
+    Params: { id: string };
+    Querystring: { before?: string; limit?: string };
+  }>("/api/v1/sessions/:id/messages", async (req, reply) => {
+    try {
+      const all = pool?.history(req.params.id);
+      if (!all) return reply.code(404).send({ error: "not_found" });
+      const page = pageMessages(all, req.query.before, req.query.limit);
+      if (!page.ok) return reply.code(400).send({ error: "bad_request" });
+      return { messages: page.messages, nextBefore: page.nextBefore };
+    } catch (err) {
+      return loadFailed(err, reply);
+    }
+  });
+
+  app.get<{ Params: { id: string; index: string } }>(
+    "/api/v1/sessions/:id/messages/:index",
+    async (req, reply) => {
+      if (!/^(0|[1-9][0-9]*)$/.test(req.params.index))
+        return reply.code(400).send({ error: "bad_request" });
+      try {
+        const all = pool?.history(req.params.id);
+        if (!all) return reply.code(404).send({ error: "not_found" });
+        const m = all[Number(req.params.index)];
+        if (!m) return reply.code(404).send({ error: "not_found" });
+        return m;
+      } catch (err) {
+        return loadFailed(err, reply);
+      }
     },
   );
 
@@ -93,10 +181,14 @@ export async function sessionsApi(
     "/api/v1/sessions/:id/stream",
     {
       websocket: true,
-      // 升级之前拒绝：不存在的会话得到普通 404，而不是先握手再关闭。
+      // 升级之前加载并拒绝：不存在的会话得到普通 404，加载失败得到 500，而不是先握手再关闭。
       preValidation: async (req, reply) => {
-        if (!pool?.get(req.params.id))
-          return reply.code(404).send({ error: "not_found" });
+        try {
+          if (!(await pool?.acquire(req.params.id)))
+            return reply.code(404).send({ error: "not_found" });
+        } catch (err) {
+          return loadFailed(err, reply);
+        }
       },
     },
     (socket, req) => {
@@ -126,7 +218,10 @@ export async function sessionsApi(
       }
       socket.send(text);
     };
-    const subscriber = { send: writeRaw };
+    const subscriber = {
+      send: writeRaw,
+      close: () => socket.close(1001, "session_deleted"),
+    };
     let unsubscribe = () => {};
 
     const ack = (id: unknown, error?: AckError): void => {
@@ -218,8 +313,11 @@ export async function sessionsApi(
         });
       }
       const { id, type } = msg;
-      if (typeof id !== "string" || id === "")
-        return ack(undefined, { code: "bad_request", message: "缺少 id" });
+      if (typeof id !== "string" || id === "" || id.length > MAX_CMD_ID_LEN)
+        return ack(undefined, {
+          code: "bad_request",
+          message: `id 必须是 1 到 ${MAX_CMD_ID_LEN} 个字符的字符串`,
+        });
       try {
         switch (type) {
           case "send_message": {

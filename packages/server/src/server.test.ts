@@ -12,9 +12,15 @@ import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { Config } from "./config.js";
-import { createServer, isLoopbackHost, type YuanshuServer } from "./server.js";
+import {
+  createServer,
+  hideServerErrorDetails,
+  isLoopbackHost,
+  type YuanshuServer,
+} from "./server.js";
 
 const VERSION = (
   JSON.parse(
@@ -413,12 +419,12 @@ describe("生命周期（R7）", () => {
 });
 
 describe("数据目录（R4）", () => {
-  test("启动并停止之后，数据目录里没有任何文件", async () => {
+  test("启动并停止之后，数据目录里只有数据库与 sessions 目录", async () => {
     const dataDir = path.join(base, "data");
     const { server } = await launch(cfg({ dataDir }));
     await server.stop();
     const { readdir } = await import("node:fs/promises");
-    expect(await readdir(dataDir)).toEqual([]);
+    expect(await readdir(dataDir)).toEqual(["sessions", "yuanshu.db"]);
   });
 });
 
@@ -454,5 +460,30 @@ describe("无全局状态（R8）", () => {
     await a.stop();
     expect((await fetch(`${urlB}/healthz`)).status).toBe(200);
     await expect(fetch(`${urlA}/healthz`)).rejects.toThrow();
+  });
+});
+
+describe("5xx 不泄漏内部细节", () => {
+  test("未处理异常只返回通用文案，详情进日志；4xx 保持原样", async () => {
+    const app = Fastify({ logger: false });
+    app.setErrorHandler(hideServerErrorDetails);
+    app.get("/boom", async () => {
+      throw new Error("ENOENT: '/home/u/secret/x.jsonl'");
+    });
+    app.post("/j", async () => "ok");
+    const boom = await app.inject({ method: "GET", url: "/boom" });
+    expect(boom.statusCode).toBe(500);
+    expect(JSON.parse(boom.body)).toEqual({
+      statusCode: 500,
+      error: "Internal Server Error",
+    });
+    const bad = await app.inject({
+      method: "POST",
+      url: "/j",
+      payload: "{bad",
+      headers: { "content-type": "application/json" },
+    });
+    expect(bad.statusCode).toBe(400);
+    await app.close();
   });
 });

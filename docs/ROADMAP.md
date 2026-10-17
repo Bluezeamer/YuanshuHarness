@@ -14,7 +14,7 @@
    - skill 在 pi 中被扫描的目录（[ADR-0008](genesis/adr/0008-capability-sets.md)）
    - 真实 Windows 机器上 ssh 原语与 GUI 应用自动化的可行性；macOS 上零安装档命令的差异（[ADR-0002](genesis/adr/0002-thin-environment-ssh.md)）
    - `sudo -n -l` 的缓存与跨系统输出差异（[ADR-0007](genesis/adr/0007-private-variables.md)）
-3. 主干：会话池、带序号的事件流与排队、持久化、认证、最小命令行客户端，仅本机环境（[ADR-0004](genesis/adr/0004-state-storage-recovery.md)、[ADR-0005](genesis/adr/0005-client-protocol.md)、[ADR-0011](genesis/adr/0011-auth-and-im-routing.md)、[ADR-0020](genesis/adr/0020-transport-websocket.md)、[ADR-0021](genesis/adr/0021-session-wire-protocol.md)）
+3. 主干：会话池、带序号的事件流与排队、持久化、认证、最小命令行客户端，仅本机环境（[ADR-0004](genesis/adr/0004-state-storage-recovery.md)、[ADR-0005](genesis/adr/0005-client-protocol.md)、[ADR-0011](genesis/adr/0011-auth-and-im-routing.md)、[ADR-0020](genesis/adr/0020-transport-websocket.md)、[ADR-0021](genesis/adr/0021-session-wire-protocol.md)、[ADR-0022](genesis/adr/0022-sqlite-driver.md)、[ADR-0025](genesis/adr/0025-data-dir-layout-and-versioning-revised.md)、[ADR-0024](genesis/adr/0024-session-rest-and-history.md)）
 4. WebUI 基础：对话、停止、断线重连、统一弹窗
 5. 权限：三档、规则、自动审批与审核模型、只读命令白名单（[ADR-0006](genesis/adr/0006-permission-tiers.md)）
 6. 环境：ssh 环境（含 Windows）、workspace、环境切换、文件传输、状态通知、存 ssh 凭据的基础密码库（[ADR-0002](genesis/adr/0002-thin-environment-ssh.md)、[ADR-0003](genesis/adr/0003-concept-model.md)、[ADR-0007](genesis/adr/0007-private-variables.md)）

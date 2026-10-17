@@ -66,6 +66,6 @@ SERVER_PID=""
 ((code == 0)) || die "SIGTERM 后退出码应为 0，实际 $code"
 
 [[ -d "$WORK/data" ]] || die "数据目录没有被创建"
-[[ -z "$(ls -A "$WORK/data")" ]] || die "数据目录里不应有任何文件：$(ls -A "$WORK/data")"
+[[ "$(ls -A "$WORK/data" | sort | tr "\n" " ")" == "sessions yuanshu.db " ]] || die "数据目录内容不符（应只有 sessions 与 yuanshu.db）：$(ls -A "$WORK/data")"
 
 echo "装包冒烟通过（版本 $VERSION）"
