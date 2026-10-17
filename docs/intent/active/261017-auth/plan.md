@@ -52,3 +52,4 @@ Date: 2026-10-17
   - (c) `ws` 不设 `handleProtocols` 时确实回显请求里的第一个子协议：客户端发 `bearer.good, yuanshu.v1`，响应头是 `bearer.good`，令牌被原样回显。设成"只选 `yuanshu.v1`"后响应头为 `yuanshu.v1`。R10 的风险真实存在。
   - (d) IPv4 监听下 `req.socket.remoteAddress` 是 `127.0.0.1`；双栈监听（`::`）下 IPv4 客户端显示为 `::ffff:127.0.0.1`，由 (a) 的比对处理。
   - 与 spec 假设无冲突，无需改 Requirements。
+- 2026-10-17 步骤 7 手动验证（真实启动的 `dist/bin.js serve`，令牌 40 字符，回环）：`/healthz` 200；无令牌 401；正确令牌 200；连续 10 次错令牌后第 11 次起 429、`Retry-After: 60`，封禁期内正确令牌同样 429；带令牌的 WebSocket 对不存在的会话得到 404（认证已通过）；日志中令牌出现 0 次。真实 Server 尚无会话工厂（第 7 条前），所以"带令牌连上并收到快照"无法在真实进程里演示，由集成测试覆盖（R8、R10、R13）。
