@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  createAuthHook,
   createSourceMatcher,
   extractToken,
   FailureLimiter,
@@ -133,17 +134,89 @@ describe("失败限流（R11、R12）", () => {
     expect(l.blockedFor("b")).toBe(0);
   });
 
-  test("表满时先丢过期项，仍满则丢最早插入的一项，容量有界", () => {
+  test("表满时先丢过期项", () => {
     const { clock, l } = make({ capacity: 3 });
-    l.fail("old");
+    failN(l, "old", 10);
     clock.t += 10 * 60_000 + 1;
     l.fail("b");
     l.fail("c");
     l.fail("d");
     expect(l.size).toBe(3);
-    failN(l, "e", 1);
+    expect(l.blockedFor("old")).toBe(0);
+  });
+
+  test("仍满则丢最早插入的一项（含被封禁的），新项保留", () => {
+    const { l } = make({ capacity: 3 });
+    failN(l, "a", 10);
+    l.fail("b");
+    l.fail("c");
+    expect(l.blockedFor("a")).toBeGreaterThan(0);
+    failN(l, "d", 10);
     expect(l.size).toBe(3);
-    failN(l, "old-banned", 10);
-    expect(l.size).toBe(3);
+    expect(l.blockedFor("a")).toBe(0);
+    expect(l.blockedFor("d")).toBeGreaterThan(0);
+    failN(l, "b", 8);
+    expect(l.blockedFor("b")).toBe(0);
+    l.fail("b");
+    expect(l.blockedFor("b")).toBeGreaterThan(0);
+  });
+
+  test("恰好 10 分钟不算过期，超过才算", () => {
+    const { clock, l } = make();
+    failN(l, "a", 9);
+    clock.t += 10 * 60_000;
+    l.fail("a");
+    expect(l.blockedFor("a")).toBeGreaterThan(0);
+  });
+
+  test("表内无定时器：构造与使用不留下活动句柄", () => {
+    const before = process
+      .getActiveResourcesInfo()
+      .filter((x) => x === "Timeout");
+    const { l } = make();
+    failN(l, "a", 10);
+    const after = process
+      .getActiveResourcesInfo()
+      .filter((x) => x === "Timeout");
+    expect(after.length).toBe(before.length);
+  });
+});
+
+describe("hook 检查顺序（R5、R7）", () => {
+  const call = async (
+    h: ReturnType<typeof createAuthHook>,
+    remoteAddress: string,
+    authorization?: string,
+  ) => {
+    let code = 0;
+    const reply: Record<string, unknown> = {
+      code(c: number) {
+        code = c;
+        return reply;
+      },
+      header: () => reply,
+      send: () => reply,
+    };
+    await h.hook(
+      {
+        socket: { remoteAddress },
+        headers: authorization ? { authorization } : {},
+      } as never,
+      reply as never,
+    );
+    return code;
+  };
+
+  test("网段外的请求得 403，且不计入失败，也不触发 429", async () => {
+    const h = createAuthHook({
+      token: "t".repeat(40),
+      allowCidrs: ["10.0.0.0/8"],
+    });
+    for (let i = 0; i < 15; i++)
+      expect(await call(h, "192.168.0.1", "Bearer wrong")).toBe(403);
+    expect(h.limiter.size).toBe(0);
+    // 同一个"来源"若在网段内，计数从零开始，而不是已被前面的 403 推到封禁
+    for (let i = 0; i < 9; i++)
+      expect(await call(h, "10.1.1.1", "Bearer wrong")).toBe(401);
   });
 });

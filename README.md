@@ -28,10 +28,10 @@
 
 <!-- smoke:docker-run -->
 ```bash
-docker run -d --name yuanshu -p 7420:7420 -e YUANSHU_TOKEN="$YUANSHU_TOKEN" -v yuanshu-data:/data yuanshu
+docker run -d --name yuanshu -p 7420:7420 -e YUANSHU_TOKEN -v yuanshu-data:/data yuanshu
 ```
 
-- 容器监听 `0.0.0.0`，所以必须提供 `YUANSHU_TOKEN`（先在 shell 里设好，示例原样转发），否则容器启动失败。
+- 容器监听 `0.0.0.0`，所以必须提供 `YUANSHU_TOKEN`（先在 shell 里导出该变量，`-e YUANSHU_TOKEN` 只转发变量名，令牌不进入命令行），否则容器启动失败。
 - 用命名卷（如上）时，卷会继承镜像里 `/data` 的属主，开箱即用。
 - 绑定挂载宿主机目录时，该目录必须对 uid 1000 可写，否则服务按上面的规则启动失败。
 - 容器里要改端口，请设环境变量 `-e YUANSHU_PORT=…`，不要改命令行：镜像内置的健康检查读的是 `YUANSHU_PORT`。

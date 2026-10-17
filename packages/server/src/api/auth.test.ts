@@ -210,9 +210,8 @@ describe("令牌（R8、R10）", () => {
 });
 
 describe("网段（R5、R7）", () => {
-  test("网段外 + 错令牌得 403 而非 401，且不推进失败计数", async () => {
-    const clock = { t: 1_000_000 };
-    const s = await launch({ allowCidrs: ["10.0.0.0/8"], clock });
+  test("网段外 + 错令牌得 403 而非 401（不计入失败见 auth.test.ts）", async () => {
+    const s = await launch({ allowCidrs: ["10.0.0.0/8"] });
     for (let i = 0; i < 15; i++) {
       const r = await fetch(`${s.http}/api/v1/sessions`, bearer("wrong"));
       expect(r.status).toBe(403);

@@ -110,14 +110,14 @@ describe("非法输入一律报错（R2）", () => {
     ["端口 0x50", ["serve", "--port", "0x50"], {}],
     ["端口含空格", ["serve", "--port", " 80"], {}],
     ["未知选项（拼错）", ["serve", "--prot", "80"], {}],
-    ["未实现的 --token", ["serve", "--token", "x"], {}],
+    ["过短的 --token", ["serve", "--token", "x"], {}],
     ["选项缺值", ["serve", "--host"], {}],
     ["多余的位置参数", ["serve", "extra"], {}],
     ["环境变量端口非法", ["serve"], { YUANSHU_PORT: "abc" }],
     ["环境变量 host 为空", ["serve"], { YUANSHU_HOST: "" }],
     ["环境变量数据目录为空", ["serve"], { YUANSHU_DATA_DIR: "" }],
     ["未知的 YUANSHU_ 环境变量", ["serve"], { YUANSHU_PROT: "80" }],
-    ["未实现的 YUANSHU_TOKEN", ["serve"], { YUANSHU_TOKEN: "x" }],
+    ["过短的 YUANSHU_TOKEN", ["serve"], { YUANSHU_TOKEN: "x" }],
   ])("%s", (_name, argv, env) => {
     expect(parse(argv, env)).toMatchObject({ kind: "error" });
   });
