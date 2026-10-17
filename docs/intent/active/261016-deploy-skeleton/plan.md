@@ -1,0 +1,85 @@
+# Plan: 部署骨架
+Author: bluezeamer
+Status: accepted
+Date: 2026-10-17
+
+> plan 是活的：实现中偏离计划，写进 Deviations，与对应代码同一次提交，无需重新审批。
+> 只有偏离触及 spec 的 Requirements 时才回头改 spec。
+
+## Links
+来源: [spec.md](spec.md)
+下游: PR（实现后回填）
+
+## Files that change
+| 文件 | 说明 |
+|---|---|
+| `packages/server/src/config.ts`、`config.test.ts` | 纯函数：把 argv、环境变量、主目录解析成 `help`、用法错误或 `serve` 配置（R1、R2） |
+| `packages/server/src/data-dir.ts`、`data-dir.test.ts` | `prepareDataDir`：创建、0700、写入并删除探测文件（R4） |
+| `packages/server/src/server.ts`、`server.test.ts` | `createServer(config, { webRoot?, logStream? })` 返回 `{ start, stop }`；`/healthz`、静态托管、非回环警告（R3、R5、R6、R7、R8） |
+| `packages/server/src/cli.ts`、`cli.test.ts` | `execute(argv, { env, home, stdout, stderr, signal })` 返回退出码；无副作用，可在进程内测试（R1、R7） |
+| `packages/server/src/bin.ts` | 带 shebang 的入口：接 SIGTERM/SIGINT 到 `signal`，调用 `execute`（R7） |
+| `packages/server/src/release.test.ts` | 静态断言：`package.json`、`Dockerfile`、`.dockerignore`（R9、R10、R12、R14） |
+| `packages/server/package.json`、`pnpm-lock.yaml` | 精确版本的 `fastify`、`@fastify/static`；`@types/node`；`bin`、`files`、`engines`（R9、R10） |
+| `packages/web/public/index.html` | 占位页（R10） |
+| `packages/web/package.json`；删除 `packages/web/tsconfig.build.json` | `build` 改为把 `public/` 复制到 `dist/`。web 没有可发射的 JS，原来的 `tsc` 发射成了孤儿，随本变更删除；占位模块与占位测试保留，仍参与类型检查和测试 |
+| `scripts/pack.sh` | 清理旧产物，按 web、server 的顺序构建，复制 web 产物到 `packages/server/web/`，打出 tarball（R10、R11、R12） |
+| `scripts/lib/smoke-common.sh` | 两个冒烟脚本共用：找空闲端口、轮询 HTTP、清理 |
+| `scripts/smoke-package.sh` | 装包冒烟（R11） |
+| `Dockerfile`、`.dockerignore`、`scripts/smoke-image.sh` | 镜像与镜像冒烟（R12、R13、R14） |
+| `scripts/check.sh`、`tests/check/selfcheck.sh` | 前置检查加 docker；构建之后加两个冒烟步骤；自检覆盖新增部分（R15） |
+| `.github/workflows/ci.yml` | 只调超时时间；仍只调用 `scripts/check.sh`（R16） |
+| `.gitignore`、`README.md` | 忽略 `packages/server/web/`；补充 `yuanshu serve` 参数与镜像用法（R17） |
+
+## Order of work
+每一步完成即按语义分批提交。凡标"失败先行"的，先写测试并确认它在没有实现时红，再写实现。
+
+0. **环境核实（需要我能执行 docker 命令）。** 本机是 LXD 容器，Docker 守护进程可用（29.9.1），但我这边的自动模式拦了 `docker pull` 和 `docker run`，需要先放行。核实三件事，结论写进下面的「实测记录」：
+   - `node:24-slim` 的底层 Debian 代号、`node -v`、`node` 用户的 uid、镜像里有没有 curl 或 wget，据此定下 `node:24.x.y-<代号>-slim` 的具体标签（R12）。
+   - 默认 bridge 网络加 `-p` 映射，与 `--network host`，各起一个最小容器，看宿主能否访问。**规则：** bridge 可用则 `smoke-image.sh` 一律走 bridge；不可用则一律走 host。只走一条路径，不加开关。host 模式下 R13 的「映射端口」就是直连，记入 Deviations。
+   - pnpm 的 `minimumReleaseAge` 会不会拒绝刚发布的 Fastify。
+1. **依赖。** 用 `pnpm add --save-exact` 加 `fastify`、`@fastify/static` 和 `@types/node`（取 22 主线）。取当前能安装的最新稳定版本，Fastify 不低于 5.12.2；实际版本记入「实测记录」。`.gitignore` 加 `packages/server/web/`。
+2. **config（R1、R2），失败先行。** `parseArgs` 用 strict 模式。要覆盖的输入：优先级、默认值、相对路径转绝对、空串、`0`、`70000`、`80abc`、未知选项、多余位置参数、未知的 `YUANSHU_*`、裸命令、未知子命令、`--help`、`-h`、`serve --help`。变异验证：交换优先级、放过未知 `YUANSHU_*`，对应用例必须变红，随后还原。
+3. **data-dir（R4），失败先行。** 要覆盖：新建 0700、已存在不改权限、路径是文件、目录 0555、父目录缺失、服务启停后目录为空。权限用例遇到 root 直接失败，不跳过。变异验证：不删探测文件，必须变红。
+4. **server（R3、R5、R6、R7、R8），失败先行。** `start()` 的顺序固定为：检查 web 目录、准备数据目录、监听。这样前端缺失时不会先建出数据目录。要覆盖：
+   - `/healthz` 的状态、`Content-Type`、响应体全等、`HEAD`，以及 web 目录里放同名文件也遮蔽不了；
+   - 静态托管的首页、404、点文件、目录列表、`/../`、`/%2e%2e/`、`/%2e%2e%2f`、`/..%5c`。穿越用例用原始 `node:http` 发请求，因为 `fetch` 和 `inject` 会先规范化路径；
+   - 非回环四种、回环四种的警告有无；
+   - 端口被占、带空闲 keep-alive 连接时 `stop()` 在 5 秒内完成；
+   - 同一进程内两个实例互不影响。
+
+   静态托管的选项名（`dotfiles`、`list`、`wildcard`）按实际安装的 `@fastify/static` 文档核对后显式写出，不依赖默认值。变异验证按 spec Proof 的 R3、R5、R6、R8 逐条做。
+5. **cli 与 bin（R1、R7）。** `execute` 的用法错误和启动失败都写 stderr、返回非零；`--help` 写 stdout、返回 0；`serve` 一直运行到 `signal` 被触发，然后返回 0。测试里触发 `signal`，验证 5 秒内返回。真实进程收到 SIGTERM 的行为留给步骤 7 和 8。
+6. **包结构（R9、R10），失败先行。** 先在 `release.test.ts` 里写 `package.json` 的断言并确认红，再改 `packages/server/package.json`、web 的 `build`、写 `scripts/pack.sh`。
+7. **`smoke-package.sh`（R11）。** 脚本里显式断言安装目录在仓库目录树之外。变异验证：让服务不响应、把安装目录移进仓库树并删掉一个运行时依赖声明（应当误绿，证明那条断言不可去掉）、把 `@fastify/static` 移到 `devDependencies`，各自观察结果。
+8. **镜像（R12、R13、R14）。** 写 `Dockerfile`、`.dockerignore` 和 `smoke-image.sh`。几个设计点：
+   - `HEALTHCHECK` 的间隔取 10 秒，因为第一次探测发生在启动后一个间隔之后，间隔 30 秒会让 R13 的「30 秒内 healthy」没有余量。
+   - 「探测对未监听端口必须失败」这一步不去解析 `Healthcheck.Test`：另起一个容器，把入口改成一个什么都不监听的 node 进程，只把健康检查的时间参数调小，观察状态变成 `unhealthy`。这样检验的是镜像里真实的探测命令。
+   - 「监听 0.0.0.0」这一步在容器内 `docker exec` 一个 node，用容器自己的非回环 IPv4 访问 `/healthz`。bridge 和 host 模式下都有效。
+   - 「安装文件清单与 tarball 一致」要拿到 Docker 里打出的那个 tarball：`Dockerfile` 里单设 `pack` 阶段，脚本用 `docker build --target pack --output` 导出，再构建最终镜像（层缓存复用）。
+   - 清理：容器、卷、镜像标签都用带随机后缀的名字，`trap EXIT` 里删除。
+
+   变异验证按 spec Proof 的 R12、R13：去掉 `USER node`、`ENTRYPOINT` 改 shell 形式、`HEALTHCHECK` 恒成功、`/data` 属主改 root、换成浮动标签。
+9. **`check.sh` 与自检（R15），失败先行。** 自检的临时工程增加两个冒烟脚本的桩，并加入「任一步失败整体必须失败」的用例；加「PATH 里没有 docker」「docker 命令在但 `docker info` 失败」两个用例。已有的「缺 python3 / pnpm / node」用例，受限 PATH 里都放入 docker，保证每个用例只缺一项。变异验证：删掉 docker 前置检查，自检必须变红。
+10. **`ci.yml` 与 README（R16、R17）。** 作业超时从 15 分钟提到 20 分钟，因为要拉基础镜像并构建；其余不动。README 补三个参数与对应环境变量、命名卷的 `docker run` 示例、绑定挂载须对 uid 1000 可写、容器内改端口须用 `YUANSHU_PORT`，并把这条 `docker run` 原样放进镜像冒烟里跑。
+11. **本地完整跑 `scripts/check.sh`**，记录关键输出到「实测记录」。
+12. **变异验证汇总。** 把 spec Proof 里全部变异再跑一遍，逐条记下结果（红或绿），之后评审者独立再做一遍。
+13. **评审。** 新开空上下文 subagent，写进 `review.md`；本变更命中「依赖外部系统的真实行为」，按 [hardening.md](../../../../.agents/skills/aisdlc/references/hardening.md) 多轮评审，修复后评审增量，直到无阻塞级问题；连续三轮仍有阻塞级问题则暂停并升档。
+14. **PR。** 经你同意后推送分支并开 PR，观察 CI 通过。再开一个一次性草稿 PR，其中去掉 `USER node`，确认作业变红（R16 的变异验证），随后关闭并删除该分支（远程分支删除按项目配置会先问你）。
+15. **合并与关闭。** 你评审并合并；之后另开小 PR 把 intent 关闭并整夹移入 `done/`，与上一轮相同。
+
+## 实测记录
+（步骤 0、1、11 完成后填写）
+- `node:24-slim` 对应的具体标签与 Debian 代号（2026-10-17 实测）：`node:24.22.0-bookworm-slim`，Debian 12（bookworm），Node v24.22.0，`node` 用户 uid/gid 1000，镜像内没有 curl 与 wget。`24.22.0-bookworm-slim` 与 `24-slim` 的镜像 ID 相同（`sha256:a5f4366e…`）。
+- 本机 bridge 与 host 网络的实测结果，以及据此选定的模式：LXD 容器里，默认 bridge 网络 `docker run` 失败，报 `open sysctl net.ipv4.ip_unprivileged_port_start file: reopen fd 8: permission denied`（runc 无法给容器设置 sysctl）；`--network host` 正常。`docker build` 在默认网络下正常。**选定：`docker run` 一律加 `--network host`，不走端口映射；`docker build` 不加。**
+- 锁定的依赖版本：
+- 完整检查的关键输出：
+
+## Rollback
+- 这次变更没有任何持久化数据，也没有发布到外部：不发布 npm，不推镜像，不创建数据目录以外的状态。所以退回只需要 `git revert` 合并提交，没有迁移顺序，也没有双写窗口。
+- 命令名、`/healthz`、端口 7420、环境变量名这些「难逆」的契约，在首次发布（ROADMAP 第 13 条）之前并没有外部使用方。合并之后到发布之前发现需要改，代价是一次修订 ADR 加一次代码变更，不涉及兼容。首次发布之后才真正难逆。
+- 合并之后若镜像冒烟在 CI 上不稳定（最可能的原因是基础镜像拉取失败或限流），不要临时删掉那一步：spec 要求缺前提必须失败。应当先停下，另提变更处理（例如换镜像源），必要时升档。
+- 实现过程中若发现要改 ADR-0017、0018、0019 的任何一条，停下并向你说明，按「中途升级」处理。
+
+## Deviations
+- 2026-10-17：步骤 0 实测后，本机 `docker run` 只能用 `--network host`。因此 spec R13 的「宿主机经映射端口访问」在本机与 CI 上都改为直连容器监听的端口；容器内监听 `0.0.0.0` 的检查仍用容器自己的非回环 IPv4。README 的 `docker run -p` 示例不进镜像冒烟的 host 模式路径，改为在冒烟里按等价参数核对。不触及 spec 的 Requirements 取值，只是验证手段的细节。
+- 2026-10-17：`HEALTHCHECK` 间隔与 plan 一致取 10 秒。
