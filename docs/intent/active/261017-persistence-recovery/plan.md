@@ -57,3 +57,5 @@ Date: 2026-10-17
   - (c) 悬挂工具调用重放时 SDK 自己补 `"No result provided"` 的 tool 结果；`sendCustomMessage({customType, content, display:false}, {deliverAs:"nextTurn"})` 在空闲会话上可用：通知在下一次 prompt 时作为 custom_message 条目写入 JSONL，并随历史进入此后所有请求。因此 R12 的“只出现一次”由“只发送一次”保证，不会重复追加；通知位于历史末尾、本次用户消息之前（不是请求的最后一条），语义仍是“历史末尾的附加通知”，spec 的“末尾”按此理解，不改 Requirements。custom_message 不是 message 条目，不会出现在历史分页里。
   - (d) better-sqlite3 13.0.3 在 Node 22.19.0（SQLite 3.53.4）与 Node 24.13.1 下均可加载。
 
+- 2026-10-17 步骤 3 探测：`SessionManager.open` 对**空文件**会重写该文件并生成新的会话 id（字节改变、id 与文件名不一致）；对无头文件或乱码抛错、文件不变。因此对账与恢复在调用 SDK 之前，先用只读的文件头校验（首行是 JSON 对象、`type:"session"`、`id` 等于文件名里的 id、带时间戳），校验不过就跳过并警告，绝不把文件交给 SDK。对账时的创建时间与名称由我们只读解析（头行与 `session_info` 条目，二者是 SDK 导出的类型），不经 SDK 的 open。
+- 2026-10-17 步骤 3 变异验证：去掉 UUID 格式校验不会使用例变红——定位只用“列目录加文件名后缀精确相等”，从不拼接 id，所以格式校验是纵深防御而非唯一屏障；穿越类 id 用例仍断言结果为 null。其余变异（不校验文件头、不补建、孤儿索引不删、名称取第一条）均变红。
