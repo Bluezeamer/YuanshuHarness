@@ -185,10 +185,13 @@ describe("R3 以消息附加到上下文末尾（ADR-0009 的实际路径）", (
     expect(textOf(at(r2?.messages ?? [], 0))).toBe(
       textOf(at(r1?.messages ?? [], 0)),
     );
+    expect(countIn(r1 as Body, MARK)).toBe(0);
     expect(countIn(r2 as Body, MARK)).toBe(1);
     const carrier = (r2 as Body).messages.find((m) => textOf(m).includes(MARK));
     expect(carrier?.role).toBe("user");
-    expect((r2 as Body).messages.indexOf(carrier as never)).toBeGreaterThan(1);
+    expect((r2 as Body).messages.indexOf(carrier as never)).toBe(
+      (r2 as Body).messages.length - 1,
+    );
     expect(countIn(r3 as Body, MARK)).toBe(1);
     expect(textOf(at(r3?.messages ?? [], 0))).toBe(
       textOf(at(r1?.messages ?? [], 0)),

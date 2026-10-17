@@ -17,7 +17,7 @@ SDK 迭代快，升级版本时也需要一组能自动判断"假设是否还成
 ## Proposed outcome
 - Server 包以精确版本依赖 pi SDK，锁文件入库。
 - 一套契约测试，全部对着本地 stub provider 运行，进 `scripts/check.sh` 与 CI；另有一个手动冒烟脚本，对真实端点跑一次最小会话，不进 CI。
-- 第一批覆盖的假设：压缩后在系统提示词末尾追加；`supportsMidConvoSystemMessages` / `supportsMidConvoToolChanges` 的实际行为；从 JSONL 加载会话；AGENTS.md 的接管；单槽位界面分发；模型配置的指定路径与密钥来源；skill 扫描目录。
+- 第一批覆盖的假设：压缩后在系统提示词末尾追加；`supportsMidConvoSystemMessages` 与工具类中途变更标志的实际行为（第一批只覆盖 openai-completions，见 Decisions needed 第 4 条）；从 JSONL 加载会话；AGENTS.md 的接管；单槽位界面分发；模型配置的指定路径与密钥来源；skill 扫描目录。
 - 每条假设有实测结论。结论与 ADR 一致则记录；不一致则停下，向人说明并升档。
 
 ## Out of scope

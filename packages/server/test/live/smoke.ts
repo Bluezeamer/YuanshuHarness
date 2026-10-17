@@ -75,12 +75,6 @@ async function main(baseUrl: string, modelId: string) {
     const text = session.getLastAssistantText()?.trim();
     if (!text) throw new Error("真实端点没有返回任何助手文本");
     console.log(`冒烟通过：收到 ${text.length} 个字符的回复`);
-  } catch (e) {
-    const msg = String(e instanceof Error ? e.message : e)
-      .split(baseUrl)
-      .join("<endpoint>");
-    console.error(`冒烟失败：${msg.slice(0, 300)}`);
-    process.exitCode = 1;
   } finally {
     session.dispose();
   }
