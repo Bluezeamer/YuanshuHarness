@@ -7,7 +7,7 @@
 ## 能力演进序列
 1. 部署骨架：空壳 Server，健康端点可探测，npm 包与 Docker 镜像可构建（[ADR-0012](genesis/adr/0012-delivery-form.md)、[ADR-0017](genesis/adr/0017-server-web-framework.md)、[ADR-0018](genesis/adr/0018-startup-params-and-health-endpoint.md)、[ADR-0019](genesis/adr/0019-release-artifacts.md)）
 2. 契约测试：固化对 pi SDK 的假设并锁定版本（[ADR-0001](genesis/adr/0001-pi-sdk-no-fork.md)）。需要验证的假设：
-   - 压缩后能否在系统提示词末尾追加；`supportsMidConvoSystemMessages` 与 `supportsMidConvoToolChanges` 的实际行为（[ADR-0009](genesis/adr/0009-prompt-assembly-injection.md)）
+   - 压缩后能否在系统提示词末尾追加；`supportsMidConvoSystemMessages` 与工具类中途变更标志的实际行为（openai-completions 为 `supportsMidConvoToolAdditions`，anthropic-messages 为 `supportsMidConvoToolChanges`；后者随接入该协议时再验证）（[ADR-0009](genesis/adr/0009-prompt-assembly-injection.md)）
    - 从 JSONL 加载会话的接口；pi 自身读取 AGENTS.md 时如何接管、避免重复注入（[ADR-0004](genesis/adr/0004-state-storage-recovery.md)）
    - 单槽位界面在 Server 层分发是否可行（[ADR-0005](genesis/adr/0005-client-protocol.md)）
    - 模型配置能否引用密码库而不是写明文 key，SDK 能否指定配置路径（[ADR-0015](genesis/adr/0015-model-management.md)）
@@ -33,4 +33,5 @@
 13. 首次发布（npm 包与镜像）：用户确认有可用版本后（条件式）
 
 ## 调整记录
+- 2026-10-17 第 2 条：契约测试第一批只覆盖 openai-completions，anthropic-messages 的工具类标志延期到接入该协议时（bluezeamer 批准）。
 - 2026-10-16 创世：初始序列。排序原则是先验证风险、再搭主干、最后按依赖叠加。
