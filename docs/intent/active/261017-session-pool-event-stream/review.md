@@ -37,3 +37,15 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 验证：补齐仓库 Node 24 工具链 PATH 后执行 `cd packages/server && npx vitest run`，结果为 8 个测试文件通过、10 个失败，149 项中 106 通过、43 失败，另有 5 个未处理错误；失败根因均为沙箱禁止监听端口（`listen EPERM`），因此不能据此确认网络集成用例。无需端口的 `src/session/events.test.ts` 6 项全过；另用 `/tmp` 内存 WebSocket 探针确认了上述 R15 时序。
 
 上轮核对：同连接命令串行、写后背压复查、base64 字符与长度校验、dispose 后拒绝订阅，以及调试日志、stub 监听错误和未用导入的清理均已在当前代码中确认；R5 队列顺序的驳回理由与澄清后的 spec 一致。上轮 R15 待确认项未消失，已在本轮升级为阻塞。
+
+## 第 3 轮（2026-10-17）— 范围：06c93dbf85a10dd5941194559f85fc82929377fa..ee9a04c7d398d363441ac457fdd100aba69d82c8 — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 阻塞 | `packages/server/src/api/sessions.ts:113`、`packages/server/src/api/sessions.ts:130`、`packages/server/src/api/sessions.ts:151` | 违反 R14：`serve()` 先把连接加入 `sockets`，随后 `entry.subscribe()` 同步发送首帧，最后才安装 `close` 清理。大快照触发硬上限时，`writeRaw()` 会先 `close(1013)` 再抛错，控制流因此在安装清理监听器之前退出；这个已关闭连接永远不会从 `sockets` 删除。客户端反复重连到同一个大快照会线性积累 WebSocket 对象。新增的“快照单帧越线”用例只断言关闭码，没有断言连接资源释放。 | 已修：close 监听器改为先于 subscribe 安装，首帧失败不再中断流程；新增用例（连续 3 次连到大快照，订阅与 ws 客户端集合均归零）。注：该用例观测不到内部 sockets 集合本身，第 4 轮请复核 |
+| 阻塞 | `packages/server/src/api/sessions.ts:236`、`packages/server/src/api/sessions.ts:239` | 违反 R15：1 秒强制终止定时器只调用了 `unref()`，连接正常关闭时没有 `clearTimeout()`；`close` 监听器只解析 Promise，所以 `stop()` 可在定时器仍排队时返回。用编译后的 HEAD 配合 `injectWS` 做无端口探针并模拟对端 10 ms 内完成关闭，`app.close()` 在 11 ms 返回，此时捕获的 1 秒定时器仍为 `_destroyed: false`。`unref()` 不等于取消，且定时器闭包在到期前仍持有 socket。默认 `@fastify/websocket` 的 `preClose` 与本钩子并存未造成永久等待：不配合关闭的内存连接在约 1 秒后由 `terminate()` 收敛。 | 已修：强制终止定时器在连接 close 时 clearTimeout，不再依赖 unref |
+| 重要 | `packages/server/src/api/sessions.ts:151`、`packages/server/src/api/sessions.ts:169`、`packages/server/src/session/pool.ts:211` | 连接关闭只清理心跳、订阅和 `sockets`，不取消或拆除串行 `chain`。若当前 `stop` 正在等待 SDK `abort()` 变为空闲，后续已计入上限的消息仍由 `.then()` 闭包捕获；即使连接已经关闭，它们也只能等前一 Promise 完成后才跳过处理并在 `finally` 回减。一个长期不收敛的工具/运行可让已关闭连接继续保留接近 50 MiB 原始帧，重复连接可叠加。超限的触发帧在 `packages/server/src/api/sessions.ts:165` 确实没有回减 `pending`，但该分支没有把该帧加入 chain；实质风险是此前已入链帧在关闭后无法释放。 | 已修：串行链改为显式队列，连接关闭时清空队列并归零 pending，已收未处理的帧立即释放 |
+
+本轮阻塞级：2 条。
+
+复核补充：硬背压现已在 `send()` 前按 `bufferedAmount + frame bytes` 拒绝写入，`images` 上限为 20；正常及已知错误命令路径各调用一次 `ack`，未发现重复发送。当前 `handle()` 会吸收已知异常，单个已执行任务由 `finally` 回减一次，未确认减两次或常规异常导致 chain 拒绝的路径。类型检查通过；`events.test.ts` 6 项通过，`sessions.test.ts` 与 `pool.test.ts` 因沙箱禁止监听 `127.0.0.1`（`listen EPERM`）无法运行其网络用例，关闭时序改用 `injectWS` 探针验证。

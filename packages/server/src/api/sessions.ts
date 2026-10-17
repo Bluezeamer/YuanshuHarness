@@ -127,7 +127,7 @@ export async function sessionsApi(
       socket.send(text);
     };
     const subscriber = { send: writeRaw };
-    const unsubscribe = entry.subscribe(subscriber);
+    let unsubscribe = () => {};
 
     const ack = (id: unknown, error?: AckError): void => {
       const frame = error
@@ -148,17 +148,44 @@ export async function sessionsApi(
     }, opts.pingIntervalMs);
     socket.on("pong", () => clearTimeout(pongTimer));
 
+    // 命令队列：按到达顺序逐条处理；连接关闭时直接丢弃未处理的消息，释放其内存。
+    const queue: Array<{ raw: RawData; isBinary: boolean; size: number }> = [];
+    let draining = false;
+    let pending = 0;
+
+    // 必须先于 subscribe 安装：首帧（大快照）就可能触发背压断开。
     socket.on("close", () => {
       clearInterval(ping);
       clearTimeout(pongTimer);
       unsubscribe();
       sockets.delete(socket);
+      queue.length = 0;
+      pending = 0;
     });
 
+    try {
+      unsubscribe = entry.subscribe(subscriber);
+    } catch {
+      // 首帧写入失败（背压或连接已关）：连接已被关闭，清理由 close 事件完成。
+    }
+
     // 同一连接的命令严格按到达顺序执行：stop 未完成时，后到的 send_message 不得抢先。
-    let chain: Promise<void> = Promise.resolve();
-    // 已收到但尚未处理完的字节数；超限说明客户端发得比处理得快，断开而不是无界缓存。
-    let pending = 0;
+    // pending 是已收到但未处理完的字节；超限说明客户端发得比处理得快，断开而不是无界缓存。
+    async function drain(): Promise<void> {
+      if (draining) return;
+      draining = true;
+      try {
+        for (let m = queue.shift(); m; m = queue.shift()) {
+          try {
+            await handle(m.raw, m.isBinary);
+          } finally {
+            pending = Math.max(0, pending - m.size);
+          }
+        }
+      } finally {
+        draining = false;
+      }
+    }
     socket.on("message", (raw: RawData, isBinary: boolean) => {
       const size = rawSize(raw);
       pending += size;
@@ -166,13 +193,8 @@ export async function sessionsApi(
         socket.close(1013, "overloaded");
         return;
       }
-      chain = chain.then(async () => {
-        try {
-          if (socket.readyState === OPEN) await handle(raw, isBinary);
-        } finally {
-          pending -= size;
-        }
-      });
+      queue.push({ raw, isBinary, size });
+      void drain();
     });
 
     async function handle(raw: RawData, isBinary: boolean): Promise<void> {
@@ -236,7 +258,8 @@ export async function sessionsApi(
           s.once("close", () => resolve());
           s.close(1001, "server_shutdown");
           // 对端不配合关闭握手时不能让 stop() 一直等下去。
-          setTimeout(() => s.terminate(), 1000).unref();
+          const force = setTimeout(() => s.terminate(), 1000);
+          s.once("close", () => clearTimeout(force));
         }),
     );
     pool?.dispose();

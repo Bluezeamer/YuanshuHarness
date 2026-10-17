@@ -389,6 +389,30 @@ describe("R11 入站积压", () => {
   });
 });
 
+describe("连接关闭后资源释放", () => {
+  test("首帧背压断开的连接不留在 sockets 里，订阅也不残留", async () => {
+    const big = await startStub(() => "z".repeat(8 * 1024 * 1024));
+    const b = await boot({ maxBufferedBytes: 1024 * 1024 }, undefined, big);
+    try {
+      const id = await newSession(b.http);
+      const entry = pool.get(id);
+      entry?.send("go");
+      await waitFor(() => entry?.running === false, "运行结束", 15000);
+      for (let i = 0; i < 3; i++) {
+        const c = await TestClient.connect(
+          `${b.ws}/api/v1/sessions/${id}/stream`,
+        );
+        clients.push(c);
+        expect(await c.waitClosed()).toBe(1013);
+      }
+      expect(entry?.subscriberCount).toBe(0);
+      expect(app.websocketServer.clients.size).toBe(0);
+    } finally {
+      await big.close();
+    }
+  }, 60000);
+});
+
 describe("R15 服务停止", () => {
   test("stop() 断开所有连接并释放会话", async () => {
     const dataDir = path.join(base, "data");
