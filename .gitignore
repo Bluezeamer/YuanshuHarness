@@ -24,3 +24,6 @@ coverage/
 .playwright-cli/
 .playwright/
 .agents/skills/playwright-cli/
+
+# server 包里的 web 产物：构建时从 packages/web/dist 复制而来
+packages/server/web/
