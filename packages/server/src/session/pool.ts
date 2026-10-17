@@ -100,6 +100,8 @@ export class SessionEntry {
   readonly createdAt: string;
   updatedAt: string;
   running = false;
+  // send 已接受但 SDK 尚未发出 agent_start 的窗口；删除必须把它当作运行中。
+  private starting = 0;
   private interrupted: boolean;
 
   private seq = 0;
@@ -335,6 +337,10 @@ export class SessionEntry {
   }
 
   // 返回时命令已被接受；整个运行是否成功由事件流告知。
+  get busy(): boolean {
+    return this.running || this.starting > 0;
+  }
+
   send(text: string, images: ImageInput[] = []): void {
     if (this.disposed) throw new PoolError("disposed", "会话已关闭");
     if (text.trim() === "") throw new PoolError("bad_request", "text 不能为空");
@@ -343,6 +349,7 @@ export class SessionEntry {
       throw new PoolError("bad_request", "当前模型不支持图片输入");
     const notice = this.interrupted;
     this.interrupted = false;
+    this.starting++;
     (async () => {
       if (notice)
         await this.session.sendCustomMessage(
@@ -359,7 +366,11 @@ export class SessionEntry {
           ? { images: images.map((i) => ({ type: "image" as const, ...i })) }
           : {}),
       });
-    })().catch((err) => this.emit("run.failed", { message: reason(err) }));
+    })()
+      .catch((err) => this.emit("run.failed", { message: reason(err) }))
+      .finally(() => {
+        this.starting--;
+      });
   }
 
   async stop(): Promise<void> {
@@ -570,8 +581,10 @@ export class SessionPool {
   async remove(id: string): Promise<"ok" | "not_found" | "running"> {
     if (!UUID_RE.test(id)) return "not_found";
     const { store, sessionDir } = this.deps;
+    // 加载中的会话还没进池；不等它就删，加载完成后会话会带着已删除的文件复活。
+    await this.loading.get(id)?.catch(() => {});
     const entry = this.entries.get(id);
-    if (entry?.running) return "running";
+    if (entry?.busy) return "running";
     const file = findSessionFile(sessionDir, id);
     if (!entry && !file && !store.get(id)) return "not_found";
     if (file) {

@@ -28,14 +28,23 @@ type AckError = { code: string; message: string };
 
 const OPEN = 1;
 const MAX_IMAGES = 20;
+// 命令 id 由客户端生成，会被原样回显进 ack，所以必须有界。
+const MAX_CMD_ID_LEN = 256;
+const MAX_MIME_LEN = 128;
 const rawSize = (raw: RawData): number =>
   Array.isArray(raw)
     ? raw.reduce((n, b) => n + b.length, 0)
     : "byteLength" in raw
       ? raw.byteLength
       : 0;
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
-/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+// 图片可达数十 MiB，字符集检查用单个字符类；填充另行检查：只允许在末尾，且至多两个。
+const BASE64_BODY = /^[A-Za-z0-9+/]*$/;
+
+function isBase64(data: string): boolean {
+  if (data.length === 0 || data.length % 4 !== 0) return false;
+  const pad = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return BASE64_BODY.test(pad ? data.slice(0, -pad) : data);
+}
 
 function parseImages(value: unknown): ImageInput[] | null {
   if (value === undefined) return [];
@@ -46,10 +55,10 @@ function parseImages(value: unknown): ImageInput[] | null {
     if (
       !i ||
       typeof i.mimeType !== "string" ||
+      i.mimeType.length > MAX_MIME_LEN ||
       !i.mimeType.startsWith("image/") ||
       typeof i.data !== "string" ||
-      i.data.length % 4 !== 0 ||
-      !BASE64.test(i.data)
+      !isBase64(i.data)
     )
       return null;
     out.push({ mimeType: i.mimeType, data: i.data });
@@ -304,8 +313,11 @@ export async function sessionsApi(
         });
       }
       const { id, type } = msg;
-      if (typeof id !== "string" || id === "")
-        return ack(undefined, { code: "bad_request", message: "缺少 id" });
+      if (typeof id !== "string" || id === "" || id.length > MAX_CMD_ID_LEN)
+        return ack(undefined, {
+          code: "bad_request",
+          message: `id 必须是 1 到 ${MAX_CMD_ID_LEN} 个字符的字符串`,
+        });
       try {
         switch (type) {
           case "send_message": {

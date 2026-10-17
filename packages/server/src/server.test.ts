@@ -12,9 +12,15 @@ import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { Config } from "./config.js";
-import { createServer, isLoopbackHost, type YuanshuServer } from "./server.js";
+import {
+  createServer,
+  hideServerErrorDetails,
+  isLoopbackHost,
+  type YuanshuServer,
+} from "./server.js";
 
 const VERSION = (
   JSON.parse(
@@ -454,5 +460,27 @@ describe("无全局状态（R8）", () => {
     await a.stop();
     expect((await fetch(`${urlB}/healthz`)).status).toBe(200);
     await expect(fetch(`${urlA}/healthz`)).rejects.toThrow();
+  });
+});
+
+describe("5xx 不泄漏内部细节", () => {
+  test("未处理异常只返回通用文案，详情进日志；4xx 保持原样", async () => {
+    const app = Fastify({ logger: false });
+    app.setErrorHandler(hideServerErrorDetails);
+    app.get("/boom", async () => {
+      throw new Error("ENOENT: '/home/u/secret/x.jsonl'");
+    });
+    app.post("/j", async () => "ok");
+    const boom = await app.inject({ method: "GET", url: "/boom" });
+    expect(boom.statusCode).toBe(500);
+    expect(boom.body).not.toContain("/home/u");
+    const bad = await app.inject({
+      method: "POST",
+      url: "/j",
+      payload: "{bad",
+      headers: { "content-type": "application/json" },
+    });
+    expect(bad.statusCode).toBe(400);
+    await app.close();
   });
 });

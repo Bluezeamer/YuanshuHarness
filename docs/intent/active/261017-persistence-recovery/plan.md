@@ -62,3 +62,10 @@ Date: 2026-10-17
 
 - 2026-10-17 步骤 6 回归：既有测试里三处断言随新行为更新——数据目录启动后含 `sessions` 与 `yuanshu.db`（原为空）；会话列表按创建时间升序（与 spec R13 一致）。新增 `src/api/persist.test.ts` 覆盖 R2、R3、R11–R17 与重启恢复端到端。
 - 2026-10-17 步骤 6 补充：`scripts/smoke-package.sh` 原断言“数据目录启动后为空”，随持久化改为只含 `sessions` 与 `yuanshu.db`；同时清掉 lint 警告。`scripts/check.sh` 全量通过（server 270 项、web 1 项）。
+- 2026-10-17 评审第 1、2 轮后修复（均为空上下文评审者的发现，已逐条核对后修改）：
+  - 加载进行中收到 DELETE 会话复活：`remove` 先等同 id 的加载；`send` 接受到 `agent_start` 之间用 `starting` 计数，删除按运行中处理。
+  - ack 回显：命令 `id` 限 256 字符，超长不回显；`mimeType` 限 128 字符。
+  - 图片校验：原 `BASE64` 正则允许空串和"=" 在中间，且一行严格正则成了死代码；改为长度为 4 的非零倍数 + 字符集 + 仅末尾至多两个填充。
+  - 5xx：Fastify 默认处理器会把 `err.message`（含本机路径）返回给客户端，已实测；加 `setErrorHandler` 只改 5xx。
+  - 接受不改：Origin/Host 校验（见 spec Risks，bluezeamer 确认）。
+  - 推迟：历史读取为同步全量解析，会阻塞事件循环；`seed` 未按 32 KiB 截断。需缓存或增量读取，改动较大，另开变更。`run.failed` 可能带 provider 原始错误文本，待确认后再定。

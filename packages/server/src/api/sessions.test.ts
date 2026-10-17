@@ -257,6 +257,44 @@ describe("R11 非法输入", () => {
     expect(stub.requests).toHaveLength(0);
   });
 
+  test("超长 id 被拒绝且不回显；畸形 base64、空 data 被拒绝", async () => {
+    const { http, ws } = await boot({}, undefined, stub, {
+      input: ["text", "image"],
+    });
+    const id = await newSession(http);
+    const c = await connect(ws, id);
+    const raw = async (obj: unknown) => {
+      const n = c.acks.length;
+      c.ws.send(JSON.stringify(obj));
+      await waitFor(() => c.acks.length > n, "ack");
+      return c.acks[n];
+    };
+    const long = await raw({
+      id: "i".repeat(257),
+      type: "send_message",
+      text: "x",
+    });
+    expect(long).toMatchObject({ ok: false, error: { code: "bad_request" } });
+    expect(JSON.stringify(long).length).toBeLessThan(1024);
+    for (const data of ["", "abc", "ab=c", "a===", "@@@@", "AA=A"]) {
+      const ack = await raw({
+        id: "b",
+        type: "send_message",
+        text: "x",
+        images: [{ mimeType: "image/png", data }],
+      });
+      expect(ack, data).toMatchObject({ ok: false });
+    }
+    const longMime = await raw({
+      id: "m",
+      type: "send_message",
+      text: "x",
+      images: [{ mimeType: `image/${"p".repeat(200)}`, data: "AAAA" }],
+    });
+    expect(longMime).toMatchObject({ ok: false });
+    expect(c.closed).toBeNull();
+  });
+
   test("接近上限的带图消息可以接受", async () => {
     const { http, ws } = await boot();
     const id = await newSession(http);

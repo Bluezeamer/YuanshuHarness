@@ -5,7 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
-import Fastify from "fastify";
+import Fastify, {
+  type FastifyError,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
@@ -86,6 +90,20 @@ function isInsideWebRoot(webRoot: string, pathName: string): boolean {
 }
 
 // 每次调用都新建 Fastify 实例，不使用模块级可变状态，同一进程内可并存多个实例。
+// 未处理的 5xx 默认会把 err.message 原样返回，里面可能带本机文件路径；详情只进日志。
+export function hideServerErrorDetails(
+  err: FastifyError,
+  req: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const status = err.statusCode ?? 500;
+  if (status < 500) return reply.send(err);
+  req.log.error({ err }, "请求处理失败");
+  return reply
+    .code(status)
+    .send({ statusCode: status, error: "Internal Server Error" });
+}
+
 export function createServer(
   config: Config,
   options: ServerOptions = {},
@@ -104,6 +122,8 @@ export function createServer(
       ? { level: "info", stream: options.logStream }
       : { level: "info" },
   });
+
+  app.setErrorHandler(hideServerErrorDetails);
 
   let db: Db | null = null;
   app.register(fastifyWebsocket, {

@@ -332,6 +332,39 @@ describe("R14 删除", () => {
     t.data.close(true);
   });
 
+  test("加载进行中收到删除：等加载完成再判断，不会留下已删文件的会话", async () => {
+    const t = start();
+    const { id } = await converse(t.pool, ["x"]);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const inner = stubSessionFactory(stub);
+    const n = restart(t, async (o) => {
+      await gate;
+      return inner(o);
+    });
+    const loading = n.pool.acquire(id);
+    const removing = n.pool.remove(id);
+    release();
+    await loading;
+    expect(await removing).toBe("ok");
+    expect(n.pool.get(id)).toBeUndefined();
+    expect(n.pool.list().map((x) => x.id)).not.toContain(id);
+    expect(findSessionFile(n.data.sessionDir, id)).toBeNull();
+    n.data.close(true);
+  });
+
+  test("send 已接受但 agent_start 未到：删除按运行中拒绝", async () => {
+    const t = start();
+    const { id, entry } = await converse(t.pool, ["x"]);
+    stub.mode.delayMs = 1000;
+    entry.send("again");
+    expect(entry.running).toBe(false);
+    expect(await t.pool.remove(id)).toBe("running");
+    await entry.stop();
+    await waitFor(() => !entry.busy, "停止");
+    t.data.close(true);
+  });
+
   test("未加载的会话也能删；重启对账不会把它补回来", async () => {
     const t = start();
     const { id } = await converse(t.pool, ["x"]);
