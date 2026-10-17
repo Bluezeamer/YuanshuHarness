@@ -69,3 +69,4 @@ Date: 2026-10-17
   - 5xx：Fastify 默认处理器会把 `err.message`（含本机路径）返回给客户端，已实测；加 `setErrorHandler` 只改 5xx。
   - 接受不改：Origin/Host 校验（见 spec Risks，bluezeamer 确认）。
   - 推迟：历史读取为同步全量解析，会阻塞事件循环；`seed` 未按 32 KiB 截断。需缓存或增量读取，改动较大，另开变更。`run.failed` 可能带 provider 原始错误文本，待确认后再定。
+- 2026-10-17 第 3 轮快速审核:评审者指出 WebSocket 命令分支可能回显 `load_failed` 的 message,担心泄漏路径。复核后确认命令分支里的 `send`/`stop`/`resync` 只抛 `disposed`/`bad_request`,不抛 `load_failed`;REST 路由的错误由 `hideServerErrorDetails` 或 `loadFailed` 处理,不需要在命令分支加防护。补了"加载失败时删除"的用例,验证等待逻辑覆盖加载失败的情形。`prompt()` 与 `agent_start` 的时序:已读 pi-agent-core 源码,确认 `agent_start` 在 `prompt()` resolve 之前发出,所以 `starting` 计数器必须覆盖从接受到 `agent_start` 的窗口。
