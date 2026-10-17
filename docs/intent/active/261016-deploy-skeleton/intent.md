@@ -60,6 +60,7 @@ Why: 要选 Web 框架（新的外部依赖），要定下健康端点与启动�
    - 命令名与包名：npm 一旦发布难以更改，本条只定命令名用于 Docker 入口与文档，包名到首次发布时定；上一份骨架 intent 把命令名划出了范围。需要你提供，或我给候选。
    - Docker 基础镜像：建议 `node:22-slim`（glibc）而不是 alpine（musl），后面 SQLite 与 pi SDK 的原生依赖在 glibc 下更稳；以非 root 用户运行，数据目录固定为 `/data`，不在镜像内放任何配置。
    - 镜像构建方式：多阶段，复用同一份构建产出。
+   - **决定：见 [ADR-0019](../../../genesis/adr/0019-release-artifacts.md)。命令 `yuanshu serve`；只发布 server 一个 npm 包；多阶段构建，镜像里装的就是该 npm 包。与上面建议不同的一处：基础镜像选 `node:24-slim`，不是 `node:22-slim`。（2026-10-17，bluezeamer 确认并定稿）**
 4. **数据目录的结构版本号推到第 3 条**（难逆；记录在本 intent，不单独出 ADR）。建议：本 intent 的 Server 只校验数据目录存在且可写，不写任何版本标记。[ADR-0012](../../../genesis/adr/0012-delivery-form.md) 的"影响"一节要求数据目录带版本号，但现在没有数据，设计出来的版本格式无法被验证。
 5. **传输层（WebSocket 或 SSE）推到第 3 条**（难逆；记录在本 intent）。[ADR-0013](../../../genesis/adr/0013-tech-stack.md) 说留给骨架 intent，本条明确改为留给第 3 条，因为选择取决于 [ADR-0005](../../../genesis/adr/0005-client-protocol.md) 事件流的具体形态（双向与否、重连方式）。第 1 条的框架选型要保证两种都支持。
 6. **CI 里是否构建镜像**（易逆，推迟到 spec）。倾向每个 PR 都构建并起容器做健康探测；托管 runner 自带 Docker。

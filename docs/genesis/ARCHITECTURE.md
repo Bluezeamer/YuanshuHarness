@@ -38,6 +38,7 @@
 | 认证 | 受限网段加令牌，IM 白名单路由 | [ADR-0011](adr/0011-auth-and-im-routing.md) |
 | 交付 | npm 包加 Docker 镜像，单一数据目录 | [ADR-0012](adr/0012-delivery-form.md) |
 | 启动参数与健康端点 | host、port、数据目录三个参数，命令行优先于环境变量；`GET /healthz` 无需认证 | [ADR-0018](adr/0018-startup-params-and-health-endpoint.md) |
+| 发布物形态 | 命令 `yuanshu serve`；只发布 server 一个 npm 包；镜像基于 `node:24-slim`，多阶段构建，镜像里装的就是该 npm 包 | [ADR-0019](adr/0019-release-artifacts.md) |
 | 托管与 CI | GitHub 公开仓库，脚本化 CI | [ADR-0014](adr/0014-hosting-and-ci.md) |
 | 许可 | MIT；移植的 Codex 部分保留 Apache-2.0 | [ADR-0016](adr/0016-license-mit.md) |
 | 模型 | 跟随 agent 定义，会话内手动切换，向导 | [ADR-0015](adr/0015-model-management.md) |
@@ -73,3 +74,4 @@
 - 2026-10-16：创世初版，纳入 ADR-0001 至 ADR-0016。
 - 2026-10-17：纳入 ADR-0017，选定 Server 的 HTTP 框架。
 - 2026-10-17：纳入 ADR-0018，定启动参数与健康端点的契约；令牌与来源网段参数、数据目录结构版本号推迟到认证与首份持久化数据落地时。
+- 2026-10-17：纳入 ADR-0019，定发布物形态：命令名与子命令、npm 包结构、镜像基础与构建方式。

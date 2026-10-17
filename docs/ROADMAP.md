@@ -5,7 +5,7 @@
 > 影响路线的重大取舍（为什么先做 A 后做 B）若经正式决策，须链接对应 ADR。
 
 ## 能力演进序列
-1. 部署骨架：空壳 Server，健康端点可探测，npm 包与 Docker 镜像可构建（[ADR-0012](genesis/adr/0012-delivery-form.md)、[ADR-0017](genesis/adr/0017-server-web-framework.md)、[ADR-0018](genesis/adr/0018-startup-params-and-health-endpoint.md)）
+1. 部署骨架：空壳 Server，健康端点可探测，npm 包与 Docker 镜像可构建（[ADR-0012](genesis/adr/0012-delivery-form.md)、[ADR-0017](genesis/adr/0017-server-web-framework.md)、[ADR-0018](genesis/adr/0018-startup-params-and-health-endpoint.md)、[ADR-0019](genesis/adr/0019-release-artifacts.md)）
 2. 契约测试：固化对 pi SDK 的假设并锁定版本（[ADR-0001](genesis/adr/0001-pi-sdk-no-fork.md)）。需要验证的假设：
    - 压缩后能否在系统提示词末尾追加；`supportsMidConvoSystemMessages` 与 `supportsMidConvoToolChanges` 的实际行为（[ADR-0009](genesis/adr/0009-prompt-assembly-injection.md)）
    - 从 JSONL 加载会话的接口；pi 自身读取 AGENTS.md 时如何接管、避免重复注入（[ADR-0004](genesis/adr/0004-state-storage-recovery.md)）
