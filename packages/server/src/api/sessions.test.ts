@@ -226,6 +226,9 @@ describe("R11 非法输入", () => {
     expect(c.closed).toBeNull();
     expect(await c.command("resync")).toMatchObject({ ok: true });
     expect(stub.requests).toHaveLength(0);
+    // 每条带 id 的命令恰好一个 ack
+    const ids = c.acks.flatMap((a) => (a.id === undefined ? [] : [a.id]));
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   test("超过 50 MiB 的单条消息：以 1009 关闭连接", async () => {
@@ -362,6 +365,30 @@ describe("R14 单帧越线", () => {
   }, 60000);
 });
 
+describe("R11 入站积压", () => {
+  test("待处理字节（含正在处理的这条）超限：断开连接而不是无界缓存", async () => {
+    const { http, ws } = await boot({ maxPendingBytes: 1024 * 1024 });
+    const id = await newSession(http);
+    const c = await connect(ws, id);
+    c.ws.send("x".repeat(1536 * 1024));
+    expect(await c.waitClosed()).toBe(1013);
+  });
+
+  test("images 数量有上限", async () => {
+    const { http, ws } = await boot({}, undefined, stub, {
+      input: ["text", "image"],
+    });
+    const id = await newSession(http);
+    const c = await connect(ws, id);
+    const img = { mimeType: "image/png", data: "AAAA" };
+    const ack = await c.command("send_message", {
+      text: "x",
+      images: Array.from({ length: 21 }, () => img),
+    });
+    expect(ack).toMatchObject({ ok: false, error: { code: "bad_request" } });
+  });
+});
+
 describe("R15 服务停止", () => {
   test("stop() 断开所有连接并释放会话", async () => {
     const dataDir = path.join(base, "data");
@@ -393,8 +420,9 @@ describe("R15 服务停止", () => {
     stub.mode.delayMs = 1500;
     await a.command("send_message", { text: "inflight" });
     await server.stop();
-    await a.waitClosed();
-    await b.waitClosed();
+    // stop() 返回时连接必须已经关闭，而不是之后才关
+    expect(a.closed).not.toBeNull();
+    expect(b.closed).not.toBeNull();
     expect(disposed).toBe(1);
   });
 

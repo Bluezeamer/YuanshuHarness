@@ -12,24 +12,33 @@ export interface SessionsApiOptions {
   pingIntervalMs: number;
   pongTimeoutMs: number;
   maxBufferedBytes: number;
+  maxPendingBytes: number;
 }
 
 export const DEFAULTS = {
   pingIntervalMs: 30_000,
   pongTimeoutMs: 10_000,
   maxBufferedBytes: 4 * 1024 * 1024,
+  maxPendingBytes: 50 * 1024 * 1024,
   maxPayloadBytes: 50 * 1024 * 1024,
 };
 
 type AckError = { code: string; message: string };
 
 const OPEN = 1;
+const MAX_IMAGES = 20;
+const rawSize = (raw: RawData): number =>
+  Array.isArray(raw)
+    ? raw.reduce((n, b) => n + b.length, 0)
+    : "byteLength" in raw
+      ? raw.byteLength
+      : 0;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 function parseImages(value: unknown): ImageInput[] | null {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) return null;
+  if (!Array.isArray(value) || value.length > MAX_IMAGES) return null;
   const out: ImageInput[] = [];
   for (const v of value) {
     const i = v as { mimeType?: unknown; data?: unknown } | null;
@@ -106,15 +115,16 @@ export async function sessionsApi(
 
     const writeRaw = (text: string): void => {
       if (socket.readyState !== OPEN) throw new Error("socket closed");
-      if (socket.bufferedAmount > opts.maxBufferedBytes) {
-        // 慢客户端：断开它，重连后会拿到新快照；不替它缓冲。
+      // 硬上限：已排队的加上这一帧不得超过阈值，超过则不入队、直接断开，
+      // 内存因此有界；重连后会拿到新快照。
+      if (
+        socket.bufferedAmount + Buffer.byteLength(text) >
+        opts.maxBufferedBytes
+      ) {
         socket.close(1013, "backpressure");
         throw new Error("backpressure");
       }
       socket.send(text);
-      // 写入后再查一次：这一帧本身把积压推过阈值、且之后没有新事件时，也要断开。
-      if (socket.bufferedAmount > opts.maxBufferedBytes)
-        socket.close(1013, "backpressure");
     };
     const subscriber = { send: writeRaw };
     const unsubscribe = entry.subscribe(subscriber);
@@ -147,8 +157,22 @@ export async function sessionsApi(
 
     // 同一连接的命令严格按到达顺序执行：stop 未完成时，后到的 send_message 不得抢先。
     let chain: Promise<void> = Promise.resolve();
+    // 已收到但尚未处理完的字节数；超限说明客户端发得比处理得快，断开而不是无界缓存。
+    let pending = 0;
     socket.on("message", (raw: RawData, isBinary: boolean) => {
-      chain = chain.then(() => handle(raw, isBinary));
+      const size = rawSize(raw);
+      pending += size;
+      if (pending > opts.maxPendingBytes) {
+        socket.close(1013, "overloaded");
+        return;
+      }
+      chain = chain.then(async () => {
+        try {
+          if (socket.readyState === OPEN) await handle(raw, isBinary);
+        } finally {
+          pending -= size;
+        }
+      });
     });
 
     async function handle(raw: RawData, isBinary: boolean): Promise<void> {
@@ -204,7 +228,18 @@ export async function sessionsApi(
 
   // 停止时先断开全部连接，再释放全部会话，最后才轮到 HTTP 服务关闭。
   app.addHook("preClose", async () => {
-    for (const s of [...sockets]) s.close(1001, "server_shutdown");
+    const open = [...sockets];
+    const closed = open.map(
+      (s) =>
+        new Promise<void>((resolve) => {
+          if (s.readyState === 3) return resolve();
+          s.once("close", () => resolve());
+          s.close(1001, "server_shutdown");
+          // 对端不配合关闭握手时不能让 stop() 一直等下去。
+          setTimeout(() => s.terminate(), 1000).unref();
+        }),
+    );
     pool?.dispose();
+    await Promise.all(closed);
   });
 }

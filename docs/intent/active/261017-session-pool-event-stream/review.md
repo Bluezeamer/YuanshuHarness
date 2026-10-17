@@ -22,3 +22,18 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 | 建议 | `packages/server/src/session/pool.ts:3` | `toChatMessage` 导入后未使用，是本次新增的死代码。 | 已修：删除未用的导入 |
 
 本轮阻塞级：4 条。
+
+## 第 2 轮（2026-10-17）— 范围：06c93dbf85a10dd5941194559f85fc82929377fa..d60854131b4e604f458409a57d6a3c79d1e9b44d — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 阻塞 | `packages/server/src/api/sessions.ts:206`、`packages/server/src/api/sessions.test.ts:395` | 违反 R15：`preClose` 只发起 `socket.close()` 就立即返回，未等待各连接的 `close`；`@fastify/websocket` 11.3.4 的默认 `preClose` 同样在调用 `websocketServer.close(done)` 后立即调用 `done()`。用插件自带的内存 WebSocket（无需监听端口）暂停客户端读取后实测：`await app.close()` 已返回、池已 dispose，但服务端仍为 `CLOSING`、客户端仍为 `OPEN`，连接及 `serve()` 创建的心跳定时器要等关闭握手或 `ws` 的关闭超时才释放。现有测试在 `await server.stop()` 之后才调用 `waitClosed()`，因此没有断言“stop 返回时已关闭”。 | 已修：preClose 等待每个连接真正关闭（对端不配合 1 秒后 terminate）再返回；R15 用例改为断言 stop() 返回时连接已关闭，变异验证（去掉等待）变红 |
+| 重要 | `packages/server/src/api/sessions.ts:107` | R14 的“内存增长有界”没有被 4 MiB 阈值真正约束：代码先把已完整序列化的任意大小帧交给 `socket.send()`，再检查 `bufferedAmount` 并关闭；一个大快照或工具事件可在关闭前一次性排入远超阈值的数据，关闭帧还会排在数据之后，内存持续到排空或关闭超时。`packages/server/src/api/sessions.test.ts:345` 用 1 MiB 阈值发送 8 MiB 快照，只断言最终 1013，实际固化了“先超额入队、后关闭”，没有证明内存有界。上轮“最后一帧越线也会关闭”已修，但背压预算仍不是硬上限。 | 已修：改为硬上限——已排队字节加本帧超过阈值就不写入、直接断开；spec R14 改写，明确单帧超 4 MiB 的连接会被断开。快照越线用例在改回软检查时变红 |
+| 重要 | `packages/server/src/api/sessions.ts:30`、`packages/server/src/api/sessions.ts:149` | 入站只有“单条消息 50 MiB”限制，没有每连接待处理条数或总字节上限。每个 `message` 都把 `RawData` 捕获进 Promise 串行链；当前 `stop` 等待 `abort()` 时，客户端仍可持续提交接近上限的消息，原始 Buffer 会无界滞留，连接关闭也不取消已排队任务。处理时又同时保留 `raw.toString()`、`JSON.parse` 结果；`images` 不限数量且 `parseImages` 为每项再建对象，随后 `SessionEntry.send()` 还会再次 `map`，所以 50 MiB 线长不能形成可靠的内存/CPU 上限。现有背靠背测试只有两条小消息且等待很短，未覆盖积压。 | 已修：每连接待处理字节上限 50 MiB（超限 1013），images 最多 20 项；两条用例，变异验证均变红 |
+| 建议 | `packages/server/test/support/ws-client.ts:49`、`packages/server/src/api/sessions.test.ts:188` | R11 要求每条命令“恰好一个 ack”，但测试助手只等待“存在一个同 id ack”，非法输入助手也只等待 ack 数量增加；若实现对同一命令发送两个相同 ack，现有用例仍可能通过。应按命令 id 断言最终计数恰为 1。 | 已修：R11 用例增加“带 id 的 ack 各只出现一次”的断言 |
+
+本轮阻塞级：1 条。
+
+验证：补齐仓库 Node 24 工具链 PATH 后执行 `cd packages/server && npx vitest run`，结果为 8 个测试文件通过、10 个失败，149 项中 106 通过、43 失败，另有 5 个未处理错误；失败根因均为沙箱禁止监听端口（`listen EPERM`），因此不能据此确认网络集成用例。无需端口的 `src/session/events.test.ts` 6 项全过；另用 `/tmp` 内存 WebSocket 探针确认了上述 R15 时序。
+
+上轮核对：同连接命令串行、写后背压复查、base64 字符与长度校验、dispose 后拒绝订阅，以及调试日志、stub 监听错误和未用导入的清理均已在当前代码中确认；R5 队列顺序的驳回理由与澄清后的 spec 一致。上轮 R15 待确认项未消失，已在本轮升级为阻塞。

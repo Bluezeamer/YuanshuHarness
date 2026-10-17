@@ -23,7 +23,10 @@ export interface ServerOptions {
   tuning?: Partial<
     Pick<
       Parameters<typeof sessionsApi>[1],
-      "pingIntervalMs" | "pongTimeoutMs" | "maxBufferedBytes"
+      | "pingIntervalMs"
+      | "pongTimeoutMs"
+      | "maxBufferedBytes"
+      | "maxPendingBytes"
     >
   >;
 }
