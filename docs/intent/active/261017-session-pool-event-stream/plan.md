@@ -45,4 +45,16 @@ Date: 2026-10-17
 - 步骤 2 的测试支撑抽取是纯重构，独立成提交，出问题可单独撤回。
 
 ## Deviations
-无
+- 2026-10-17 步骤 1 的探测结论（SDK 1.3.0，stub provider，一次性探针，已删除）：
+  - `agent_settled` 在正常（`aborted:false`）、abort（`aborted:true`）、provider 报错三种结局下都会触发，`prompt()` 在三种情况下都 resolve，不抛错。
+  - provider 返回 500 时，SDK 默认自动重试 3 次（共 4 次请求，间隔有退避），其间会重复出现 `agent_start`/`agent_end{willRetry:true}`/`auto_retry_start`，最终 `agent_end{willRetry:false}` 后才 `agent_settled`。失败只体现在最后一条助手消息上（`stopReason:"error"`、`errorMessage`）。
+  - 对 spec 的影响（不改 Requirements，只改实现方式）：
+    - `run.started` 由池在"空闲→运行"转换时发一次，`run.ended` 在 `agent_settled` 时发一次；重试期间多次 `agent_start` 不重复发 `run.started`。
+    - R6 的 `run.failed` 不靠 `prompt()` 抛错，而是在 `agent_settled` 时检查最后一条助手消息，`stopReason === "error"` 则在 `run.ended` 之前下发 `run.failed { message: errorMessage }`。`prompt()` 真抛错时同样兜底下发。
+    - 测试里用 `SettingsManager.inMemory` 关闭重试，避免失败用例等退避。
+  - `steer` 已确认：运行中调用立即 resolve，返回前触发 `queue_update`（steering:["two"]）；当前助手轮结束后、下一次模型调用之前送达，随后 `queue_update` 变空；stub 共收到 2 次请求，与 spec 一致。
+  - SDK 会发出 `role:"system"` 的 `message_start/end`；`message.*` 只映射 `user` 与 `assistant` 两种角色，其余角色（含 system、toolResult）不下发。
+- 2026-10-17 步骤 4：
+  - 快照的全部状态（最近窗口、`partial`、`activeTools`、`queue`、`running`）由池自己从同一条事件流累积，不读 `session.messages`，这样快照与 `seq` 构造上一致；窗口初始为空，持久化 intent 加载历史时再从 JSONL 播种。
+  - 探测发现：模型配置的 `input` 不含 `image` 时，SDK 把图片悄悄换成"(image omitted: model does not support images)"，不报错。已在 `send` 里拒绝并补进 spec R9；这是静默类问题，评审时重点复核。
+  - 变异验证已做（改坏后对应用例变红，还原后全绿）：广播先于状态更新、吞掉 `run.failed`、排队改直插、不拒绝不支持的图片、`dispose` 不清订阅、快照不含 `partial`。

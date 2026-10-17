@@ -174,3 +174,16 @@ export async function openSession(
   });
   return { session, modelRuntime, resourceLoader };
 }
+
+// 每次调用建一个全新的隔离会话，对着给定的 stub；关闭重试，避免失败用例等退避。
+export function stubSessionFactory(
+  stub: { url: string },
+  modelExtra: Record<string, unknown> = {},
+) {
+  return async () => {
+    const env = makeEnv();
+    writeModels(env, stub.url, modelExtra);
+    const { session } = await openSession(env, { retry: false });
+    return session;
+  };
+}
