@@ -1,6 +1,6 @@
 # Intent: 主干（四）最小命令行客户端
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 Lane: build
 Why: 不新增协议、持久化形状或鉴权规则，只是 ADR-0021/0024/0026 的第一个真实消费者，出错时当场可见，revert 一个提交可恢复，所以不是决策档；命中"静默"（序号缺口、重连、乱序、依赖 Node 全局 WebSocket 的真实行为），按标准档加固。
@@ -33,7 +33,9 @@ ADR-0019 已把 `yuanshu serve` 之外的子命令留给命令行客户端。
 - 只说 `/api/v1` 现有协议，不为客户端改协议；发现协议缺陷按 `v1` 内只增不改处理（[ADR-0021](../../../genesis/adr/0021-session-wire-protocol.md)）。
 - 令牌不得出现在输出、错误信息、日志里（[ADR-0026](../../../genesis/adr/0026-access-token-and-source-network.md)）。
 
-## Decisions needed
+## Decisions
+以下 5 项均按建议采纳（bluezeamer，2026-10-17）。
+
 1. **子命令名**：`sessions` / `new` / `attach`，还是别的。建议：就用这三个，短、不与 `serve` 冲突，发布前可改。
 2. **令牌来源**：只读环境变量 `YUANSHU_TOKEN`，还是也接受 `--token`。建议：只读环境变量。命令行会出现在进程列表（服务端 `--token` 的文档已有同样提醒），客户端没有"必须用命令行"的场景。
 3. **服务地址**：`--url` 参数与 `YUANSHU_URL` 环境变量，默认 `http://127.0.0.1:7420`。建议：照此，命令行优先于环境变量，与 [ADR-0018](../../../genesis/adr/0018-startup-params-and-health-endpoint.md) 一致。

@@ -1,6 +1,6 @@
 # Spec: 最小命令行客户端
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 
 > 写成 delta：协议、端点、认证都已在 [ADR-0021](../../../genesis/adr/0021-session-wire-protocol.md)、[ADR-0024](../../../genesis/adr/0024-session-rest-and-history.md)、[ADR-0026](../../../genesis/adr/0026-access-token-and-source-network.md)，此处只写客户端新增的行为。
