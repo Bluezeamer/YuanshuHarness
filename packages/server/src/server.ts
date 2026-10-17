@@ -89,7 +89,6 @@ function isInsideWebRoot(webRoot: string, pathName: string): boolean {
   }
 }
 
-// 每次调用都新建 Fastify 实例，不使用模块级可变状态，同一进程内可并存多个实例。
 // 未处理的 5xx 默认会把 err.message 原样返回，里面可能带本机文件路径；详情只进日志。
 export function hideServerErrorDetails(
   err: FastifyError,
@@ -104,6 +103,7 @@ export function hideServerErrorDetails(
     .send({ statusCode: status, error: "Internal Server Error" });
 }
 
+// 每次调用都新建 Fastify 实例，不使用模块级可变状态，同一进程内可并存多个实例。
 export function createServer(
   config: Config,
   options: ServerOptions = {},

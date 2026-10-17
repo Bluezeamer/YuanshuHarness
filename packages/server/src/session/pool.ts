@@ -336,11 +336,11 @@ export class SessionEntry {
     return this.subscribers.size;
   }
 
-  // 返回时命令已被接受；整个运行是否成功由事件流告知。
   get busy(): boolean {
     return this.running || this.starting > 0;
   }
 
+  // 返回时命令已被接受；整个运行是否成功由事件流告知。
   send(text: string, images: ImageInput[] = []): void {
     if (this.disposed) throw new PoolError("disposed", "会话已关闭");
     if (text.trim() === "") throw new PoolError("bad_request", "text 不能为空");

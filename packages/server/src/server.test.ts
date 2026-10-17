@@ -473,7 +473,10 @@ describe("5xx 不泄漏内部细节", () => {
     app.post("/j", async () => "ok");
     const boom = await app.inject({ method: "GET", url: "/boom" });
     expect(boom.statusCode).toBe(500);
-    expect(boom.body).not.toContain("/home/u");
+    expect(JSON.parse(boom.body)).toEqual({
+      statusCode: 500,
+      error: "Internal Server Error",
+    });
     const bad = await app.inject({
       method: "POST",
       url: "/j",
