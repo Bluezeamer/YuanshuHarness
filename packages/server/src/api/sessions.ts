@@ -24,6 +24,8 @@ export const DEFAULTS = {
 type AckError = { code: string; message: string };
 
 const OPEN = 1;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 function parseImages(value: unknown): ImageInput[] | null {
   if (value === undefined) return [];
@@ -35,7 +37,9 @@ function parseImages(value: unknown): ImageInput[] | null {
       !i ||
       typeof i.mimeType !== "string" ||
       !i.mimeType.startsWith("image/") ||
-      typeof i.data !== "string"
+      typeof i.data !== "string" ||
+      i.data.length % 4 !== 0 ||
+      !BASE64.test(i.data)
     )
       return null;
     out.push({ mimeType: i.mimeType, data: i.data });
@@ -102,13 +106,15 @@ export async function sessionsApi(
 
     const writeRaw = (text: string): void => {
       if (socket.readyState !== OPEN) throw new Error("socket closed");
-      console.error("buffered", socket.bufferedAmount, text.length);
       if (socket.bufferedAmount > opts.maxBufferedBytes) {
         // 慢客户端：断开它，重连后会拿到新快照；不替它缓冲。
         socket.close(1013, "backpressure");
         throw new Error("backpressure");
       }
       socket.send(text);
+      // 写入后再查一次：这一帧本身把积压推过阈值、且之后没有新事件时，也要断开。
+      if (socket.bufferedAmount > opts.maxBufferedBytes)
+        socket.close(1013, "backpressure");
     };
     const subscriber = { send: writeRaw };
     const unsubscribe = entry.subscribe(subscriber);
@@ -139,8 +145,10 @@ export async function sessionsApi(
       sockets.delete(socket);
     });
 
+    // 同一连接的命令严格按到达顺序执行：stop 未完成时，后到的 send_message 不得抢先。
+    let chain: Promise<void> = Promise.resolve();
     socket.on("message", (raw: RawData, isBinary: boolean) => {
-      void handle(raw, isBinary);
+      chain = chain.then(() => handle(raw, isBinary));
     });
 
     async function handle(raw: RawData, isBinary: boolean): Promise<void> {

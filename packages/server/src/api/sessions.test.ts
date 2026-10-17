@@ -32,8 +32,9 @@ async function boot(
   tuning: Partial<typeof DEFAULTS> = {},
   poolOverride?: SessionPool | null,
   backend: { url: string } = stub,
+  modelExtra: Record<string, unknown> = {},
 ) {
-  pool = new SessionPool(stubSessionFactory(backend));
+  pool = new SessionPool(stubSessionFactory(backend, modelExtra));
   app = Fastify({ logger: false });
   await app.register(fastifyWebsocket, {
     options: { maxPayload: DEFAULTS.maxPayloadBytes },
@@ -179,7 +180,9 @@ describe("流与命令", () => {
 
 describe("R11 非法输入", () => {
   test("逐项失败 ack，连接保持可用", async () => {
-    const { http, ws } = await boot();
+    const { http, ws } = await boot({}, undefined, stub, {
+      input: ["text", "image"],
+    });
     const id = await newSession(http);
     const c = await connect(ws, id);
     const raw = async (data: string | Buffer, binary = false) => {
@@ -214,6 +217,12 @@ describe("R11 非法输入", () => {
     expect(
       await c.command("send_message", { text: "x", images: [{ data: 1 }] }),
     ).toMatchObject({ ok: false });
+    expect(
+      await c.command("send_message", {
+        text: "x",
+        images: [{ mimeType: "image/png", data: "!not base64!" }],
+      }),
+    ).toMatchObject({ ok: false, error: { code: "bad_request" } });
     expect(c.closed).toBeNull();
     expect(await c.command("resync")).toMatchObject({ ok: true });
     expect(stub.requests).toHaveLength(0);
@@ -310,6 +319,47 @@ describe("R14 背压", () => {
       await big.close();
     }
   }, 120000);
+});
+
+describe("R9/R10 同一连接的命令顺序", () => {
+  test("背靠背的 stop 与 send_message：消息在中止之后开始新的运行，不滞留", async () => {
+    const { http, ws } = await boot();
+    const id = await newSession(http);
+    const c = await connect(ws, id);
+    stub.mode.delayMs = 1500;
+    await c.command("send_message", { text: "long" });
+    await waitFor(
+      () => c.types().filter((t) => t === "message.started").length === 2,
+      "生成中",
+    );
+    stub.mode.delayMs = 0;
+    c.ws.send(JSON.stringify({ id: "s", type: "stop" }));
+    c.ws.send(JSON.stringify({ id: "m", type: "send_message", text: "next" }));
+    await waitFor(() => c.acks.some((a) => a.id === "m"), "ack m");
+    await waitFor(ended(c, 2), "新的运行完成");
+    expect(JSON.stringify(stub.requests.at(-1)?.body)).toContain("next");
+  });
+});
+
+describe("R14 单帧越线", () => {
+  test("快照这一帧本身把积压推过阈值、之后没有事件：仍然断开", async () => {
+    const big = await startStub(() => "z".repeat(8 * 1024 * 1024));
+    const b = await boot({ maxBufferedBytes: 1024 * 1024 }, undefined, big);
+    try {
+      const id = await newSession(b.http);
+      const entry = pool.get(id);
+      entry?.send("go");
+      await waitFor(() => big.requests.length === 1, "请求到达");
+      await waitFor(() => entry?.running === false, "运行结束", 15000);
+      const c = await TestClient.connect(
+        `${b.ws}/api/v1/sessions/${id}/stream`,
+      );
+      clients.push(c);
+      expect(await c.waitClosed()).toBe(1013);
+    } finally {
+      await big.close();
+    }
+  }, 60000);
 });
 
 describe("R15 服务停止", () => {

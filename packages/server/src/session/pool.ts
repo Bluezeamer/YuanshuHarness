@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { type ChatMessage, mapEvent, toChatMessage } from "./events.js";
+import { type ChatMessage, mapEvent } from "./events.js";
 
 export type SessionFactory = () => Promise<AgentSession>;
 
@@ -172,6 +172,7 @@ export class SessionEntry {
 
   // 整段同步：先发快照，再登记订阅，其间不会有事件插入。
   subscribe(sub: Subscriber): () => void {
+    if (this.disposed) throw new PoolError("disposed", "会话已关闭");
     sub.send(this.snapshotFrame());
     this.subscribers.add(sub);
     return () => {
@@ -180,6 +181,7 @@ export class SessionEntry {
   }
 
   resync(sub: Subscriber): void {
+    if (this.disposed) throw new PoolError("disposed", "会话已关闭");
     sub.send(this.snapshotFrame());
   }
 

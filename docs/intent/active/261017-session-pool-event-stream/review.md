@@ -4,3 +4,21 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 
 > 每一轮评审追加一节。评审记录写在这里，不写进 spec。
 > 连续三轮仍有阻塞级问题 → 暂停，回到 spec 澄清口径，必要时请人裁决或升档。
+
+## 第 1 轮（2026-10-17）— 范围：06c93dbf85a10dd5941194559f85fc82929377fa..c26816e35e6970d75612984283e07f6eeb126e6d — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 阻塞 | `packages/server/src/session/events.ts:96` | 违反 R5：`queue_update` 固定按 `steering`、`followUp` 分组拼接，不能保留两类消息的全局送达顺序。复现：先送达 follow-up `a`，再送达 steering `b` 时，事件仍输出 `["b", "a"]`；现有测试只覆盖了 steering 恰好先到的排列。 | 驳回：SDK 总是先送达 steering、后送达 follow-up（follow-up 仅在没有工具调用和 steering 时才取），分组拼接就是送达顺序；复现用的先 follow-up 后 steering 的次序在 SDK 里不会出现。spec R5 措辞已澄清；本期只用 steer |
+| 阻塞 | `packages/server/src/api/sessions.ts:142` | 违反 R9/R10：每条消息都以 `void handle(...)` 并发执行，没有串行化同一连接的命令。运行中背靠背发送 `stop`、`send_message` 时，`stop` 在等待 `abort()`，后一命令会先被排入正在中止的 SDK run 并成功 ack；SDK 1.3.0 的 abort 不清 steering queue，该消息不会启动新运行，要等未来另一条 prompt 才可能被取走。现有测试都先等待前一 ack，未覆盖此路径。 | 已修：同一连接命令串行执行；新增用例 stop 与 send_message 背靠背，消息在中止后启动新运行 |
+| 阻塞 | `packages/server/src/api/sessions.ts:106` | 违反 R14：只在写入前检查旧的 `bufferedAmount`，没有计入本帧或在写入后复查；一个快照/事件可把积压从阈值以下推到 4 MiB 以上，若之后没有事件就永远不会触发 1013。现有背压测试依靠后续多帧才触发检查，未覆盖最后一帧越线。 | 已修：写入后再查一次积压；新增用例（快照单帧越线）。取舍：单帧本身超过阈值的连接也会被断开，正常回复远小于阈值 |
+| 重要（待确认） | `packages/server/src/api/sessions.ts:198`、`packages/server/src/session/pool.ts:212` | R15 关闭时序仍需真实运行验证：应用钩子调用 `socket.close()` 后立即释放会话，但没有显式等待连接 `close` 事件或 SDK 清理完成。`@fastify/websocket` 的默认 `preClose` 会关闭连接并调用 `wss.close(done)`，随后立即 `done()`；`ws` 的 noServer `close` 回调会等客户端关闭，Fastify 再关闭 HTTP 服务。仅凭静态源码尚不能证明 `stop()` 返回时仍有连接或定时器；缺少 Fastify、Node 与升级连接关闭时序的集成验证。 | 推迟：已有 R15 用例断言连接全部关闭且每个会话 dispose 一次（变异验证过）；`stop()` 返回时无遗留句柄的更强断言留给评审第 2 轮复核 |
+| 阻塞 | `packages/server/src/api/sessions.ts:28` | 违反 R9：`parseImages` 只检查 `data` 是字符串，不验证它是 base64；如 `{ mimeType: "image/png", data: "!" }` 会被成功 ack 并交给 SDK，而 Node 的 base64 解码会宽松地产生错误/空内容。现有非法图片测试只覆盖非字符串。 | 已修：校验 base64（长度为 4 的倍数且字符集合法）；用例使用支持图片的模型，使该检查独立生效 |
+| 重要（待确认） | `packages/server/src/session/pool.ts:83`、`packages/server/src/session/pool.ts:197` | 存在运行生命周期时序风险，但不是已确认的 R6 违约：R6 要求运行失败时发送 `run.failed`，没有规定它必须先于 `run.ended`。若 SDK 抛错路径先触发 `agent_settled`、再使 `prompt()` reject，当前 `.catch()` 可能在 `run.ended` 后发送 `run.failed`；若此前已记录错误助手消息，还需确认是否会重复发送。`/tmp` 最小模拟复现了 `run.started → run.ended → run.failed`，但缺少真实 SDK 运行证据确认该时序。 | 待第 2 轮复核：prompt() 在 provider 失败时 resolve 不抛错（探测已证），run.failed 由 agent_settled 路径发出；抛错路径仅用于 SDK 前置校验失败 |
+| 建议 | `packages/server/src/session/pool.ts:174` | `dispose()` 后直接调用 `subscribe()` 仍可重新登记订阅者，`resync()` 也未检查 `disposed`；最小复现 `entry.dispose(); entry.subscribe(sub)` 会让 `subscriberCount` 从 0 回到 1。目前未发现生产路径会在 dispose 后调用这些内部 API，因此这是内部 API 终态约束建议，不据此认定违反 R15。 | 已修：dispose 后 subscribe/resync 抛 PoolError |
+| 建议 | `packages/server/src/session/pool.ts:150` | 广播使用订阅集合快照；合成的 `Subscriber.send()` 若重入并退订后续订阅者，该订阅者仍会收到当前帧。生产 `writeRaw` 会检查 WebSocket `readyState`，退订则由异步 `close` 事件触发，尚无证据表明生产路径可触发该情形；可作为广播重入行为的测试建议，不认定违反 R13。 | 驳回：生产路径的 send 不会重入退订，合成场景无实际影响 |
+| 建议 | `packages/server/src/api/sessions.ts:105` | 生产路径遗留逐帧 `console.error`，每个文本 delta 都会记录缓冲量与帧长度并绕过 Fastify logger。它是否会阻塞事件循环或拖慢同会话其他连接尚未证实，不据此认定违反 R14；建议移除临时日志。 | 已修：这是我调试时遗留的 console.error（sed 误删了 if 行），已删除 |
+| 建议 | `packages/server/test/support/stub.ts:96` | 测试 stub 的 listen Promise 不监听 `error`；当前受限环境拒绝监听时，`pnpm --filter yuanshu-harness-server test` 报 `EPERM` 后永久悬挂而非失败退出，只能人工终止。应让监听错误 reject，保证测试结论可复现。 | 已修：listen 监听 error 并 reject |
+| 建议 | `packages/server/src/session/pool.ts:3` | `toChatMessage` 导入后未使用，是本次新增的死代码。 | 已修：删除未用的导入 |
+
+本轮阻塞级：4 条。

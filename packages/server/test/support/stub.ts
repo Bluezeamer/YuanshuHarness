@@ -93,7 +93,10 @@ export async function startStub(
       }, mode.delayMs);
     });
   });
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
   const port = (server.address() as AddressInfo).port;
   return {
     url: `http://127.0.0.1:${port}/v1`,

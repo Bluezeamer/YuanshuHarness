@@ -28,7 +28,7 @@ R5. SDK 事件按下表映射为 Server 事件；表外的 SDK 事件不下发�
 | `message_start` / `message_end` | `message.started` / `message.ended` | `{ role, text }`（`text` 为各文本块拼接，不含工具调用块） |
 | `message_update`（文本或思考增量） | `message.delta` | `{ kind: "text" \| "thinking", text }` |
 | `tool_execution_start` / `_update` / `_end` | `tool.started` / `tool.updated` / `tool.ended` | `{ toolCallId, toolName, ... }`，`_end` 另有 `isError` |
-| `queue_update` | `queue.updated` | `{ queue: string[] }`（steering 与 follow-up 合并，按送达顺序） |
+| `queue_update` | `queue.updated` | `{ queue: string[] }`（steering 在前、follow-up 在后；SDK 总是先送达 steering，所以这就是送达顺序，本期只产生 steering） |
 
 R6. 一次运行失败（`prompt` 抛错或 `agent_settled` 之前出现不可恢复错误）时，必须下发 `run.failed`，`data` 为 `{ message }`；不得吞掉，也不得让连接断开。
 
