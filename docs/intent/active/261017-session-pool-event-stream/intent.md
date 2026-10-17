@@ -1,6 +1,6 @@
 # Intent: 主干（一）会话池与带序号的事件流
 Author: bluezeamer
-Status: closed
+Status: accepted
 Date: 2026-10-17
 Lane: decide
 Why: 命中"难逆"——定下对外通信协议（传输层、事件格式、会话标识），客户端一旦依赖就难改；同时命中"静默"（乱序、断线重连、排队），实现阶段按加固处理。不降档：协议是日后所有客户端的契约。

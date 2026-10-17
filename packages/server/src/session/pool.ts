@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { type ChatMessage, mapEvent } from "./events.js";
+import {
+  boundStrings,
+  type ChatMessage,
+  EVENT_STRING_MAX,
+  mapEvent,
+  SNAPSHOT_MESSAGE_MAX,
+} from "./events.js";
 
 export type SessionFactory = () => Promise<AgentSession>;
 
@@ -95,7 +101,10 @@ export class SessionEntry {
   }
 
   // 先改状态，再分配序号并广播：序号 N 的快照就是事件 N 之后的状态。
-  private emit(type: string, data: Record<string, unknown>): void {
+  private emit(type: string, raw: Record<string, unknown>): void {
+    // 单个字符串超限就截断并标记：保证单帧有界，客户端需要全文时另行拉取。
+    const b = boundStrings(raw, EVENT_STRING_MAX);
+    const data = b.truncated ? { ...b.value, truncated: true } : b.value;
     this.apply(type, data);
     this.seq += 1;
     this.broadcast(this.frame(type, data));
@@ -108,7 +117,11 @@ export class SessionEntry {
           this.partial = { role: "assistant", text: "" };
         break;
       case "message.delta":
-        if (data.kind === "text" && this.partial)
+        if (
+          data.kind === "text" &&
+          this.partial &&
+          this.partial.text.length < EVENT_STRING_MAX
+        )
           this.partial.text += String(data.text);
         break;
       case "message.ended":
@@ -158,15 +171,21 @@ export class SessionEntry {
   }
 
   private snapshotFrame(): string {
+    const messages = boundStrings(this.recent, SNAPSHOT_MESSAGE_MAX);
+    const rest = boundStrings(
+      { partial: this.partial, queue: this.queue },
+      SNAPSHOT_MESSAGE_MAX,
+    );
     return this.frame("snapshot", {
-      messages: this.recent,
+      messages: messages.value,
+      ...(messages.truncated || rest.truncated ? { truncated: true } : {}),
       running: this.running,
       activeTools: [...this.activeTools].map(([toolCallId, toolName]) => ({
         toolCallId,
         toolName,
       })),
-      partial: this.partial,
-      queue: this.queue,
+      partial: rest.value.partial,
+      queue: rest.value.queue,
     });
   }
 

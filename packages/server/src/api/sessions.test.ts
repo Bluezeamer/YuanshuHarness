@@ -344,21 +344,45 @@ describe("R9/R10 同一连接的命令顺序", () => {
   });
 });
 
-describe("R14 单帧越线", () => {
-  test("快照这一帧本身把积压推过阈值、之后没有事件：仍然断开", async () => {
+describe("R16 大载荷截断", () => {
+  test("超大回复被截断并标记，连接保持可用；重连的快照也有界且可连上", async () => {
     const big = await startStub(() => "z".repeat(8 * 1024 * 1024));
     const b = await boot({ maxBufferedBytes: 1024 * 1024 }, undefined, big);
     try {
       const id = await newSession(b.http);
-      const entry = pool.get(id);
-      entry?.send("go");
-      await waitFor(() => big.requests.length === 1, "请求到达");
-      await waitFor(() => entry?.running === false, "运行结束", 15000);
-      const c = await TestClient.connect(
-        `${b.ws}/api/v1/sessions/${id}/stream`,
-      );
-      clients.push(c);
-      expect(await c.waitClosed()).toBe(1013);
+      const c = await connect(b.ws, id);
+      await c.command("send_message", { text: "go" });
+      await waitFor(ended(c), "运行结束", 20000);
+      const end = c.frames.filter((f) => f.type === "message.ended").at(-1);
+      expect(end?.data.truncated).toBe(true);
+      expect(String(end?.data.text).length).toBeLessThanOrEqual(256 * 1024);
+      expect(c.closed).toBeNull();
+      expectContiguous(c.frames);
+      // 快照：每条消息文本不超过 32 KiB，整体远小于 1 MiB 阈值，新连接连得上
+      const c2 = await connect(b.ws, id);
+      await waitFor(() => c2.frames.length > 0, "快照");
+      const snap = c2.frames[0];
+      expect(snap?.data.truncated).toBe(true);
+      for (const m of snap?.data.messages ?? [])
+        expect(m.text.length).toBeLessThanOrEqual(32 * 1024);
+      expect(c2.closed).toBeNull();
+    } finally {
+      await big.close();
+    }
+  }, 60000);
+});
+
+describe("R14 空队列允许整帧", () => {
+  test("单帧大于阈值但连接健康（队列为空）：不断开", async () => {
+    const big = await startStub(() => "z".repeat(300 * 1024));
+    const b = await boot({ maxBufferedBytes: 64 * 1024 }, undefined, big);
+    try {
+      const id = await newSession(b.http);
+      const c = await connect(b.ws, id);
+      await c.command("send_message", { text: "go" });
+      await waitFor(ended(c), "运行结束", 20000);
+      expect(c.frames.some((f) => f.type === "message.ended")).toBe(true);
+      expect(c.closed).toBeNull();
     } finally {
       await big.close();
     }
@@ -390,27 +414,28 @@ describe("R11 入站积压", () => {
 });
 
 describe("连接关闭后资源释放", () => {
-  test("首帧背压断开的连接不留在 sockets 里，订阅也不残留", async () => {
-    const big = await startStub(() => "z".repeat(8 * 1024 * 1024));
+  test("背压断开的连接不留在订阅与连接集合里", async () => {
+    const big = await startStub(() => "z".repeat(700 * 1024));
+    big.mode.chunkBytes = 64 * 1024;
     const b = await boot({ maxBufferedBytes: 1024 * 1024 }, undefined, big);
     try {
       const id = await newSession(b.http);
       const entry = pool.get(id);
-      entry?.send("go");
-      await waitFor(() => entry?.running === false, "运行结束", 15000);
-      for (let i = 0; i < 3; i++) {
-        const c = await TestClient.connect(
-          `${b.ws}/api/v1/sessions/${id}/stream`,
-        );
-        clients.push(c);
-        expect(await c.waitClosed()).toBe(1013);
+      const fast = await connect(b.ws, id);
+      const slow = await connect(b.ws, id);
+      (slow.ws as unknown as { _socket: net.Socket })._socket.pause();
+      for (let round = 1; round <= 30 && slow.closed === null; round++) {
+        await fast.command("send_message", { text: `r${round}` });
+        await waitFor(ended(fast, round), `第 ${round} 轮`, 15000);
       }
-      expect(entry?.subscriberCount).toBe(0);
-      expect(app.websocketServer.clients.size).toBe(0);
+      (slow.ws as unknown as { _socket: net.Socket })._socket.resume();
+      expect(await slow.waitClosed()).toBe(1013);
+      await waitFor(() => entry?.subscriberCount === 1, "慢连接订阅已释放");
+      expect(app.websocketServer.clients.size).toBe(1);
     } finally {
       await big.close();
     }
-  }, 60000);
+  }, 120000);
 });
 
 describe("R15 服务停止", () => {

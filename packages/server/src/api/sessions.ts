@@ -115,11 +115,11 @@ export async function sessionsApi(
 
     const writeRaw = (text: string): void => {
       if (socket.readyState !== OPEN) throw new Error("socket closed");
-      // 硬上限：已排队的加上这一帧不得超过阈值，超过则不入队、直接断开，
-      // 内存因此有界；重连后会拿到新快照。
+      // 积压已存在时，再写这一帧会超过阈值就断开慢客户端；队列为空时允许写入一整帧
+      // （帧本身由池截断到有界），所以内存上界是"阈值加一帧"，大载荷不会误伤健康连接。
       if (
-        socket.bufferedAmount + Buffer.byteLength(text) >
-        opts.maxBufferedBytes
+        socket.bufferedAmount > 0 &&
+        socket.bufferedAmount + Buffer.byteLength(text) > opts.maxBufferedBytes
       ) {
         socket.close(1013, "backpressure");
         throw new Error("backpressure");

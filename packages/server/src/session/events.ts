@@ -102,3 +102,33 @@ export function mapEvent(e: AgentSessionEvent): ServerEvent | null {
       return null;
   }
 }
+
+export const EVENT_STRING_MAX = 256 * 1024;
+export const SNAPSHOT_MESSAGE_MAX = 32 * 1024;
+const MAX_DEPTH = 8;
+
+// 递归截断过长的字符串（按 UTF-16 长度，足够限制量级），截断处不加标记字符，
+// 由调用方在 data 顶层加 truncated: true。返回是否发生过截断。
+export function boundStrings<T>(
+  value: T,
+  max: number,
+): { value: T; truncated: boolean } {
+  let truncated = false;
+  const walk = (v: unknown, depth: number): unknown => {
+    if (typeof v === "string") {
+      if (v.length <= max) return v;
+      truncated = true;
+      return v.slice(0, max);
+    }
+    if (v === null || typeof v !== "object") return v;
+    if (depth >= MAX_DEPTH) {
+      truncated = true;
+      return null;
+    }
+    if (Array.isArray(v)) return v.map((x) => walk(x, depth + 1));
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) out[k] = walk(x, depth + 1);
+    return out;
+  };
+  return { value: walk(value, 0) as T, truncated };
+}
