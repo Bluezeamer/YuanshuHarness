@@ -3,7 +3,9 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
   boundStrings,
   type ChatMessage,
+  capFrameData,
   EVENT_STRING_MAX,
+  FRAME_DATA_MAX,
   mapEvent,
   SNAPSHOT_MESSAGE_MAX,
 } from "./events.js";
@@ -104,7 +106,9 @@ export class SessionEntry {
   private emit(type: string, raw: Record<string, unknown>): void {
     // 单个字符串超限就截断并标记：保证单帧有界，客户端需要全文时另行拉取。
     const b = boundStrings(raw, EVENT_STRING_MAX);
-    const data = b.truncated ? { ...b.value, truncated: true } : b.value;
+    const data = capFrameData(
+      b.truncated ? { ...b.value, truncated: true } : b.value,
+    );
     this.apply(type, data);
     this.seq += 1;
     this.broadcast(this.frame(type, data));
@@ -126,7 +130,10 @@ export class SessionEntry {
         break;
       case "message.ended":
         if (data.role === "assistant") this.partial = null;
-        this.recent.push(data as unknown as ChatMessage);
+        this.recent.push({
+          role: data.role as ChatMessage["role"],
+          text: String(data.text ?? ""),
+        });
         if (this.recent.length > WINDOW) this.recent.shift();
         break;
       case "tool.started":
@@ -171,22 +178,31 @@ export class SessionEntry {
   }
 
   private snapshotFrame(): string {
-    const messages = boundStrings(this.recent, SNAPSHOT_MESSAGE_MAX);
-    const rest = boundStrings(
-      { partial: this.partial, queue: this.queue },
-      SNAPSHOT_MESSAGE_MAX,
-    );
-    return this.frame("snapshot", {
-      messages: messages.value,
-      ...(messages.truncated || rest.truncated ? { truncated: true } : {}),
-      running: this.running,
-      activeTools: [...this.activeTools].map(([toolCallId, toolName]) => ({
-        toolCallId,
-        toolName,
-      })),
-      partial: rest.value.partial,
-      queue: rest.value.queue,
-    });
+    // 先按每条 32 KiB 截断；整帧仍过大（50 条都很长）就逐级收紧，最后只保留空窗口。
+    for (const limit of [SNAPSHOT_MESSAGE_MAX, 4 * 1024, 0]) {
+      const messages =
+        limit === 0
+          ? { value: [] as ChatMessage[], truncated: this.recent.length > 0 }
+          : boundStrings(this.recent, limit);
+      const rest = boundStrings(
+        { partial: this.partial, queue: this.queue },
+        Math.max(limit, 1024),
+      );
+      const data = {
+        messages: messages.value,
+        ...(messages.truncated || rest.truncated ? { truncated: true } : {}),
+        running: this.running,
+        activeTools: [...this.activeTools].map(([toolCallId, toolName]) => ({
+          toolCallId,
+          toolName,
+        })),
+        partial: rest.value.partial,
+        queue: rest.value.queue,
+      };
+      if (limit === 0 || JSON.stringify(data).length <= FRAME_DATA_MAX)
+        return this.frame("snapshot", data);
+    }
+    throw new Error("unreachable");
   }
 
   // 整段同步：先发快照，再登记订阅，其间不会有事件插入。

@@ -1,6 +1,12 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, test } from "vitest";
-import { mapEvent, messageText } from "./events.js";
+import {
+  boundStrings,
+  capFrameData,
+  FRAME_DATA_MAX,
+  mapEvent,
+  messageText,
+} from "./events.js";
 
 const ev = (e: unknown) => e as AgentSessionEvent;
 
@@ -83,5 +89,54 @@ describe("mapEvent", () => {
       "agent_end",
     ])
       expect(mapEvent(ev({ type }))).toBeNull();
+  });
+});
+
+describe("R16 有界", () => {
+  test("字符串截断不切开代理对", () => {
+    const r = boundStrings("a".repeat(9) + "😀", 10);
+    expect(r.truncated).toBe(true);
+    expect(r.value).toBe("a".repeat(9));
+  });
+
+  test("宽数组、宽对象、长键、Buffer、深嵌套都被限制并标记", () => {
+    const wide = boundStrings(
+      { a: Array.from({ length: 5000 }, () => 1) },
+      100,
+    );
+    expect(wide.value.a).toHaveLength(200);
+    expect(wide.truncated).toBe(true);
+    const keys = Object.fromEntries(
+      Array.from({ length: 1000 }, (_, i) => [`k${i}`, i]),
+    );
+    expect(Object.keys(boundStrings(keys, 100).value)).toHaveLength(200);
+    const longKey = boundStrings({ ["k".repeat(5000)]: 1 }, 100);
+    expect(Object.keys(longKey.value)[0]?.length).toBe(256);
+    const buf = boundStrings({ b: Buffer.alloc(300_000) }, 100);
+    expect(buf.value.b).toBeNull();
+    expect(buf.truncated).toBe(true);
+    let deep: unknown = "x";
+    for (let i = 0; i < 20; i++) deep = { d: deep };
+    expect(boundStrings(deep, 100).truncated).toBe(true);
+  });
+
+  test("宽度乘长度仍超限时整体兜底，只留短标量", () => {
+    const heavy = {
+      toolCallId: "c1",
+      toolName: "t",
+      isError: false,
+      result: Array.from({ length: 200 }, () => "y".repeat(100_000)),
+    };
+    const b = boundStrings(heavy, 256 * 1024);
+    const capped = capFrameData(b.value);
+    expect(JSON.stringify(capped).length).toBeLessThan(FRAME_DATA_MAX);
+    expect(capped).toMatchObject({
+      toolCallId: "c1",
+      toolName: "t",
+      isError: false,
+      omitted: true,
+      truncated: true,
+    });
+    expect(capped).not.toHaveProperty("result");
   });
 });

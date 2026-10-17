@@ -313,3 +313,32 @@ describe("R15 释放", () => {
     await expect(pool.create()).rejects.toThrow(PoolError);
   });
 });
+
+describe("R16 快照形状与有界", () => {
+  test("截断后的快照消息只含 role 与 text，truncated 在 data 顶层", async () => {
+    const entry = await open();
+    const c = collector();
+    entry.subscribe(c);
+    // 构造过长的助手回复
+    stub.requests.length = 0;
+    pool.dispose();
+    const big = await startStub(() => "z".repeat(300 * 1024));
+    try {
+      pool = new SessionPool(stubSessionFactory(big));
+      const e = pool.get((await pool.create()).id);
+      if (!e) throw new Error();
+      const cc = collector();
+      e.subscribe(cc);
+      e.send("go");
+      await waitFor(finished(cc), "run.ended");
+      const late = collector();
+      e.subscribe(late);
+      const snap = late.frames[0];
+      expect(snap?.data.truncated).toBe(true);
+      for (const m of snap?.data.messages ?? [])
+        expect(Object.keys(m).sort()).toEqual(["role", "text"]);
+    } finally {
+      await big.close();
+    }
+  });
+});
