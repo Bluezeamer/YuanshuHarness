@@ -1,6 +1,6 @@
 # Spec: 持久化与恢复
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 
 > 写成 delta：决策已在 ADR，此处只引用。存储与版本见 [ADR-0022](../../../genesis/adr/0022-sqlite-driver.md)、[ADR-0025](../../../genesis/adr/0025-data-dir-layout-and-versioning-revised.md)（取代 0023），REST 契约见 [ADR-0024](../../../genesis/adr/0024-session-rest-and-history.md)，既有事件协议见 [ADR-0021](../../../genesis/adr/0021-session-wire-protocol.md)。
