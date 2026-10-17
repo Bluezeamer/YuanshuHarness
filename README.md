@@ -17,8 +17,10 @@
 | 监听地址 | `--host` | `YUANSHU_HOST` | `127.0.0.1` |
 | 监听端口 | `--port` | `YUANSHU_PORT` | `7420` |
 | 数据目录 | `--data-dir` | `YUANSHU_DATA_DIR` | `~/.yuanshu` |
+| 访问令牌 | `--token` | `YUANSHU_TOKEN` | 无（仅回环监听时可不设） |
+| 允许的来源网段 | `--allow-cidr`（逗号分隔） | `YUANSHU_ALLOW_CIDR` | 不限制 |
 
-未知的参数、非法的端口、拼错的 `YUANSHU_*` 环境变量都会让启动失败，而不是被悄悄忽略。监听非回环地址时会打警告：认证尚未实现，能访问该地址的人都能访问服务。健康探测用 `GET /healthz`，返回 `{"status":"ok","version":"…"}`。
+未知的参数、非法的端口、拼错的 `YUANSHU_*` 环境变量都会让启动失败，而不是被悄悄忽略。监听非回环地址必须同时给令牌，否则启动失败；令牌至少 32 个字符，只能含 `A-Za-z0-9._~-`，推荐用环境变量给出（命令行参数会出现在进程列表里）。配了令牌后，`/api/v1` 下的 REST 与 WebSocket 都要带 `Authorization: Bearer <令牌>`（WebSocket 也可在 `Sec-WebSocket-Protocol` 里给 `bearer.<令牌>`）；`/healthz` 与静态页不需要。配了网段时，来源不在网段内的请求得 403；同一来源令牌连续错 10 次，封 60 秒（429）。没有 TLS，令牌明文传输，请只在受信网络里使用；放在反向代理后时，网段与限流看到的是代理的地址。健康探测用 `GET /healthz`，返回 `{"status":"ok","version":"…"}`。
 
 ### Docker
 
@@ -26,12 +28,17 @@
 
 <!-- smoke:docker-run -->
 ```bash
-docker run -d --name yuanshu -p 7420:7420 -v yuanshu-data:/data yuanshu
+docker run -d --name yuanshu -p 7420:7420 -e YUANSHU_TOKEN="$YUANSHU_TOKEN" -v yuanshu-data:/data yuanshu
 ```
 
+- 容器监听 `0.0.0.0`，所以必须提供 `YUANSHU_TOKEN`（先在 shell 里设好，示例原样转发），否则容器启动失败。
 - 用命名卷（如上）时，卷会继承镜像里 `/data` 的属主，开箱即用。
 - 绑定挂载宿主机目录时，该目录必须对 uid 1000 可写，否则服务按上面的规则启动失败。
 - 容器里要改端口，请设环境变量 `-e YUANSHU_PORT=…`，不要改命令行：镜像内置的健康检查读的是 `YUANSHU_PORT`。
+
+### 升级说明
+
+此前按“非回环只警告”部署的实例，升级后会因缺少令牌而启动失败，这是有意的：请在部署配置里加上 `YUANSHU_TOKEN`。回退到旧版本前要先去掉 `--token`、`--allow-cidr` 及对应环境变量，旧版本会把它们当作未知参数。
 
 ## 本地检查
 
