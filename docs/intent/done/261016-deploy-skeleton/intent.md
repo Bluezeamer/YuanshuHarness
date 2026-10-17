@@ -1,6 +1,6 @@
 # Intent: 部署骨架
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-16
 Lane: decide
 Why: 要选 Web 框架（新的外部依赖），要定下健康端点与启动参数（对外契约），要引入 Dockerfile 与 npm 打包（新的部署形态），均难逆，故为决策档；产物的真实运行行为（镜像能否起来、包装好后能否跑）只有实际运行才能证实，实现阶段按静默信号加固。
@@ -8,7 +8,7 @@ Why: 要选 Web 框架（新的外部依赖），要定下健康端点与启动�
 ## Links
 来源: ROADMAP 第 1 条
 上游: ../../../ROADMAP.md、../../../genesis/adr/0012-delivery-form.md、../../../genesis/adr/0013-tech-stack.md、../../../genesis/adr/0014-hosting-and-ci.md
-下游: [spec.md](spec.md)、plan.md、PR（实现后回填）
+下游: [spec.md](spec.md)、plan.md、[PR #5](https://github.com/Bluezeamer/YuanshuHarness/pull/5)
 
 ## Problem
 骨架只有占位模块和检查护栏，没有任何可运行的 Server，也没有交付物。ROADMAP 第 2 条起的所有能力既没有可挂载的进程，也没有"装得上、起得来"的交付路径。

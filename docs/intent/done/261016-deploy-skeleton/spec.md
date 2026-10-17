@@ -1,6 +1,6 @@
 # Spec: 部署骨架
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 
 > 写成 delta：只写本次变更相对既有约定新增或改变了什么。ARCHITECTURE / ADR 已讲过的内容只链接，不复述。
@@ -9,7 +9,7 @@ Date: 2026-10-17
 ## Links
 来源: [intent.md](intent.md)
 上游: [ADR-0012](../../../genesis/adr/0012-delivery-form.md)、[ADR-0013](../../../genesis/adr/0013-tech-stack.md)、[ADR-0014](../../../genesis/adr/0014-hosting-and-ci.md)、[ADR-0017](../../../genesis/adr/0017-server-web-framework.md)、[ADR-0018](../../../genesis/adr/0018-startup-params-and-health-endpoint.md)、[ADR-0019](../../../genesis/adr/0019-release-artifacts.md)
-下游: plan.md、PR（实现后回填）
+下游: plan.md、[PR #5](https://github.com/Bluezeamer/YuanshuHarness/pull/5)
 
 ## Requirements
 

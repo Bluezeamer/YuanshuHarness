@@ -1,6 +1,6 @@
 # Plan: 部署骨架
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 
 > plan 是活的：实现中偏离计划，写进 Deviations，与对应代码同一次提交，无需重新审批。
