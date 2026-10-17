@@ -30,6 +30,8 @@
 | 概念模型 | agent 定义、环境、workspace、会话 | [ADR-0003](adr/0003-concept-model.md) |
 | 对话记录与 Server 状态 | pi JSONL 加 SQLite，单写入者 | [ADR-0004](adr/0004-state-storage-recovery.md) |
 | 客户端协议 | 带序号事件流，最近窗口，统一排队，先答先赢弹窗 | [ADR-0005](adr/0005-client-protocol.md) |
+| 传输层 | 每会话一条 WebSocket，REST 管会话的创建与查询 | [ADR-0020](adr/0020-transport-websocket.md) |
+| 会话线上协议 | `/api/v1` 路径版本化；Server 自定义薄事件类型；UUIDv7 会话标识；`send_message`/`stop`/`resync` 命令，缺口靠 `resync` 重发快照 | [ADR-0021](adr/0021-session-wire-protocol.md) |
 | 权限 | 三档，规则共用，模型审批，Codex 为蓝本 | [ADR-0006](adr/0006-permission-tiers.md) |
 | 凭据 | 占位符引用，Server 持有并替换 | [ADR-0007](adr/0007-private-variables.md) |
 | 能力集 | Server 集中管理 skill 与 MCP | [ADR-0008](adr/0008-capability-sets.md) |
@@ -75,3 +77,4 @@
 - 2026-10-17：纳入 ADR-0017，选定 Server 的 HTTP 框架。
 - 2026-10-17：纳入 ADR-0018，定启动参数与健康端点的契约；令牌与来源网段参数、数据目录结构版本号推迟到认证与首份持久化数据落地时。
 - 2026-10-17：纳入 ADR-0019，定发布物形态：命令名与子命令、npm 包结构、镜像基础与构建方式。
+- 2026-10-17：纳入 ADR-0020、ADR-0021，定传输层（WebSocket）与会话线上协议；认证的令牌携带方式、历史拉取路径分别推迟到认证与持久化。
