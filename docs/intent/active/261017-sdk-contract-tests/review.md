@@ -76,3 +76,13 @@ Reviewer: 每轮由新开的空上下文评审者执行（见 references/review.
 | 重要 | `docs/intent/active/261017-sdk-contract-tests/spec.md:24,38`、`packages/server/test/contract/isolation.test.ts:13-30`、`packages/server/test/live/smoke.ts:72-79` | R9 用临时 HOME/显式路径替代真实 `~/.pi` mtime 检查是合理收窄；但 Requirements 和 intent 中“端点与密钥不得出现在测试输出”没有收窄，Proof 却删除了输出检查。现有静态扫描既不捕获输出，也只识别少数 IPv4/`sk-` 形式；live 冒烟还会让 `session.prompt` 的 SDK 异常原样冒泡。用“stub 地址不敏感”不能证明真实端点冒烟的输出约束，所以上轮该项只修复了目录隔离部分。 | 部分接受：live 冒烟的异常输出已脱敏（把端点地址替换为 `<endpoint>`、截断 300 字符）。stub 测试没有真实端点信息；静态扫描只能挡常见形态，spec R9 的 Proof 已如实写明范围。 |
 
 本轮阻塞级：0 条。
+
+## 第 3 轮（2026-10-17）— 范围：0ac6d09..HEAD — 执行：独立评审，纸面核对（未运行测试）
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 重要 | `packages/server/test/live/smoke.ts:23-82`、`packages/server/test/contract/isolation.test.ts:13-30`、`docs/intent/active/261017-sdk-contract-tests/spec.md:24` | 第 2 轮 R9 标为部分接受；本轮确认仅 `session.prompt` 位于脱敏 `catch` 内，初始化阶段的异常仍会原样输出；该 `catch` 也只替换异常文本中原样出现的 `baseUrl`，未脱敏 API key 或 SDK/端点改写后的地址，静态检查不核验运行时输出。异常若回显这些值，仍会违反 R9“测试输出不得出现端点与密钥”的要求；故此项并未完全消失。 | |
+
+本轮确认：第 2 轮 R3 范围收窄仍在记录中标为“待人裁决”，并列明补 anthropic-messages 用例或批准延期并同步上游两种选项；本轮不将其计作阻塞。工具移除断言、skill fixture 清理及 `signal` 同一性断言均已按第 2 轮处理记录补实。压缩用例中摘要会作为额外 user 消息进入请求，故真假分支的位置断言不会同时满足；`ui-dispatch` 在开始 400ms 竞速前已等待 `uiContext` 被调用，未发现所怀疑的起跑时序问题。
+
+本轮阻塞级：0 条。
