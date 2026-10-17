@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
@@ -44,6 +44,17 @@ async function assertWebRoot(webRoot: string): Promise<void> {
   }
 }
 
+function isInsideWebRoot(webRoot: string, pathName: string): boolean {
+  try {
+    const root = realpathSync(webRoot);
+    const real = realpathSync(path.join(webRoot, pathName));
+    return real === root || real.startsWith(root + path.sep);
+  } catch {
+    // 文件不存在等：放行给静态托管自己返回 404，不在这里泄露任何信息。
+    return true;
+  }
+}
+
 // 每次调用都新建 Fastify 实例，不使用模块级可变状态，同一进程内可并存多个实例。
 export function createServer(
   config: Config,
@@ -56,6 +67,9 @@ export function createServer(
   ) as { version: string };
 
   const app = Fastify({
+    // 关闭时强制断开所有连接。默认只关"空闲"连接，已连接但没发完请求的连接会让进程一直等下去，
+    // 在容器里表现为 docker stop 被强杀（退出码 137）。
+    forceCloseConnections: true,
     logger: options.logStream
       ? { level: "info", stream: options.logStream }
       : { level: "info" },
@@ -68,7 +82,8 @@ export function createServer(
     wildcard: true,
     redirect: false,
     dotfiles: "deny",
-    serveDotFiles: false,
+    // @fastify/static 会跟随符号链接；web 目录内指向目录外的链接要拒绝。
+    allowedPath: (pathName) => isInsideWebRoot(webRoot, pathName),
   });
 
   return {

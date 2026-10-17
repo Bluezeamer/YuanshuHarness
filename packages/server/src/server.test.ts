@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -183,6 +183,34 @@ describe("静态托管（R6）", () => {
     expect(res.body).not.toContain("TOP-SECRET");
   });
 
+  test.each([
+    ["指向目录外文件的符号链接", "/link.txt"],
+    ["指向目录外目录的符号链接", "/outdir/secret.txt"],
+  ])("%s 得到 4xx，且读不到目录外内容", async (_n, p) => {
+    await symlink(
+      path.join(base, "secret.txt"),
+      path.join(webRoot, "link.txt"),
+    );
+    await symlink(base, path.join(webRoot, "outdir"));
+    const { addr } = await launch();
+    const res = await rawGet(addr.port, p);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(res.body).not.toContain("TOP-SECRET");
+  });
+
+  test("指向目录内部的符号链接仍可访问", async () => {
+    await writeFile(path.join(webRoot, "real.txt"), "INSIDE");
+    await symlink(
+      path.join(webRoot, "real.txt"),
+      path.join(webRoot, "alias.txt"),
+    );
+    const { addr } = await launch();
+    const res = await rawGet(addr.port, "/alias.txt");
+    expect(res.status).toBe(200);
+    expect(res.body).toBe("INSIDE");
+  });
+
   test("web 目录不存在时启动失败，且不创建数据目录、不监听", async () => {
     const port = await freePort();
     const server = createServer(cfg({ port }), {
@@ -281,6 +309,32 @@ describe("生命周期（R7）", () => {
     expect(Date.now() - started).toBeLessThan(5000);
     await expect(rawGet(addr.port, "/healthz")).rejects.toThrow(/ECONNREFUSED/);
   });
+
+  // 已连接但没发完请求的连接，不会被 Node 当作"空闲"关闭，必须由 stop() 强制断开。
+  test.each([
+    ["连上后什么都不发", ""],
+    ["请求头只发一半", "GET /healthz HTTP/1.1\r\nHost: x\r\n"],
+    [
+      "请求体没发完",
+      "POST /healthz HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\nab",
+    ],
+  ])(
+    "存在半开连接（%s）时 stop() 仍在 5 秒内完成",
+    async (_name, partial) => {
+      const { server, addr } = await launch();
+      const socket = net.connect(addr.port, "127.0.0.1");
+      socket.on("error", () => {});
+      await new Promise<void>((r) => socket.once("connect", () => r()));
+      if (partial) socket.write(partial);
+      await new Promise((r) => setTimeout(r, 100));
+
+      const started = Date.now();
+      await server.stop();
+      socket.destroy();
+      expect(Date.now() - started).toBeLessThan(5000);
+    },
+    15000,
+  );
 });
 
 describe("数据目录（R4）", () => {
