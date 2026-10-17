@@ -197,6 +197,14 @@ describe("R16 有界", () => {
     expect(bytes(edge)).toBeLessThanOrEqual(FRAME_DATA_MAX);
   });
 
+  test("紧贴上限（预留余量内）的载荷被兜底，不会在加标记后越线", () => {
+    const r = sanitizeData(
+      { a: "x".repeat(FRAME_DATA_MAX - 18) },
+      FRAME_DATA_MAX,
+    );
+    expect(r.omitted).toBe(true);
+  });
+
   test("队列条目数与长度有界", () => {
     const e = mapEvent({
       type: "queue_update",

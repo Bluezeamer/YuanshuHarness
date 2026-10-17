@@ -459,6 +459,20 @@ describe("R16 SDK 载荷异常与快照有界", () => {
     );
   });
 
+  test("活动工具最多登记 100 个", () => {
+    const { entry, emit } = fake();
+    for (let i = 0; i < 150; i++)
+      emit({
+        type: "tool_execution_start",
+        toolCallId: `t${i}`,
+        toolName: "n",
+        args: {},
+      });
+    const c = collector();
+    entry.subscribe(c);
+    expect(c.frames[0]?.data.activeTools).toHaveLength(100);
+  });
+
   test("转义放大后的最坏快照仍不超过 1 MiB", () => {
     const { entry, emit } = fake();
     for (let i = 0; i < 100; i++)
