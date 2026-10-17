@@ -34,3 +34,24 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 已执行且通过：`pnpm lint`、`pnpm -r typecheck`、`pnpm -r test`（server 124、web 1）、`scripts/smoke-package.sh`、`bash tests/check/selfcheck.sh`、`scripts/smoke-image.sh`（约 94 秒，`docker stop` 4.4 秒）。冒烟后 `docker ps -a --filter name=yuanshu-smoke`、卷、镜像均无遗留。另验证 `//healthz` 403、`/healthz/` 404、`/HEALTHZ` 404、`/%2e%2e/secret` 403，`/healthz` 不被遮蔽。临时在被 git 忽略的 `packages/server/web/` 放过 300 MB 测试文件，已删除。
 
 本轮阻塞级：0 条。
+
+## 第 3 轮（2026-10-17）— 范围：1058574...HEAD — 执行：新开空上下文 subagent
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 建议 | `packages/server/src/server.ts:60`（`existsSync(index)`） | 与第 2 轮 ELOOP 同一类问题没有收尾：`existsSync` 会把 `EACCES` 吞成 `false`，于是目录本身没有搜索权限（`chmod 000 sub`）时，`!existsSync(index)` 为真、守卫放行，库随后 `stat` 失败，返回 500 且响应体带服务器绝对路径。复现：web 目录里 `mkdir priv; echo P > priv/index.html; chmod 000 priv`，`node tmp/review/r3.mjs <web> /priv/`，得到 `500 {"code":"EACCES","message":"EACCES: permission denied, stat '/…/priv/index.html'"}`（`/priv` 不带斜杠为 404，恢复权限后 `/priv/` 为 200）。前提是运维把 web 目录里某子目录权限弄坏，远程攻击者无法制造，所以只算建议；修法是把 `existsSync` 换成 `try { realpathSync(index) } catch ENOENT/ENOTDIR 才放行`，与 catch 的口径一致。 | 已修 `d3ed9b0`：去掉 `existsSync`，改为对 `index.html` 做 `realpathSync`，与 `catch` 同一口径（只有 `ENOENT`/`ENOTDIR` 放行）。新增 `chmod 000` 子目录用例，修前红（500 带路径）修后绿，改回恒放行的变异被抓住。 |
+| 建议 | `packages/server/src/server.test.ts:208-219` | "根目录 index.html 是外链"一支只断言 `launch()` 失败（`addr` 为 `undefined`），不检查失败原因。任何启动失败（端口占用、数据目录问题）都会让它通过，所以去掉 `assertWebRoot` 里的 `within` 检查之外的别的故障也能让它绿；我没有做变异验证，但断言本身没有绑定到 `index.html 指向 web 目录之外`。另外 `launch().catch(() => ({addr: undefined}))` 让三个参数化用例共用同一段带分支的体，子目录两支若启动意外失败会落到 `rawGet(0, …)` 报出不相关的错误。建议把根目录一支拆成独立用例并断言错误信息包含"指向 web 目录之外"。 | 已修 `d3ed9b0`：根目录外链拆成独立用例，断言错误信息含「指向 web 目录之外」；子目录两支不再共用带分支的体。 |
+| 待确认 | `packages/server/src/server.ts:56-62`（检查与使用之间） | 守卫先 `realpath` 再由库按原路径读取，存在 TOCTOU：目录请求时 `index.html` 在检查后被换成外链即可绕过。利用前提是攻击者对 web 目录有写权限，无写权限的远程攻击者无法触发；评估为"低"，且库自身的 `allowedPath` 也是同样假设（库的 `send` 是按路径打开，不是按 fd）。缺的证据：没有对 `@fastify/static` 打开文件的源码路径做逐行核对，只做了黑盒实测，所以不下结论，仅标注前提。 | 接受，不改：已读 `@fastify/static` 源码（`index.js:342-343`），库自己的注释写明「静态根目录被假定不会在这次检查与 send 打开文件之间被攻击者改动」，与评审者评估的前提一致（需要对 web 目录有写权限）。web 目录是构建产物，只有部署者能写。守卫依赖库行为的担忧（升级库后悄悄失效）由常驻的符号链接用例兜底：这些用例在每次 CI 里跑，库升级使守卫失效就会变红。 |
+
+上轮阻塞/重要项核对：
+- 第 2 轮"重要"（符号链接修复被目录索引 `index.html` 绕过）：确实消失。真实 `dist/server.js` 起服务，`tmp/review/sl.mjs` 与 `tmp/review/r3.mjs` 实测：子目录 `sub/index.html -> 目录外文件`，`/sub/`、`/sub` 均 404；三级目录 `a/b/c/index.html` 外链，`/a/b/c/`、`/a/b/c` 均 404；根目录外链启动即失败（`index.html 指向 web 目录之外`）；`index.html` 指向另一个目录内部文件，`/idxdir/`、`/idxdir` 均 200 且内容正确；`index.html` 本身是目录 404；`index.html` 悬空链接 404；中间组件是外链（`midlink/`、`mid/x/`、`outlink/…`）404；链式链接指向外部 404；`%2e%2e` 403，双重编码 `%252e%252e` 404，`//sub/`、`/./sub/`、`/sub//`、`/sub/%00` 403，`/SUB/`、`%73ub/`、`%2573ub/`、`sub%2f` 404；5000 字符路径带/不带斜杠 403，均无 500。web 根本身是符号链接（`wlink -> w`）时 `/` 200、内部链接可访问、外链 404。
+- 正常路径未被新 `catch` 挡住：`/nope`、`/nope/x`、`/index.html/foo`（ENOTDIR）均 404 而非 403/500；`/sub/` 这类"目录无 index"返回库自己的 404。唯一的例外是上面 EACCES 一条（500）。
+- 第 2 轮"建议"（ELOOP 500 带路径）：确实消失（新用例断言 4xx 且不含路径，`/loop1` 修后 4xx）；同类的 EACCES 见上表第一条。
+- 第 2 轮"符号链接测试缺口"：补了 index.html 外链三支与环；但根目录一支断言偏弱，见上表第二条。
+- `assertWebRoot`：`index.html` 外链失败信息为"index.html 指向 web 目录之外"；是目录为"index.html 不是文件"；悬空链接与不存在均为 `ENOENT … realpath '<web>/index.html'`。信息都包含的只是运维自己传入的 web 目录路径，不泄露目录之外的内容；悬空链接那条不告诉人链接目标，清楚度足够。
+
+回归检查：`realpath` 比较双方都已 realpath，所以全局 node_modules 目录路径里含符号链接不影响（`wlink` 实测等价）；`scripts/smoke-package.sh`（3.5 秒）与 `scripts/smoke-image.sh`（100 秒，`docker stop` 4.6 秒、退出码 0）均通过，占位页 `GET /` 200、`/healthz` 不受影响。测试里用的是 `mkdtemp` 的 `base`，断言 `not.toContain(base)` 时若 `/tmp` 为符号链接，服务端报错带的是传入路径而非 realpath，仍然成立，未见对文件系统的特殊依赖；但环用例里的 500 路径泄露由 `ELOOP` 触发，依赖内核对链接环的行为，在常见 Linux/macOS 上一致。
+
+已执行且通过：`pnpm lint`、`pnpm -r typecheck`、`pnpm -r test`（server 128、web 1）、`bash tests/check/selfcheck.sh`、两个冒烟脚本。冒烟后 `docker ps -a --filter name=yuanshu-smoke`、卷、镜像均无遗留。实验目录 `tmp/review/r3/` 内临时改过权限的目录已恢复。
+
+本轮阻塞级：0 条。
