@@ -122,7 +122,8 @@ export class FailureLimiter {
     const rec = this.live(source) ?? this.insert(source, now);
     rec.failures += 1;
     rec.lastFailure = now;
-    if (rec.failures >= this.o.maxFailures) rec.bannedUntil = now + this.o.banMs;
+    if (rec.failures >= this.o.maxFailures)
+      rec.bannedUntil = now + this.o.banMs;
   }
 
   succeed(source: string): void {

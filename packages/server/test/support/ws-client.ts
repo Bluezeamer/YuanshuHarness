@@ -28,9 +28,12 @@ export class TestClient {
 
   static async connect(
     url: string,
-    opts: ConstructorParameters<typeof WebSocket>[2] = {},
+    opts: ConstructorParameters<typeof WebSocket>[2] & { token?: string } = {},
   ): Promise<TestClient> {
-    const ws = new WebSocket(url, opts);
+    const { token, ...wsOpts } = opts;
+    const ws = token
+      ? new WebSocket(url, ["yuanshu.v1", `bearer.${token}`], wsOpts)
+      : new WebSocket(url, wsOpts);
     const c = new TestClient(ws);
     await new Promise<void>((resolve, reject) => {
       ws.once("open", () => resolve());
