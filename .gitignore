@@ -7,6 +7,9 @@ tmp/
 # 本地 agent 配置；技能的唯一来源是 .agents/skills，.claude/skills 是指向它的本地符号链接
 .claude/
 
+# pi运行产生的临时文件
+.pi/
+
 # 本地aisdlc评估相关
 tests/aisdlc
 
