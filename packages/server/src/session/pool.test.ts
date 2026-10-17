@@ -61,7 +61,9 @@ describe("R4/R5 序号与映射", () => {
       kind: "text",
       text: "reply-1",
     });
-    expect(b.frames).toEqual(a.frames.map((f) => ({ ...f }))); // 同序号、同内容
+    // 事件帧是同一份广播，逐帧相同；快照是各自构造的，时间戳可能差 1ms，故忽略 ts。
+    const strip = (fs: Frame[]) => fs.map(({ ts: _ts, ...rest }) => rest);
+    expect(strip(b.frames)).toEqual(strip(a.frames));
   });
 });
 

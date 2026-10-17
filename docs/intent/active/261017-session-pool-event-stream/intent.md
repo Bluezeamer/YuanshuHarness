@@ -1,6 +1,6 @@
 # Intent: 主干（一）会话池与带序号的事件流
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 Lane: decide
 Why: 命中"难逆"——定下对外通信协议（传输层、事件格式、会话标识），客户端一旦依赖就难改；同时命中"静默"（乱序、断线重连、排队），实现阶段按加固处理。不降档：协议是日后所有客户端的契约。
@@ -8,7 +8,7 @@ Why: 命中"难逆"——定下对外通信协议（传输层、事件格式、�
 ## Links
 来源: ROADMAP 第 3 条（主干）的第一块；第 3 条拆为四个 intent：会话池与事件流 → 持久化与恢复 → 认证 → 最小命令行客户端
 上游: [ROADMAP](../../../ROADMAP.md)、[ADR-0005](../../../genesis/adr/0005-client-protocol.md)、[ADR-0013](../../../genesis/adr/0013-tech-stack.md)、[ADR-0017](../../../genesis/adr/0017-server-web-framework.md)、[ADR-0001](../../../genesis/adr/0001-pi-sdk-no-fork.md)
-下游: 定稿后回填
+下游: [spec.md](spec.md)、[plan.md](plan.md)、[review.md](review.md)、PR 待回填
 
 ## Problem
 契约测试已证实 pi SDK 的关键行为，但 Server 里还没有任何会话相关代码。后续的持久化、认证、命令行客户端、WebUI 都要挂在"会话池 + 事件流"上，

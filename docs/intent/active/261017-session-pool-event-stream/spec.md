@@ -1,6 +1,6 @@
 # Spec: 会话池与带序号的事件流
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 
 > 写成 delta：只写本次变更相对既有约定新增或改变了什么。端点、信封、命令集、缺口处理已在 [ADR-0021](../../../genesis/adr/0021-session-wire-protocol.md)，传输层在 [ADR-0020](../../../genesis/adr/0020-transport-websocket.md)，此处只链接，补的是 ADR 留给 spec 的细节。
