@@ -199,6 +199,41 @@ describe("静态托管（R6）", () => {
     expect(res.body).not.toContain("TOP-SECRET");
   });
 
+  // 请求路径本身在根内，库随后才拼上 index.html 去读：index.html 是指向目录外的链接时也必须拒绝。
+  test.each([
+    ["子目录", "/idx/", "idx"],
+    ["子目录（不带斜杠）", "/idx", "idx"],
+    ["根目录", "/", ""],
+  ])("%s 的 index.html 是指向目录外的链接时得到 4xx", async (_n, p, dir) => {
+    const dirPath = path.join(webRoot, dir);
+    await mkdir(dirPath, { recursive: true });
+    await rm(path.join(dirPath, "index.html"), { force: true });
+    await symlink(
+      path.join(base, "secret.txt"),
+      path.join(dirPath, "index.html"),
+    );
+    const { addr } = await launch().catch(() => ({ addr: undefined }));
+    // 根目录的 index.html 若是外链，assertWebRoot 应当在启动时就拒绝。
+    if (dir === "") {
+      expect(addr).toBeUndefined();
+      return;
+    }
+    const res = await rawGet(addr?.port ?? 0, p);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(res.body).not.toContain("TOP-SECRET");
+  });
+
+  test("符号链接环得到 4xx，响应不含服务器路径", async () => {
+    await symlink(path.join(webRoot, "loop2"), path.join(webRoot, "loop1"));
+    await symlink(path.join(webRoot, "loop1"), path.join(webRoot, "loop2"));
+    const { addr } = await launch();
+    const res = await rawGet(addr.port, "/loop1");
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(res.body).not.toContain(base);
+  });
+
   test("指向目录内部的符号链接仍可访问", async () => {
     await writeFile(path.join(webRoot, "real.txt"), "INSIDE");
     await symlink(

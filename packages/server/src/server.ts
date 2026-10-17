@@ -1,5 +1,5 @@
-import { readFileSync, realpathSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { realpath, stat } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,23 +35,36 @@ export function isLoopbackHost(host: string): boolean {
   return net.isIPv4(host) && host.startsWith("127.");
 }
 
+const within = (root: string, real: string) =>
+  real === root || real.startsWith(root + path.sep);
+
 async function assertWebRoot(webRoot: string): Promise<void> {
-  const index = path.join(webRoot, "index.html");
   try {
-    if (!(await stat(index)).isFile()) throw new Error("不是文件");
+    const root = await realpath(webRoot);
+    const index = await realpath(path.join(webRoot, "index.html"));
+    if (!within(root, index)) throw new Error("index.html 指向 web 目录之外");
+    if (!(await stat(index)).isFile()) throw new Error("index.html 不是文件");
   } catch (err) {
     throw new Error(`web 静态目录不可用：${webRoot}（${reason(err)}）`);
   }
 }
 
+// 符号链接可能让请求路径解析到 web 目录之外。@fastify/static 会跟随链接，且对目录请求
+// 是先过 allowedPath、之后才拼上 index.html 去读，所以目录请求要把 index.html 也解析进去检查。
+// 只有"不存在"才放行（交给静态托管返回 404）；符号链接环等其他错误一律拒绝，免得 500 带出服务器路径。
 function isInsideWebRoot(webRoot: string, pathName: string): boolean {
   try {
     const root = realpathSync(webRoot);
     const real = realpathSync(path.join(webRoot, pathName));
-    return real === root || real.startsWith(root + path.sep);
-  } catch {
-    // 文件不存在等：放行给静态托管自己返回 404，不在这里泄露任何信息。
+    if (!within(root, real)) return false;
+    if (statSync(real).isDirectory()) {
+      const index = path.join(real, "index.html");
+      return !existsSync(index) || within(root, realpathSync(index));
+    }
     return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return code === "ENOENT" || code === "ENOTDIR";
   }
 }
 
