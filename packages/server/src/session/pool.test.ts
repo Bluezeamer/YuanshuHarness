@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "../../test/support/frames.js";
 import { startStub, stubSessionFactory } from "../../test/support/stub.js";
-import { PoolError, SessionPool } from "./pool.js";
+import { PoolError, SessionEntry, SessionPool } from "./pool.js";
 
 const stub = await startStub((n) => `reply-${n}`);
 afterAll(() => stub.close());
@@ -341,4 +341,107 @@ describe("R16 快照形状与有界", () => {
       await big.close();
     }
   });
+});
+
+describe("R16 SDK 载荷异常与快照有界", () => {
+  // 直接构造 SessionEntry，向它的 SDK 监听器喂事件。
+  function fake() {
+    let listener: (e: unknown) => void = () => {};
+    const session = {
+      subscribe: (l: (e: unknown) => void) => {
+        listener = l;
+        return () => {};
+      },
+      dispose() {},
+    };
+    const entry = new SessionEntry(session as never);
+    return { entry, emit: (e: unknown) => listener(e) };
+  }
+
+  test("会抛错的工具参数不会把异常抛回 SDK，序号不乱，后续事件照常", () => {
+    const { entry, emit } = fake();
+    const c = collector();
+    entry.subscribe(c);
+    const args = {};
+    Object.defineProperty(args, "x", {
+      enumerable: true,
+      get() {
+        throw new Error("getter boom");
+      },
+    });
+    expect(() =>
+      emit({
+        type: "tool_execution_start",
+        toolCallId: "t1",
+        toolName: "n",
+        args,
+      }),
+    ).not.toThrow();
+    emit({ type: "agent_start" });
+    expectContiguous(c.frames);
+    expect(c.types()).toContain("tool.started");
+    expect(c.types()).toContain("run.started");
+  });
+
+  test("mapEvent 自身抛错（消息内容 getter）也不会抛回 SDK", () => {
+    const { entry, emit } = fake();
+    const c = collector();
+    entry.subscribe(c);
+    const message = { role: "assistant" };
+    Object.defineProperty(message, "content", {
+      get() {
+        throw new Error("content boom");
+      },
+    });
+    expect(() => emit({ type: "message_start", message })).not.toThrow();
+    emit({ type: "agent_start" });
+    expect(c.types()).toContain("run.started");
+  });
+
+  test("事件线上形状与状态一致：toJSON 改写的 id 在快照里也是同一个", () => {
+    const { entry, emit } = fake();
+    const c = collector();
+    entry.subscribe(c);
+    emit({
+      type: "tool_execution_start",
+      toolCallId: { toJSON: () => "wire-id" },
+      toolName: "n",
+      args: {},
+    });
+    const late = collector();
+    entry.subscribe(late);
+    expect(late.frames[0]?.data.activeTools).toEqual([
+      { toolCallId: "wire-id", toolName: "n" },
+    ]);
+  });
+
+  test("活动工具超大 id/name、过多条目与超长 queue：快照仍然有界且字段齐全", () => {
+    const { entry, emit } = fake();
+    for (let i = 0; i < 400; i++)
+      emit({
+        type: "tool_execution_start",
+        toolCallId: `${i}-${"i".repeat(300_000)}`,
+        toolName: "n".repeat(300_000),
+        args: {},
+      });
+    emit({
+      type: "queue_update",
+      steering: Array.from({ length: 300 }, () => "q".repeat(9000)),
+      followUp: [],
+    });
+    const c = collector();
+    entry.subscribe(c);
+    const raw = JSON.stringify(c.frames[0]);
+    expect(Buffer.byteLength(raw)).toBeLessThan(1024 * 1024 + 4096);
+    const d = c.frames[0]?.data;
+    expect(d?.activeTools.length).toBeLessThanOrEqual(200);
+    expect(d?.queue.length).toBeLessThanOrEqual(100);
+    expect(Array.isArray(d?.queue)).toBe(true);
+    expect(Array.isArray(d?.messages)).toBe(true);
+  });
+});
+
+test("默认背压阈值为 64 MiB", async () => {
+  const { DEFAULTS } = await import("../api/sessions.js");
+  expect(DEFAULTS.maxBufferedBytes).toBe(64 * 1024 * 1024);
 });

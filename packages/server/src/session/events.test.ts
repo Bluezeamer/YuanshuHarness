@@ -1,11 +1,11 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, test } from "vitest";
 import {
-  boundStrings,
-  capFrameData,
+  cut,
   FRAME_DATA_MAX,
   mapEvent,
   messageText,
+  sanitizeData,
 } from "./events.js";
 
 const ev = (e: unknown) => e as AgentSessionEvent;
@@ -93,50 +93,107 @@ describe("mapEvent", () => {
 });
 
 describe("R16 有界", () => {
+  const bytes = (v: unknown) => Buffer.byteLength(JSON.stringify(v));
+
   test("字符串截断不切开代理对", () => {
-    const r = boundStrings("a".repeat(9) + "😀", 10);
-    expect(r.truncated).toBe(true);
-    expect(r.value).toBe("a".repeat(9));
+    expect(cut("a".repeat(9) + "😀", 10)).toBe("a".repeat(9));
   });
 
-  test("宽数组、宽对象、长键、Buffer、深嵌套都被限制并标记", () => {
-    const wide = boundStrings(
-      { a: Array.from({ length: 5000 }, () => 1) },
+  test("长字符串被截断并在顶层标记", () => {
+    const r = sanitizeData({ text: "x".repeat(1000), n: 1 }, 100);
+    expect(r).toEqual({ text: "x".repeat(100), n: 1, truncated: true });
+  });
+
+  test("按 UTF-8 字节判断：80 万个汉字（UTF-16 长度不大，字节超限）被兜底", () => {
+    const r = sanitizeData(
+      { toolCallId: "c1", result: Array.from({ length: 800_000 }, () => "汉") },
       100,
     );
-    expect(wide.value.a).toHaveLength(200);
-    expect(wide.truncated).toBe(true);
-    const keys = Object.fromEntries(
-      Array.from({ length: 1000 }, (_, i) => [`k${i}`, i]),
-    );
-    expect(Object.keys(boundStrings(keys, 100).value)).toHaveLength(200);
-    const longKey = boundStrings({ ["k".repeat(5000)]: 1 }, 100);
-    expect(Object.keys(longKey.value)[0]?.length).toBe(256);
-    const buf = boundStrings({ b: Buffer.alloc(300_000) }, 100);
-    expect(buf.value.b).toBeNull();
-    expect(buf.truncated).toBe(true);
-    let deep: unknown = "x";
-    for (let i = 0; i < 20; i++) deep = { d: deep };
-    expect(boundStrings(deep, 100).truncated).toBe(true);
-  });
-
-  test("宽度乘长度仍超限时整体兜底，只留短标量", () => {
-    const heavy = {
+    expect(bytes(r)).toBeLessThan(FRAME_DATA_MAX);
+    expect(r).toMatchObject({
       toolCallId: "c1",
-      toolName: "t",
-      isError: false,
-      result: Array.from({ length: 200 }, () => "y".repeat(100_000)),
-    };
-    const b = boundStrings(heavy, 256 * 1024);
-    const capped = capFrameData(b.value);
-    expect(JSON.stringify(capped).length).toBeLessThan(FRAME_DATA_MAX);
-    expect(capped).toMatchObject({
-      toolCallId: "c1",
-      toolName: "t",
-      isError: false,
       omitted: true,
       truncated: true,
     });
-    expect(capped).not.toHaveProperty("result");
+    expect(r).not.toHaveProperty("result");
+  });
+
+  test("字节而非字符：40 万个汉字的单个字符串（UTF-16 长度未超限，UTF-8 超限）被兜底", () => {
+    const r = sanitizeData(
+      { toolCallId: "c", text: "汉".repeat(400_000) },
+      1_000_000,
+    );
+    expect(bytes(r)).toBeLessThan(FRAME_DATA_MAX);
+    expect(r.omitted).toBe(true);
+  });
+
+  test("宽度乘长度：200 个 256KiB 字符串被兜底", () => {
+    const r = sanitizeData(
+      {
+        toolName: "t",
+        result: Array.from({ length: 200 }, () => "y".repeat(256 * 1024)),
+      },
+      256 * 1024,
+    );
+    expect(bytes(r)).toBeLessThan(FRAME_DATA_MAX);
+    expect(r.omitted).toBe(true);
+  });
+
+  test("会抛错的载荷不会让调用抛错：getter、toJSON、循环引用、Proxy", () => {
+    const getter = { toolCallId: "g" };
+    Object.defineProperty(getter, "boom", {
+      enumerable: true,
+      get() {
+        throw new Error("boom");
+      },
+    });
+    const cyc: Record<string, unknown> = { toolCallId: "c" };
+    cyc.self = cyc;
+    const proxy = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error("trap");
+        },
+      },
+    );
+    for (const raw of [
+      getter,
+      cyc,
+      { toolCallId: "p", x: proxy },
+      {
+        toJSON() {
+          throw new Error("t");
+        },
+      },
+    ])
+      expect(() => sanitizeData(raw as never, 100)).not.toThrow();
+    expect(sanitizeData(cyc, 100)).toMatchObject({
+      toolCallId: "c",
+      omitted: true,
+    });
+  });
+
+  test("BigInt 转字符串并受长度限制；线上形状以序列化结果为准", () => {
+    const r = sanitizeData(
+      { big: 10n ** 300000n, f: () => 1, toJSON: undefined },
+      100,
+    );
+    expect(String(r.big).length).toBe(100);
+    expect(r.truncated).toBe(true);
+    expect(sanitizeData({ id: { toJSON: () => "wire-id" } }, 100)).toEqual({
+      id: "wire-id",
+    });
+  });
+
+  test("队列条目数与长度有界", () => {
+    const e = mapEvent({
+      type: "queue_update",
+      steering: Array.from({ length: 500 }, () => "q".repeat(5000)),
+      followUp: [],
+    } as never);
+    const q = e?.data.queue as string[];
+    expect(q).toHaveLength(100);
+    expect(q[0]?.length).toBe(1024);
   });
 });

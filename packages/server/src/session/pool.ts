@@ -1,13 +1,18 @@
 import { randomBytes } from "node:crypto";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+} from "@earendil-works/pi-coding-agent";
 import {
-  boundStrings,
   type ChatMessage,
-  capFrameData,
+  cut,
   EVENT_STRING_MAX,
   FRAME_DATA_MAX,
+  MAX_ACTIVE_TOOLS,
+  MAX_ID,
   mapEvent,
   SNAPSHOT_MESSAGE_MAX,
+  sanitizeData,
 } from "./events.js";
 
 export type SessionFactory = () => Promise<AgentSession>;
@@ -70,32 +75,40 @@ export class SessionEntry {
 
   constructor(private readonly session: AgentSession) {
     this.unsubscribeSdk = session.subscribe((e) => {
-      const mapped = mapEvent(e);
-      if (!mapped) return;
-      if (mapped.type === "run.started") {
-        // 自动重试会反复 agent_start；一次运行只对外开始一次。
-        if (this.running) return;
-        this.running = true;
-        this.runError = undefined;
-      } else if (mapped.type === "message.ended" && e.type === "message_end") {
-        const m = e.message as {
-          role: string;
-          stopReason?: string;
-          errorMessage?: string;
-        };
-        if (m.role === "assistant")
-          this.runError =
-            m.stopReason === "error"
-              ? (m.errorMessage ?? "模型调用失败")
-              : undefined;
-      } else if (mapped.type === "run.ended") {
-        if (this.runError !== undefined)
-          this.emit("run.failed", { message: this.runError });
-        this.runError = undefined;
-        this.running = false;
+      try {
+        this.onSdkEvent(e);
+      } catch {
+        // 单个事件处理失败不得把异常抛回 SDK 的执行链。
       }
-      this.emit(mapped.type, mapped.data);
     });
+  }
+
+  private onSdkEvent(e: AgentSessionEvent): void {
+    const mapped = mapEvent(e);
+    if (!mapped) return;
+    if (mapped.type === "run.started") {
+      // 自动重试会反复 agent_start；一次运行只对外开始一次。
+      if (this.running) return;
+      this.running = true;
+      this.runError = undefined;
+    } else if (mapped.type === "message.ended" && e.type === "message_end") {
+      const m = e.message as {
+        role: string;
+        stopReason?: string;
+        errorMessage?: string;
+      };
+      if (m.role === "assistant")
+        this.runError =
+          m.stopReason === "error"
+            ? (m.errorMessage ?? "模型调用失败")
+            : undefined;
+    } else if (mapped.type === "run.ended") {
+      if (this.runError !== undefined)
+        this.emit("run.failed", { message: this.runError });
+      this.runError = undefined;
+      this.running = false;
+    }
+    this.emit(mapped.type, mapped.data);
   }
 
   get info(): SessionInfo {
@@ -105,10 +118,7 @@ export class SessionEntry {
   // 先改状态，再分配序号并广播：序号 N 的快照就是事件 N 之后的状态。
   private emit(type: string, raw: Record<string, unknown>): void {
     // 单个字符串超限就截断并标记：保证单帧有界，客户端需要全文时另行拉取。
-    const b = boundStrings(raw, EVENT_STRING_MAX);
-    const data = capFrameData(
-      b.truncated ? { ...b.value, truncated: true } : b.value,
-    );
+    const data = sanitizeData(raw, EVENT_STRING_MAX);
     this.apply(type, data);
     this.seq += 1;
     this.broadcast(this.frame(type, data));
@@ -137,10 +147,14 @@ export class SessionEntry {
         if (this.recent.length > WINDOW) this.recent.shift();
         break;
       case "tool.started":
-        this.activeTools.set(String(data.toolCallId), String(data.toolName));
+        if (this.activeTools.size < MAX_ACTIVE_TOOLS)
+          this.activeTools.set(
+            cut(String(data.toolCallId), MAX_ID),
+            cut(String(data.toolName), MAX_ID),
+          );
         break;
       case "tool.ended":
-        this.activeTools.delete(String(data.toolCallId));
+        this.activeTools.delete(cut(String(data.toolCallId), MAX_ID));
         break;
       case "queue.updated":
         this.queue = data.queue as string[];
@@ -177,29 +191,42 @@ export class SessionEntry {
     }
   }
 
+  // 每个字段都有界：消息逐级收紧文本，activeTools/queue 在写入状态时已限条数与长度。
   private snapshotFrame(): string {
-    // 先按每条 32 KiB 截断；整帧仍过大（50 条都很长）就逐级收紧，最后只保留空窗口。
+    const activeTools = [...this.activeTools].map(([toolCallId, toolName]) => ({
+      toolCallId,
+      toolName,
+    }));
     for (const limit of [SNAPSHOT_MESSAGE_MAX, 4 * 1024, 0]) {
-      const messages =
-        limit === 0
-          ? { value: [] as ChatMessage[], truncated: this.recent.length > 0 }
-          : boundStrings(this.recent, limit);
-      const rest = boundStrings(
-        { partial: this.partial, queue: this.queue },
-        Math.max(limit, 1024),
-      );
+      const trim = (m: ChatMessage) => ({
+        role: m.role,
+        text: cut(m.text, limit),
+      });
+      const messages = limit === 0 ? [] : this.recent.map(trim);
+      const partial = this.partial
+        ? {
+            role: this.partial.role,
+            text: cut(this.partial.text, Math.max(limit, 1024)),
+          }
+        : null;
+      const truncated =
+        (limit === 0
+          ? this.recent.length > 0
+          : this.recent.some((m) => m.text.length > limit)) ||
+        (this.partial !== null &&
+          this.partial.text.length > Math.max(limit, 1024));
       const data = {
-        messages: messages.value,
-        ...(messages.truncated || rest.truncated ? { truncated: true } : {}),
+        messages,
+        ...(truncated ? { truncated: true } : {}),
         running: this.running,
-        activeTools: [...this.activeTools].map(([toolCallId, toolName]) => ({
-          toolCallId,
-          toolName,
-        })),
-        partial: rest.value.partial,
-        queue: rest.value.queue,
+        activeTools,
+        partial,
+        queue: this.queue,
       };
-      if (limit === 0 || JSON.stringify(data).length <= FRAME_DATA_MAX)
+      if (
+        limit === 0 ||
+        Buffer.byteLength(JSON.stringify(data)) <= FRAME_DATA_MAX
+      )
         return this.frame("snapshot", data);
     }
     throw new Error("unreachable");

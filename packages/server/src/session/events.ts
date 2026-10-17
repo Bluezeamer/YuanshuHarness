@@ -96,7 +96,11 @@ export function mapEvent(e: AgentSessionEvent): ServerEvent | null {
     case "queue_update":
       return {
         type: "queue.updated",
-        data: { queue: [...e.steering, ...e.followUp] },
+        data: {
+          queue: [...e.steering, ...e.followUp]
+            .slice(0, MAX_QUEUE_ITEMS)
+            .map((q) => cut(q, MAX_QUEUE_ITEM)),
+        },
       };
     default:
       return null;
@@ -108,76 +112,53 @@ export const SNAPSHOT_MESSAGE_MAX = 32 * 1024;
 const MAX_DEPTH = 8;
 
 export const FRAME_DATA_MAX = 1024 * 1024;
-const MAX_ITEMS = 200;
-const MAX_KEY = 256;
+export const MAX_ID = 256;
+export const MAX_QUEUE_ITEMS = 100;
+export const MAX_QUEUE_ITEM = 1024;
+export const MAX_ACTIVE_TOOLS = 200;
 
 // 按 UTF-16 截断，但不留下被切开的代理对。
-function cut(v: string, max: number): string {
+export function cut(v: string, max: number): string {
+  if (v.length <= max) return v;
   let end = max;
   const last = v.charCodeAt(end - 1);
   if (last >= 0xd800 && last <= 0xdbff) end -= 1;
   return v.slice(0, end);
 }
 
-// 递归限制字符串长度、数组与对象的宽度、嵌套深度；Buffer 等非普通对象不展开。
-// 返回是否发生过截断，由调用方在 data 顶层加 truncated: true。
-export function boundStrings<T>(
-  value: T,
-  max: number,
-): { value: T; truncated: boolean } {
-  let truncated = false;
-  const walk = (v: unknown, depth: number): unknown => {
-    if (typeof v === "string") {
-      if (v.length <= max) return v;
-      truncated = true;
-      return cut(v, max);
-    }
-    if (typeof v === "bigint") return String(v);
-    if (v === null || typeof v !== "object") return v;
-    if (depth >= MAX_DEPTH) {
-      truncated = true;
-      return null;
-    }
-    if (Array.isArray(v)) {
-      if (v.length > MAX_ITEMS) truncated = true;
-      return v.slice(0, MAX_ITEMS).map((x) => walk(x, depth + 1));
-    }
-    const proto = Object.getPrototypeOf(v);
-    if (proto !== Object.prototype && proto !== null) {
-      truncated = true;
-      return null;
-    }
-    const out: Record<string, unknown> = {};
-    let n = 0;
-    for (const k in v) {
-      if (n++ >= MAX_ITEMS) {
-        truncated = true;
-        break;
-      }
-      const key =
-        k.length > MAX_KEY ? ((truncated = true), cut(k, MAX_KEY)) : k;
-      out[key] = walk((v as Record<string, unknown>)[k], depth + 1);
-    }
-    return out;
-  };
-  return { value: walk(value, 0) as T, truncated };
-}
-
-// 最后一道保险：宽度与长度各自有界，乘起来仍可能很大；序列化后超过上限就只留短的标量字段。
-export function capFrameData(
-  data: Record<string, unknown>,
+// 把任意 SDK 载荷变成可上线的普通 JSON 数据：
+// 一次序列化（toJSON、getter、循环引用、BigInt 都在 try 里处理），字符串按 maxString 截断，
+// 并以真实 UTF-8 字节数判断整体上限；失败或超限就只留短的标量字段。
+// 事件广播与状态累积都用返回值，所以两者必然一致。
+export function sanitizeData(
+  raw: Record<string, unknown>,
+  maxString: number,
 ): Record<string, unknown> {
-  let size: number;
+  let truncated = false;
   try {
-    size = JSON.stringify(data).length;
+    const text = JSON.stringify(raw, (_k, v: unknown) => {
+      if (typeof v === "bigint") v = v.toString();
+      if (typeof v === "string" && v.length > maxString) {
+        truncated = true;
+        return cut(v, maxString);
+      }
+      return v;
+    });
+    if (text !== undefined && Buffer.byteLength(text) <= FRAME_DATA_MAX) {
+      const data = JSON.parse(text) as Record<string, unknown>;
+      return truncated ? { ...data, truncated: true } : data;
+    }
   } catch {
-    size = Number.POSITIVE_INFINITY;
+    // 落到下面的兜底
   }
-  if (size <= FRAME_DATA_MAX) return data;
   const out: Record<string, unknown> = { truncated: true, omitted: true };
-  for (const [k, v] of Object.entries(data)) {
-    if (typeof v === "number" || typeof v === "boolean") out[k] = v;
-    else if (typeof v === "string" && v.length <= MAX_KEY) out[k] = v;
+  try {
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+      else if (typeof v === "string" && v.length <= MAX_ID) out[k] = v;
+    }
+  } catch {
+    // 连读取字段都会抛错：只留标记
   }
   return out;
 }
