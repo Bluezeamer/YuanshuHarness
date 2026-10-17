@@ -496,7 +496,7 @@ describe("R15 服务停止", () => {
     const inner = stubSessionFactory(stub);
     let disposed = 0;
     const server: YuanshuServer = createServer(
-      { host: "127.0.0.1", port: 0, dataDir },
+      { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
       {
         webRoot,
         sessionFactory: async (o) => {
@@ -529,7 +529,7 @@ describe("R15 服务停止", () => {
     await mkdir(webRoot, { recursive: true });
     await writeFile(path.join(webRoot, "index.html"), "<title>x</title>");
     const server = createServer(
-      { host: "127.0.0.1", port: 0, dataDir: path.join(base, "data") },
+      { host: "127.0.0.1", port: 0, dataDir: path.join(base, "data"), allowCidrs: [] },
       { webRoot },
     );
     const addr = await server.start();

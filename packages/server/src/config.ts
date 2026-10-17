@@ -1,10 +1,13 @@
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { parseCidr, TOKEN_PATTERN } from "./auth.js";
 
 export interface Config {
   host: string;
   port: number;
   dataDir: string;
+  token?: string;
+  allowCidrs: string[];
 }
 
 export type Parsed =
@@ -15,7 +18,15 @@ export type Parsed =
 const ENV_HOST = "YUANSHU_HOST";
 const ENV_PORT = "YUANSHU_PORT";
 const ENV_DATA_DIR = "YUANSHU_DATA_DIR";
-const KNOWN_ENV = new Set([ENV_HOST, ENV_PORT, ENV_DATA_DIR]);
+const ENV_TOKEN = "YUANSHU_TOKEN";
+const ENV_ALLOW_CIDR = "YUANSHU_ALLOW_CIDR";
+const KNOWN_ENV = new Set([
+  ENV_HOST,
+  ENV_PORT,
+  ENV_DATA_DIR,
+  ENV_TOKEN,
+  ENV_ALLOW_CIDR,
+]);
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 7420;
@@ -24,6 +35,8 @@ const options = {
   host: { type: "string" },
   port: { type: "string" },
   "data-dir": { type: "string" },
+  token: { type: "string" },
+  "allow-cidr": { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -45,13 +58,16 @@ function resolve<T>(
   sources: Source[],
   convert: (raw: string) => T | undefined,
   rule: string,
+  secret = false,
 ): { error: string } | { value: T | undefined } {
   let chosen: T | undefined;
   for (const { name, value } of sources) {
     if (value === undefined) continue;
     const converted = convert(value);
     if (converted === undefined) {
-      return { error: `${name} ${rule}（实际为「${value}」）` };
+      return {
+        error: secret ? `${name} ${rule}` : `${name} ${rule}（实际为「${value}」）`,
+      };
     }
     chosen ??= converted;
   }
@@ -123,12 +139,38 @@ export function parseConfig(
   );
   if ("error" in dataDir) return fail(dataDir.error);
 
+  const token = resolve(
+    [
+      { name: "--token", value: args.values.token },
+      { name: ENV_TOKEN, value: env[ENV_TOKEN] },
+    ],
+    (raw) => (TOKEN_PATTERN.test(raw) ? raw : undefined),
+    "必须至少 32 个字符，且只含 A-Za-z0-9._~-",
+    true,
+  );
+  if ("error" in token) return fail(token.error);
+
+  const allowCidrs = resolve(
+    [
+      { name: "--allow-cidr", value: args.values["allow-cidr"] },
+      { name: ENV_ALLOW_CIDR, value: env[ENV_ALLOW_CIDR] },
+    ],
+    (raw) => {
+      const items = raw.split(",");
+      return items.every((i) => parseCidr(i)) ? items : undefined;
+    },
+    "必须是逗号分隔的 CIDR 列表，如 10.0.0.0/8,fd00::/8",
+  );
+  if ("error" in allowCidrs) return fail(allowCidrs.error);
+
   return {
     kind: "serve",
     config: {
       host: host.value ?? DEFAULT_HOST,
       port: port.value ?? DEFAULT_PORT,
       dataDir: dataDir.value ?? path.join(home, ".yuanshu"),
+      ...(token.value === undefined ? {} : { token: token.value }),
+      allowCidrs: allowCidrs.value ?? [],
     },
   };
 }

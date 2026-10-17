@@ -47,7 +47,7 @@ afterEach(async () => {
 
 async function launch(withFactory = true) {
   const server = createServer(
-    { host: "127.0.0.1", port: 0, dataDir },
+    { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
     {
       webRoot,
       ...(withFactory ? { sessionFactory: stubSessionFactory(stub) } : {}),
@@ -112,7 +112,7 @@ describe("R4 / 启动与锁", () => {
   test("R3 同一数据目录的第二个 Server 启动失败，不影响第一个；停止后可再启动", async () => {
     const a = await launch();
     const second = createServer(
-      { host: "127.0.0.1", port: 0, dataDir },
+      { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
       { webRoot },
     );
     await expect(second.start()).rejects.toThrow(/数据库|另一个/);
@@ -128,7 +128,7 @@ describe("R4 / 启动与锁", () => {
     db.pragma("user_version = 99");
     db.close();
     const s = createServer(
-      { host: "127.0.0.1", port: 0, dataDir },
+      { host: "127.0.0.1", port: 0, dataDir, allowCidrs: [] },
       { webRoot },
     );
     await expect(s.start()).rejects.toThrow(/99/);

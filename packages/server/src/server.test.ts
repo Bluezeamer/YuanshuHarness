@@ -78,6 +78,7 @@ function cfg(over: Partial<Config> = {}): Config {
     host: "127.0.0.1",
     port: 0,
     dataDir: path.join(base, "data"),
+    allowCidrs: [],
     ...over,
   };
 }
