@@ -46,4 +46,9 @@ Date: 2026-10-17
 - 提交粒度：配置与 `auth.ts` 纯函数（步骤 2–3，不接入）与接线（步骤 4–5）、镜像与文档（步骤 6）分开提交。
 
 ## Deviations
-无
+- 2026-10-17 步骤 1 探测结论（Node 24.13.1，一次性探针，已删除）：
+  - (a) `BlockList` 对 IPv4 映射地址双向都能比对：IPv4 规则能匹配 `::ffff:192.168.1.5`（点分与十六进制写法都行），IPv6 规则能匹配纯 IPv4 地址；`::ffff:127.0.0.1` 命中 `127.0.0.0/8`。因此 `auth.ts` 不需要自己归一化，spec 的 R6 照原样实现。
+  - (b) `onRequest` hook 在 WebSocket 升级之前执行；hook 里 `reply.code(401).send(...)` 得到普通 HTTP 401（`application/json`），不建立 WebSocket。
+  - (c) `ws` 不设 `handleProtocols` 时确实回显请求里的第一个子协议：客户端发 `bearer.good, yuanshu.v1`，响应头是 `bearer.good`，令牌被原样回显。设成"只选 `yuanshu.v1`"后响应头为 `yuanshu.v1`。R10 的风险真实存在。
+  - (d) IPv4 监听下 `req.socket.remoteAddress` 是 `127.0.0.1`；双栈监听（`::`）下 IPv4 客户端显示为 `::ffff:127.0.0.1`，由 (a) 的比对处理。
+  - 与 spec 假设无冲突，无需改 Requirements。
