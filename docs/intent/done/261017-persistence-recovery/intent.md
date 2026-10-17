@@ -1,6 +1,6 @@
 # Intent: 主干（二）持久化与恢复
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-17
 Lane: decide
 Why: 命中"难逆"——首份持久化数据（SQLite 表结构、数据目录结构版本号、JSONL 目录布局）一旦写进用户磁盘就要迁移，且引入新依赖（SQLite 驱动）；同时命中"静默"（写入、重启恢复、双存储一致性），实现阶段按加固处理。
