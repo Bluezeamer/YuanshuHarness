@@ -62,3 +62,18 @@ Reviewer: 每轮由新开的空上下文 subagent 执行（见 references/review
 验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 6 项通过。`pool.test.ts` 与监听端口的 API 集成测试受沙箱限制，报 `listen EPERM`；`injectWS` 内存连接探针复现了表中竞态。检查范围包括最近提交相对第 3 轮的增量和指定全量基线差异。
 
 本轮阻塞级：0 条。
+
+## 第 5 轮（2026-10-17）— 范围：6325f857eac241d3d73fa4d43e956284377625ad..fd874ccc721f9dead897668bd18365065dc5e83f — 执行：codex
+
+| 级别 | 位置 | 发现 | 处理 |
+|---|---|---|---|
+| 阻塞 | `packages/server/src/session/events.ts:128`、`packages/server/src/session/events.ts:130`、`packages/server/src/session/pool.ts:174`、`packages/server/src/api/sessions.ts:121` | 违反 R14/R16：`boundStrings` 只限制单个值字符串和深度，不限制数组元素数、对象键数或键长；快照的 `queue` 也没有条目上限。因此 `tool.started.args`、`tool.updated.partialResult`、`tool.ended.result`、`queue.updated` 及重连快照仍可产生任意大的单帧。精简探针中，2 MiB 对象键、50 万个布尔数组元素、30 万字节 Buffer 分别序列化为约 2.0/3.0/3.2 MiB，三者均返回 `truncated:false`，继续放大时帧线性增长；Buffer 还会被 `Object.entries` 展开并膨胀。此时 `writeRaw` 在 `bufferedAmount === 0` 时无条件发送该帧，故 R14 声称的“阈值加一帧”仍没有有限上界。循环引用会在第 8 层被置为 null，不是本问题的绕过路径。 | |
+| 重要 | `packages/server/src/session/events.ts:121` | 按 UTF-16 code unit 直接 `slice(0, max)` 会切断代理对。探针以 `max - 1` 个 ASCII 字符后接一个 emoji，截断结果末尾为孤立高代理项 `0xD83D`；`JSON.stringify` 会将它转义，所以 JSON 语法仍合法，但客户端解析后得到的仍是非法 Unicode 序列，展示或再次编码时会出现替换字符。事件和快照使用同一函数，`tool.*`、`message.*.text` 与 queue 条目均受影响。 | |
+| 重要 | `packages/server/src/session/pool.ts:129`、`packages/server/src/session/pool.ts:174` | 截断后的 `message.ended.data` 被整体强制转换成 `ChatMessage` 存入 `recent`，连事件级顶层的 `truncated:true` 也一并保存；重连快照随后输出 `{ role, text, truncated }`，不再是 R7 规定的 `{ role, text }`，也违反 R16“所在 `data` 顶层带 `truncated`”的层级约定。精简 SessionEntry 探针确认：300 KiB 消息的 seq=1 事件与 seq=1 快照中，快照顶层已有 `truncated:true`，但 `messages[0]` 仍额外残留同名字段。 | |
+| 重要 | `packages/server/src/api/sessions.test.ts:347`、`packages/server/src/session/events.test.ts:1`、`packages/server/src/session/pool.test.ts:124` | R16 测试只断言一个超长回复的 `message.ended` 和快照文本长度；没有直接测试 `boundStrings`，也未覆盖 `tool.started.args`/`tool.ended.result`、宽数组/对象及对象键、Buffer/循环引用、8 层深度边界、代理对、queue 条目数量，且未断言截断后快照消息的精确形状。因而上述 R16/R7 缺陷均不会使现有测试变红；对 `message.delta` 和 `message.started` 的截断标记也没有断言。 | |
+
+复核补充：`emit()` 先以实际广播的截断数据执行 `apply()`，再同步增加 seq 和广播；除上表中的快照字段形状外，未发现新的 R7 订阅窗口或序号缺口。`ws` 8.22.0 的 `bufferedAmount` 读取 socket 可写队列长度与 sender 缓冲，当前未启用压缩且 `send()` 同步入队；未找到“连续写入但 bufferedAmount 尚未更新”的独立绕过证据，真正破坏内存上界的是 R16 仍允许任意大单帧。
+
+验证：`pnpm --filter yuanshu-harness-server typecheck` 通过；`events.test.ts` 6 项通过。定向 API 测试在套件初始化时因沙箱禁止监听端口报 `listen EPERM`，未执行用例；其余结论由源码核对和 `/tmp` 精简探针得到。
+
+本轮阻塞级：1 条。

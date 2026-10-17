@@ -18,7 +18,7 @@ export interface SessionsApiOptions {
 export const DEFAULTS = {
   pingIntervalMs: 30_000,
   pongTimeoutMs: 10_000,
-  maxBufferedBytes: 4 * 1024 * 1024,
+  maxBufferedBytes: 64 * 1024 * 1024,
   maxPendingBytes: 50 * 1024 * 1024,
   maxPayloadBytes: 50 * 1024 * 1024,
 };
