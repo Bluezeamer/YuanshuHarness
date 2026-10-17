@@ -4,9 +4,12 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
+import fastifyWebsocket from "@fastify/websocket";
 import Fastify from "fastify";
+import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
+import { type SessionFactory, SessionPool } from "./session/pool.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
 const PACKAGE_ROOT = new URL("../", import.meta.url);
@@ -14,6 +17,18 @@ const PACKAGE_ROOT = new URL("../", import.meta.url);
 export interface ServerOptions {
   webRoot?: string;
   logStream?: { write(msg: string): void };
+  // 未提供时会话创建返回 501（真实模型接入在后续能力里）。
+  sessionFactory?: SessionFactory;
+  // 仅供测试缩短心跳与背压阈值。
+  tuning?: Partial<
+    Pick<
+      Parameters<typeof sessionsApi>[1],
+      | "pingIntervalMs"
+      | "pongTimeoutMs"
+      | "maxBufferedBytes"
+      | "maxPendingBytes"
+    >
+  >;
 }
 
 export interface Address {
@@ -88,6 +103,17 @@ export function createServer(
       : { level: "info" },
   });
 
+  const pool = options.sessionFactory
+    ? new SessionPool(options.sessionFactory)
+    : null;
+  app.register(fastifyWebsocket, {
+    options: { maxPayload: DEFAULTS.maxPayloadBytes },
+    errorHandler: (err, _socket, req) => {
+      // ws 对超限、协议错误会自行发关闭帧（如 1009），这里只记录，不再强杀。
+      req.log.warn({ err }, "websocket 连接错误");
+    },
+  });
+  app.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
   app.get("/healthz", async () => ({ status: "ok", version }));
   app.register(fastifyStatic, {
     root: webRoot,
