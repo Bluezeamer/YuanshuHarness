@@ -1,6 +1,6 @@
 # Intent: 主干（三）认证
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 Lane: decide
 Why: 命中"难逆"——触及鉴权边界，并新增对外启动参数（令牌、来源网段），名字与行为一旦被脚本和容器配置引用就难改；同时命中"静默"（来源判定、失败限流、WebSocket 升级路径漏检），实现阶段按加固处理。
