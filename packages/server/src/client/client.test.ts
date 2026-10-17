@@ -456,4 +456,12 @@ describe("序号缺口与 resync（R7）", () => {
     expect(r.px.resyncs).toHaveLength(1);
     expect(r.out.split("reply-1")).toHaveLength(2);
   });
+
+  test("缺口期间整轮运行已结束：新快照显示空闲，EOF 仍能退出", async () => {
+    // 丢一帧触发 resync，resync 延迟 1s 才到 Server，此时运行早已结束，owed 没有机会被事件减掉。
+    const r = await scenario((f, i) => (i < 2 ? [] : f), 1000);
+    expect(r.code).toBe(0);
+    expect(r.px.resyncs).toHaveLength(1);
+    expect(r.out).toContain("reply-1");
+  });
 });

@@ -73,6 +73,10 @@ export async function attach(
         case "snapshot":
           running = d.running === true;
           queueLen = Array.isArray(d.queue) ? d.queue.length : 0;
+          // resync 期间丢掉的事件不会补发，已 ack 的消息的效果已含在快照里；只有仍未 ack 的才还欠。
+          owed = [...commands.values()].filter(
+            (t) => t === "send_message",
+          ).length;
           break;
         case "run.started":
           running = true;
