@@ -19,3 +19,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# 排除playwright-cli相关配置和目录
+.playwright-cli/
+.playwright/
+.agents/skills/playwright-cli/
