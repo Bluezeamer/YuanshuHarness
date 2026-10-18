@@ -155,6 +155,7 @@ describe("R7 快照与衔接", () => {
     expect(snap?.data.running).toBe(true);
     expect(snap?.data.partial).toEqual({ role: "assistant", text: "" });
     expect(snap?.data.messages).toEqual([{ role: "user", text: "slow" }]);
+    expect(snap?.data.startIndex).toBe(0);
     await waitFor(finished(late), "run.ended");
     expectContiguous(late.frames);
     expect(late.frames[1]?.seq).toBe((snap?.seq ?? 0) + 1);

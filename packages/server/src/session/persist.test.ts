@@ -178,6 +178,14 @@ describe("R9/R10/R11 按需加载与恢复", () => {
     e?.subscribe(c);
     expect(c.frames[0]?.data.messages).toHaveLength(50);
     expect(c.frames[0]?.data.messages.at(-1).text).toBe("reply-30");
+    // 共 60 条，窗口是最后 50 条：第一条的序位是 10，与 REST 的 index 同一套。
+    expect(c.frames[0]?.data.startIndex).toBe(10);
+    e?.send("more");
+    await waitFor(ended(c), "run.ended");
+    const later = collector();
+    e?.subscribe(later);
+    expect(later.frames[0]?.data.messages).toHaveLength(50);
+    expect(later.frames[0]?.data.startIndex).toBe(12);
     t.data.close(true);
   });
 
