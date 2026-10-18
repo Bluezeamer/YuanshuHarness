@@ -111,6 +111,18 @@ test("R2 后续快照缺 startIndex：清掉旧历史块，只显示窗口并提
   expect(screen.getByText("m299")).toBeTruthy();
 });
 
+test("R2 缺 startIndex 的快照到达时，在途的尾页请求作废，不回填旧历史", async () => {
+  const c = connect(msgs(0, 300));
+  let release = () => {};
+  c.api.tailPause = new Promise<void>((r) => (release = r));
+  serve(c.ws, snapshot(1, c.api.history));
+  serve(c.ws, snapshot(9, c.api.history, { startIndex: undefined }));
+  await act(async () => release());
+  expect(await screen.findByText(/历史加载失败/)).toBeTruthy();
+  expect(screen.queryByText("m100")).toBeNull();
+  expect(screen.getByText("m299")).toBeTruthy();
+});
+
 test("R2 历史取不到：提示失败，窗口里的消息仍显示", async () => {
   const c = connect(msgs(0, 8));
   c.api.messages = 500;
@@ -551,6 +563,16 @@ test("R11 用户在底部时，排队文本出现后也跟随到底部", () => {
   expect(m.top).toBe(1100);
 });
 
+test("R11 队列从一条含换行的文本变成两条：行数变了仍跟随到底部", () => {
+  const { ws } = open(msgs(0, 8));
+  const push = feed(ws);
+  push("queue.updated", { queue: ["甲\n乙"] });
+  const m = scrollable(600);
+  m.height = 1100;
+  push("queue.updated", { queue: ["甲", "乙"] });
+  expect(m.top).toBe(1100);
+});
+
 test("R11 用户在底部时，run.failed 的错误段出现后也跟随到底部", () => {
   const { ws } = open(msgs(0, 8));
   const m = scrollable(600);
@@ -667,6 +689,23 @@ test("R13 请求期间新消息到达：位移只算历史块增加的高度", a
   fireEvent.click(await screen.findByRole("button", { name: "加载更早" }));
   m.height = 1100;
   feed(ws)("message.ended", said("新消息"));
+  m.height = 1900;
+  await act(async () => release());
+  await screen.findByText("m0");
+  expect(m.top).toBe(300 + (1900 - 1100));
+});
+
+test("R13 请求期间尾页同步更新了历史块：锚点不被提前消费", async () => {
+  const { ws, api } = open(msgs(0, 400));
+  await screen.findByText("m200");
+  const m = scrollable(300);
+  let release = () => {};
+  api.pause = new Promise<void>((r) => (release = r));
+  fireEvent.click(await screen.findByRole("button", { name: "加载更早" }));
+  m.height = 1100;
+  api.history.push(...msgs(400, 402));
+  serve(ws, snapshot(9, api.history));
+  await screen.findByText("m401");
   m.height = 1900;
   await act(async () => release());
   await screen.findByText("m0");

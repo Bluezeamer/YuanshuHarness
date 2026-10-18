@@ -96,6 +96,7 @@ export interface Api {
   messages: number | "network" | "garbage" | "shape";
   // 设置后，带游标的请求（加载更早）会等它完成才响应。
   pause: Promise<void> | null;
+  tailPause: Promise<void> | null;
   calls: string[];
   tokens: (string | null)[];
 }
@@ -110,6 +111,7 @@ export function installApi(history: ChatEntry[] = []): Api {
     list: [],
     messages: 200,
     pause: null,
+    tailPause: null,
     calls: [],
     tokens: [],
   };
@@ -134,6 +136,7 @@ export function installApi(history: ChatEntry[] = []): Api {
     const limit = Number(q.get("limit") ?? 50);
     const before = q.get("before");
     if (before && api.pause) await api.pause;
+    if (!before && api.tailPause) await api.tailPause;
     const end = before ? Number(atob(before)) : api.history.length;
     const start = Math.max(0, end - limit);
     return reply(200, {
