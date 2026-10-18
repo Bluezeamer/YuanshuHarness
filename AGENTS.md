@@ -14,6 +14,12 @@ YuanshuHarness（元枢）：基于 Pi SDK 的常驻 Agent Server。愿景见 [d
 
 - 发现设计不合适，直接指出并建议修改，不要为了守住既有设计或规则而硬套；改动涉及已定契约或 ADR 时，先说明理由再由人决定。
 
+## 推送前检查
+
+- `git push` 之前必须在当前提交上完整跑一次 `scripts/check.sh` 并通过；它和 CI 是同一份检查。只跑单个包的测试或单个文件的格式化不算。
+- 检查之后又改了文件，要重跑，不能沿用旧结果。
+- 本地跑不了（缺 docker 等）时，先告诉人，不要直接推。
+
 ## WebUI 风格
 
 - 写或改 `packages/web` 的任何界面、样式、动效、弹窗，先用 `yuanshu-webui-style` 技能；风格取向是改良版瑞士国际主义，视觉参考见该技能的 `assets/reference.html`。

@@ -5,7 +5,7 @@
 可逆性：难逆
 取代：——
 被取代：——
-引用入口：ARCHITECTURE「技术选型」；[变更 261018-webui-pane-layout](../../intent/active/261018-webui-pane-layout/intent.md)
+引用入口：ARCHITECTURE「技术选型」；[变更 261018-webui-pane-layout](../../intent/done/261018-webui-pane-layout/intent.md)
 
 ## 背景
 WebUI 要做成 Web 端的 tmux：对话页内有多个 window，每个 window 装一棵 pane 树，pane 可在 window 之间移动。名词以变更 intent 为准（window、pane、布局文档）。
