@@ -1,9 +1,4 @@
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi } from "../fakes";
