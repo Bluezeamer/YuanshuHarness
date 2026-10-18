@@ -12,7 +12,7 @@ Date: 2026-10-17
 
 ## Requirements
 R1. `pnpm --filter yuanshu-harness-web build` 产出 `dist/index.html` 与其引用的脚本、样式；`scripts/pack.sh` 与装包冒烟照旧通过，Server 托管后 `GET /` 返回的是新界面而不是占位页。
-R2. 构建产物与源码中，除风格变量的定义文件外，不得出现写死的十六进制色值；不得引用任何第三方域名的资源。
+R2. 源码中，除风格变量的定义文件外，不得出现写死的十六进制色值；构建产物中的色值只能是风格变量的声明，加上 Tailwind 自带的 `#0000`、`#fff`（框架内置，无法去除），以及 Tailwind 的相对色特性探测 `color:rgb(from red r g b)`；源码与构建产物都不得引用任何第三方域名的资源（含不带协议的 `//host`；CSS 文件头的许可注释不算）。
 R3. 启动时先请求 `GET /api/v1/sessions`：200 则进入外壳；401 则显示令牌输入界面；网络失败显示"无法连接 Server"并提供重试，不得进入外壳。
 R4. 令牌输入后以 `Authorization: Bearer` 重试；成功才保存到 `sessionStorage` 并进入外壳；失败（401）保留在令牌界面并提示，不保存。令牌不得出现在 URL、`localStorage`、`console` 输出。
 R5. 429 `too_many_attempts` 时显示"尝试过多"，并按 `Retry-After` 提示等待秒数，期间不自动重试。403 `forbidden_source` 显示"当前来源不被允许"。
@@ -25,7 +25,7 @@ R9. `prefers-reduced-motion: reduce` 下，所有 CSS 动画与过渡时长压�
 | 需求 | 证明 | 旧实现下应失败 / 变异验证 |
 |---|---|---|
 | R1 | `scripts/smoke-package.sh`（增加：`GET /` 响应含应用根节点而非"占位页"）；`pnpm build` | 是（旧页是占位文案） |
-| R2 | `src/tokens.test.ts` 读构建产物与 `src/**` 做静态检查 | 变异：在组件里写入 `#fff`，必须变红 |
+| R2 | `src/tokens.test.ts`：静态检查 `src/**` 与 `index.html`，并实际构建后检查 `dist` | 变异：在组件或 `index.html` 里写入色值、引用 `//cdn` 域名，必须变红 |
 | R3 | `src/gate.test.tsx`：三种响应各一例 | 是 |
 | R4 | `src/gate.test.tsx`：成功保存、失败不保存；断言 `localStorage` 与 `console` 未被写入令牌 | 变异：改存 `localStorage`，必须变红 |
 | R5 | `src/gate.test.tsx`：429、403 各一例，断言无自动重试 | 是 |

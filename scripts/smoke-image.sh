@@ -103,7 +103,7 @@ eval "$CMD" >/dev/null
 wait_health "$APP" healthy 30 || { docker logs "$APP" >&2 || true; die "30 秒内容器没有变为 healthy（当前 $(health_status "$APP")）"; }
 BASE="http://127.0.0.1:$PORT"
 check_health "$BASE" "$VERSION"
-check_placeholder_page "$BASE"
+check_web_page "$BASE"
 
 echo "== /healthz 与静态页免认证，/api/v1 要求令牌"
 api_status() { # api_status [令牌]
