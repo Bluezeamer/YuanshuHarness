@@ -5,12 +5,7 @@ import {
   listSessions,
   loadToken,
 } from "../api";
-import {
-  type ConvState,
-  type Frame,
-  initial,
-  reduce,
-} from "../conversation";
+import { type ConvState, type Frame, initial, reduce } from "../conversation";
 import { afterEarlier, afterTail, type Loaded, loadOlder } from "../history";
 import { Stream, streamUrl } from "../stream";
 
@@ -123,17 +118,16 @@ export class SessionStore {
   private sync(startIndex: number) {
     const run = ++this.syncs;
     this.set({ historyLoading: true });
-    void loadOlder(
-      () => listMessages(this.id, loadToken()),
-      startIndex,
-    ).then((r) => {
-      if (!this.alive || run !== this.syncs) return;
-      this.set({
-        historyLoading: false,
-        historyFailed: !r.ok,
-        loaded: r.ok ? afterTail(this.snap.loaded, r) : none,
-      });
-    });
+    void loadOlder(() => listMessages(this.id, loadToken()), startIndex).then(
+      (r) => {
+        if (!this.alive || run !== this.syncs) return;
+        this.set({
+          historyLoading: false,
+          historyFailed: !r.ok,
+          loaded: r.ok ? afterTail(this.snap.loaded, r) : none,
+        });
+      },
+    );
   }
 
   private wait() {

@@ -158,7 +158,10 @@ export function installApi(history: ChatEntry[] = []): Api {
       }
       return reply(200, { layouts: api.saved });
     }
-    if (input.startsWith("/api/v1/saved-layouts/") && init?.method === "DELETE") {
+    if (
+      input.startsWith("/api/v1/saved-layouts/") &&
+      init?.method === "DELETE"
+    ) {
       const id = input.slice("/api/v1/saved-layouts/".length);
       const i = api.saved.findIndex((x) => x.id === id);
       if (i < 0) return reply(404, {});

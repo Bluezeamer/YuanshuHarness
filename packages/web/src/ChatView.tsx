@@ -25,7 +25,9 @@ export function ConversationView({
     if (!onAnchors) return;
     const user = (role: string) => role === "user";
     onAnchors([
-      ...c.older.filter((m) => user(m.role)).map((m) => ({ id: `h-${m.index}`, text: m.text })),
+      ...c.older
+        .filter((m) => user(m.role))
+        .map((m) => ({ id: `h-${m.index}`, text: m.text })),
       ...c.state.messages
         .map((m, i) => ({ m, i }))
         .filter(({ m }) => user(m.role))

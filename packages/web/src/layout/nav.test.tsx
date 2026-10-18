@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi, msgs, snapshot } from "../fakes";
@@ -30,13 +37,22 @@ const open = async (history = msgs(0, 5)) => {
 
 test("R13 只列用户消息", async () => {
   const nav = await open();
-  expect(nav.getAllByRole("listitem").map((li) => li.querySelector("button") as HTMLElement).map((b) => b.getAttribute("aria-label"))).toEqual(["m0", "m2", "m4"]);
+  expect(
+    nav
+      .getAllByRole("listitem")
+      .map((li) => li.querySelector("button") as HTMLElement)
+      .map((b) => b.getAttribute("aria-label")),
+  ).toEqual(["m0", "m2", "m4"]);
 });
 
 test("R13 过长的消息截断", async () => {
   const long = msgs(0, 1).map((m) => ({ ...m, text: "x".repeat(60) }));
   const nav = await open(long);
-  const t = nav.getAllByRole("listitem")[0]?.querySelector("button")?.getAttribute("data-text") ?? "";
+  const t =
+    nav
+      .getAllByRole("listitem")[0]
+      ?.querySelector("button")
+      ?.getAttribute("data-text") ?? "";
   expect(t.length).toBeLessThan(60);
   expect(t.endsWith("…")).toBe(true);
 });
@@ -47,7 +63,9 @@ test("R13 点击滚动到该条消息", async () => {
   Element.prototype.scrollIntoView = spy;
   fireEvent.click(nav.getByRole("button", { name: "m2" }));
   expect(spy).toHaveBeenCalledTimes(1);
-  expect(spy.mock.contexts[0]).toBe(document.querySelector('[data-anchor="w-2"]'));
+  expect(spy.mock.contexts[0]).toBe(
+    document.querySelector('[data-anchor="w-2"]'),
+  );
 });
 
 test("R13 没有 chat pane 焦点时为空态", async () => {

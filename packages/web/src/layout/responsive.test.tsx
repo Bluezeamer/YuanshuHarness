@@ -1,4 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi } from "../fakes";
@@ -45,7 +51,8 @@ const mount = async () => {
 const list = () => screen.queryByRole("complementary", { name: "会话列表" });
 const nav = () => screen.queryByRole("navigation", { name: "输入导航" });
 const cols = () =>
-  (document.querySelector(".enter.relative") as HTMLElement).style.gridTemplateColumns;
+  (document.querySelector(".enter.relative") as HTMLElement).style
+    .gridTemplateColumns;
 
 test("R14 宽度足够：两侧固定；跨阈值默认折叠，再变宽又固定", async () => {
   await mount();

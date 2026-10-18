@@ -36,7 +36,11 @@ export function Shell({
           Server 在线
         </div>
       </header>
-      <Workbench hub={hub} sessions={sessions} onUnauthorized={onUnauthorized} />
+      <Workbench
+        hub={hub}
+        sessions={sessions}
+        onUnauthorized={onUnauthorized}
+      />
     </div>
   );
 }

@@ -27,7 +27,12 @@ export function PaneLayer({
   menu?(paneId: string): React.ReactNode;
   dragHandle?(paneId: string): React.HTMLAttributes<HTMLElement>;
   // delta 是父节点比例的变化量（正数：线向右或向下）。
-  onResize?(windowId: string, path: number[], index: number, delta: number): void;
+  onResize?(
+    windowId: string,
+    path: number[],
+    index: number,
+    delta: number,
+  ): void;
 }) {
   const rects = useMemo(() => {
     const all = new Map<string, { rect: Rect; windowId: string }>();
@@ -59,12 +64,17 @@ export function PaneLayer({
     const box = ref.current?.getBoundingClientRect();
     if (!box) return 0;
     const px = d.dir === "h" ? dx : dy;
-    const total = (d.dir === "h" ? box.width * d.parent.w : box.height * d.parent.h);
+    const total =
+      d.dir === "h" ? box.width * d.parent.w : box.height * d.parent.h;
     return total > 0 ? px / total : 0;
   };
 
   return (
-    <div ref={ref} className="relative min-h-0 flex-1 overflow-hidden" data-pane-layer>
+    <div
+      ref={ref}
+      className="relative min-h-0 flex-1 overflow-hidden"
+      data-pane-layer
+    >
       {Object.entries(doc.panes).map(([id, entry]) => {
         const place = rects.get(id);
         const active = place?.windowId === doc.activeWindowId;
@@ -79,7 +89,6 @@ export function PaneLayer({
         return (
           <section
             key={id}
-            role="region"
             aria-label={title}
             data-pane-id={id}
             data-focused={focused}
@@ -109,11 +118,14 @@ export function PaneLayer({
                   paneId={id}
                   config={resolved.config as never}
                   focused={focused}
-                  onUpdateConfig={(c: never, v?: number) => onConfig(id, c, v ?? resolved.configVersion)}
+                  onUpdateConfig={(c: never, v?: number) =>
+                    onConfig(id, c, v ?? resolved.configVersion)
+                  }
                 />
               ) : (
                 <p className="p-4 text-mute">
-                  未知 pane{type ? "（配置版本较新）" : `（${entry.type}）`}，配置已保留
+                  未知 pane{type ? "（配置版本较新）" : `（${entry.type}）`}
+                  ，配置已保留
                 </p>
               )}
             </div>
@@ -125,8 +137,10 @@ export function PaneLayer({
         lines.map((d) => {
           const vertical = d.dir === "h";
           const key = `${d.path.join(".")}/${d.index}`;
-          const step = (delta: number) => onResize(activeWindow.id, d.path, d.index, delta);
+          const step = (delta: number) =>
+            onResize(activeWindow.id, d.path, d.index, delta);
           return (
+            // biome-ignore lint/a11y/useSemanticElements: 可聚焦、可拖动的 window splitter，<hr> 不带 aria-valuenow 与键盘交互
             <div
               key={key}
               role="separator"
@@ -142,8 +156,18 @@ export function PaneLayer({
                 left: `${d.rect.x * 100}%`,
                 top: `${d.rect.y * 100}%`,
                 ...(vertical
-                  ? { height: `${d.rect.h * 100}%`, width: 8, marginLeft: -4, cursor: "col-resize" }
-                  : { width: `${d.rect.w * 100}%`, height: 8, marginTop: -4, cursor: "row-resize" }),
+                  ? {
+                      height: `${d.rect.h * 100}%`,
+                      width: 8,
+                      marginLeft: -4,
+                      cursor: "col-resize",
+                    }
+                  : {
+                      width: `${d.rect.w * 100}%`,
+                      height: 8,
+                      marginTop: -4,
+                      cursor: "row-resize",
+                    }),
                 touchAction: "none",
               }}
               className="z-10 bg-transparent hover:bg-live/40 focus-visible:bg-live/60"
@@ -162,7 +186,11 @@ export function PaneLayer({
               onPointerMove={(e) => {
                 const from = drag.current;
                 if (!from) return;
-                const delta = toRatio(d, e.clientX - from.x, e.clientY - from.y);
+                const delta = toRatio(
+                  d,
+                  e.clientX - from.x,
+                  e.clientY - from.y,
+                );
                 drag.current = { x: e.clientX, y: e.clientY };
                 if (delta !== 0) step(delta);
               }}

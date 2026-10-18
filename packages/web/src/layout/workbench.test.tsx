@@ -1,4 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi } from "../fakes";
@@ -55,7 +61,9 @@ test("R2 分割出第二个 pane，关闭后兄弟占满", async () => {
   await mount();
   fireEvent.click(screen.getByRole("button", { name: "向右分割" }));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  fireEvent.click(screen.getAllByRole("button", { name: "关闭" })[0] as HTMLElement);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "关闭" })[0] as HTMLElement,
+  );
   expect(screen.getAllByRole("region")).toHaveLength(1);
 });
 
@@ -76,9 +84,7 @@ test("R9 未知类型的 pane 往返不丢，保存时原样写回", async () =>
     document: {
       version: 1,
       activeWindowId: "w1",
-      windows: [
-        { id: "w1", name: "a", tree: { kind: "leaf", paneId: "p1" } },
-      ],
+      windows: [{ id: "w1", name: "a", tree: { kind: "leaf", paneId: "p1" } }],
       panes: { p1: { type: "future", configVersion: 7, config: { k: [1] } } },
     },
   };
@@ -187,27 +193,55 @@ test("R23 分割线：role、方向、数值，可聚焦", async () => {
 test("R23 分割线方向键步长 2%，到最小尺寸为止", async () => {
   const sep = await split2();
   fireEvent.keyDown(sep, { key: "ArrowRight" });
-  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe("52");
+  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe(
+    "52",
+  );
   fireEvent.keyDown(screen.getByRole("separator"), { key: "ArrowLeft" });
   fireEvent.keyDown(screen.getByRole("separator"), { key: "ArrowLeft" });
-  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe("48");
+  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe(
+    "48",
+  );
   for (let i = 0; i < 40; i++)
     fireEvent.keyDown(screen.getByRole("separator"), { key: "ArrowLeft" });
-  expect(Number(screen.getByRole("separator").getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(5);
+  expect(
+    Number(screen.getByRole("separator").getAttribute("aria-valuenow")),
+  ).toBeGreaterThanOrEqual(5);
 });
 
 test("R2 拖动分割线按容器像素换算比例，pane 不重挂载", async () => {
   const sep = await split2();
   const layer = document.querySelector("[data-pane-layer]") as HTMLElement;
   layer.getBoundingClientRect = () =>
-    ({ width: 1000, height: 500, left: 0, top: 0, right: 1000, bottom: 500, x: 0, y: 0, toJSON() {} }) as DOMRect;
+    ({
+      width: 1000,
+      height: 500,
+      left: 0,
+      top: 0,
+      right: 1000,
+      bottom: 500,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    }) as DOMRect;
   const node = document.querySelector("[data-pane-id]");
   fireEvent.pointerDown(sep, { clientX: 500, clientY: 100, pointerId: 1 });
-  fireEvent.pointerMove(screen.getByRole("separator"), { clientX: 600, clientY: 100, pointerId: 1 });
-  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe("60");
+  fireEvent.pointerMove(screen.getByRole("separator"), {
+    clientX: 600,
+    clientY: 100,
+    pointerId: 1,
+  });
+  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe(
+    "60",
+  );
   fireEvent.pointerUp(screen.getByRole("separator"), { pointerId: 1 });
-  fireEvent.pointerMove(screen.getByRole("separator"), { clientX: 800, clientY: 100, pointerId: 1 });
-  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe("60");
+  fireEvent.pointerMove(screen.getByRole("separator"), {
+    clientX: 800,
+    clientY: 100,
+    pointerId: 1,
+  });
+  expect(screen.getByRole("separator").getAttribute("aria-valuenow")).toBe(
+    "60",
+  );
   expect(document.querySelector("[data-pane-id]")).toBe(node);
 });
 
@@ -216,19 +250,29 @@ test("R6 Alt+方向键按位置移动焦点 pane", async () => {
   fireEvent.click(screen.getByRole("button", { name: "向右分割" }));
   const regions = () => screen.getAllByRole("region");
   const focusedLabel = () =>
-    document.querySelector("[data-pane-id][data-focused='true']")?.getAttribute("data-pane-id");
+    document
+      .querySelector("[data-pane-id][data-focused='true']")
+      ?.getAttribute("data-pane-id");
   const right = focusedLabel();
-  fireEvent.keyDown(regions()[0] as HTMLElement, { key: "ArrowLeft", altKey: true });
+  fireEvent.keyDown(regions()[0] as HTMLElement, {
+    key: "ArrowLeft",
+    altKey: true,
+  });
   const left = focusedLabel();
   expect(left).not.toBe(right);
-  fireEvent.keyDown(regions()[0] as HTMLElement, { key: "ArrowRight", altKey: true });
+  fireEvent.keyDown(regions()[0] as HTMLElement, {
+    key: "ArrowRight",
+    altKey: true,
+  });
   expect(focusedLabel()).toBe(right);
 });
 
 test("R24 pane 总数达到 12 后新建前提示，但不阻止", async () => {
   await mount();
   for (let i = 0; i < 12; i++)
-    fireEvent.click(screen.getAllByRole("button", { name: "向右分割" })[0] as HTMLElement);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "向右分割" })[0] as HTMLElement,
+    );
   expect(screen.getAllByRole("region")).toHaveLength(13);
   expect(screen.getByRole("status").textContent).toMatch(/12|13/);
 });
@@ -246,7 +290,9 @@ const chat = (sessionId: string | null) => ({
   config: { sessionId },
 });
 const boundIds = () =>
-  [...document.querySelectorAll("[data-pane-id]")].map((n) => n.getAttribute("data-pane-id"));
+  [...document.querySelectorAll("[data-pane-id]")].map((n) =>
+    n.getAttribute("data-pane-id"),
+  );
 
 test("R17 保存失败（5xx 或网络）：提示且本地改动保留，下次改动后重试成功则提示消失", async () => {
   for (const status of [500, "network"] as const) {
@@ -286,7 +332,10 @@ test("R10 焦点不是 chat：点击会话落到本 window 内的 chat pane", as
         },
       },
     ],
-    panes: { f: { type: "file_preview", configVersion: 1, config: {} }, c: chat("s1") },
+    panes: {
+      f: { type: "file_preview", configVersion: 1, config: {} },
+      c: chat("s1"),
+    },
   });
   expect(document.querySelector("[data-pane-id='f']")).toBeTruthy();
   fireEvent.focus(document.querySelector("[data-pane-id='f']") as HTMLElement);
@@ -310,12 +359,16 @@ test("R10 本 window 没有 chat pane：点击会话新建一个", async () => {
 test("R6 菜单：向下分割、移动到其他 window", async () => {
   await mount();
   fireEvent.click(screen.getByRole("button", { name: "向右分割" }));
-  fireEvent.click(screen.getAllByRole("button", { name: "向下分割" })[0] as HTMLElement);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "向下分割" })[0] as HTMLElement,
+  );
   expect(screen.getAllByRole("region")).toHaveLength(3);
 
   fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
   fireEvent.click(screen.getAllByRole("tab")[0] as HTMLElement);
-  const select = screen.getAllByLabelText("移动到其他 window")[0] as HTMLSelectElement;
+  const select = screen.getAllByLabelText(
+    "移动到其他 window",
+  )[0] as HTMLSelectElement;
   const target = select.querySelectorAll("option")[1] as HTMLOptionElement;
   fireEvent.change(select, { target: { value: target.value } });
   expect(screen.getAllByRole("region").length).toBeLessThan(
@@ -383,7 +436,8 @@ test("R10 焦点不是 chat：优先落到最近聚焦过的 chat，而不是树
       f: { type: "file_preview", configVersion: 1, config: {} },
     },
   });
-  const pane = (id: string) => document.querySelector(`[data-pane-id='${id}']`) as HTMLElement;
+  const pane = (id: string) =>
+    document.querySelector(`[data-pane-id='${id}']`) as HTMLElement;
   fireEvent.focus(pane("c2"));
   fireEvent.focus(pane("f"));
   fireEvent.click(screen.getByRole("button", { name: /乙/ }));

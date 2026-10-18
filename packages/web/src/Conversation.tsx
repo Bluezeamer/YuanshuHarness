@@ -315,11 +315,21 @@ export function Conversation({
         )}
         {empty && <p className="text-mute">还没有消息</p>}
         {older.map((m) => (
-          <Message key={`h-${m.index}`} anchor={`h-${m.index}`} who={whoOf(m.role)} text={m.text} />
+          <Message
+            key={`h-${m.index}`}
+            anchor={`h-${m.index}`}
+            who={whoOf(m.role)}
+            text={m.text}
+          />
         ))}
         {messages.map((m, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: 窗口消息没有序位，只追加不重排
-          <Message key={`w-${i}`} anchor={`w-${i}`} who={whoOf(m.role)} text={m.text} />
+          <Message
+            // biome-ignore lint/suspicious/noArrayIndexKey: 窗口消息没有序位，只追加不重排
+            key={`w-${i}`}
+            anchor={`w-${i}`}
+            who={whoOf(m.role)}
+            text={m.text}
+          />
         ))}
         {partial !== null && <Message who="agent" text={partial} partial />}
         {tools.length > 0 && <Message who="agent" tools={tools} />}

@@ -13,7 +13,12 @@ export function emptyWindow(name: string): LayoutWindow {
 
 export function defaultDoc(): LayoutDoc {
   const w = emptyWindow("window 1");
-  return { version: DOC_VERSION, windows: [w], activeWindowId: w.id, panes: {} };
+  return {
+    version: DOC_VERSION,
+    windows: [w],
+    activeWindowId: w.id,
+    panes: {},
+  };
 }
 
 const mapWindow = (
@@ -49,8 +54,11 @@ export function closeWindow(d: LayoutDoc, id: string): LayoutDoc {
   return { ...d, windows, panes, activeWindowId };
 }
 
-export const renameWindow = (d: LayoutDoc, id: string, name: string): LayoutDoc =>
-  mapWindow(d, id, (w) => ({ ...w, name }));
+export const renameWindow = (
+  d: LayoutDoc,
+  id: string,
+  name: string,
+): LayoutDoc => mapWindow(d, id, (w) => ({ ...w, name }));
 
 export const selectWindow = (d: LayoutDoc, id: string): LayoutDoc =>
   d.windows.some((w) => w.id === id) ? { ...d, activeWindowId: id } : d;
@@ -106,11 +114,18 @@ export function movePane(
     const leaf: TreeNode = { kind: "leaf", paneId };
     if (!w.tree) return { ...w, tree: leaf };
     const target = at?.target ?? (paneIds(w.tree).at(-1) as string);
-    return { ...w, tree: split(w.tree, target, at?.dir ?? "h", paneId, at?.before) };
+    return {
+      ...w,
+      tree: split(w.tree, target, at?.dir ?? "h", paneId, at?.before),
+    };
   });
 }
 
-export function setTree(d: LayoutDoc, windowId: string, tree: TreeNode | null): LayoutDoc {
+export function setTree(
+  d: LayoutDoc,
+  windowId: string,
+  tree: TreeNode | null,
+): LayoutDoc {
   return mapWindow(d, windowId, (w) => ({ ...w, tree }));
 }
 
@@ -126,7 +141,11 @@ export function setPaneConfig(
     ...d,
     panes: {
       ...d.panes,
-      [paneId]: { ...e, config, configVersion: configVersion ?? e.configVersion },
+      [paneId]: {
+        ...e,
+        config,
+        configVersion: configVersion ?? e.configVersion,
+      },
     },
   };
 }
@@ -149,7 +168,11 @@ export function normalize(d: LayoutDoc): { doc: LayoutDoc; repaired: boolean } {
 // 已存布局：套用到新 window 时所有 pane 分配新 paneId，配置（含会话绑定）保留。
 export function instantiate(
   d: LayoutDoc,
-  saved: { name: string; tree: TreeNode | null; panes: Record<string, PaneEntry> },
+  saved: {
+    name: string;
+    tree: TreeNode | null;
+    panes: Record<string, PaneEntry>;
+  },
 ): LayoutDoc {
   const map = new Map<string, string>();
   const rewrite = (n: TreeNode): TreeNode => {

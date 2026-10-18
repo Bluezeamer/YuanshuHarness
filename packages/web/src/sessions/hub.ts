@@ -64,8 +64,7 @@ export class SessionHub {
   // 草稿为空，或仍是上次放回的原样时才写入；用户动过的草稿不覆盖。
   restoreDraft(id: string, text: string) {
     const cur = this.drafts.get(id);
-    if (!cur || cur.text === "")
-      this.drafts.set(id, { text, restored: true });
+    if (!cur || cur.text === "") this.drafts.set(id, { text, restored: true });
     else if (cur.restored)
       this.drafts.set(id, { text: `${cur.text}\n${text}`, restored: true });
     else return;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Anchor } from "../ChatView";
 import type { SessionInfo } from "../api";
+import type { Anchor } from "../ChatView";
 import type { SessionHub } from "../sessions/hub";
 import {
   addPane,
@@ -13,14 +13,14 @@ import {
   newId,
   renameWindow,
   selectWindow,
-  setTree,
   setPaneConfig,
+  setTree,
   windowOf,
 } from "./doc";
 import { type DropTarget, dropTarget } from "./drag";
 import { PaneLayer } from "./PaneLayer";
-import { SavedLayouts } from "./SavedLayouts";
 import { type ChatConfig, defaultRegistry, EnvContext } from "./panes";
+import { SavedLayouts } from "./SavedLayouts";
 import { layout, neighbor, paneIds, resize } from "./tree";
 import { LEFT_MIN_WIDTH, RIGHT_MIN_WIDTH, useSide, useWidth } from "./useSide";
 import { useWorkbench } from "./useWorkbench";
@@ -83,17 +83,24 @@ export function Workbench({
   };
   const selected = sessionOf(focused);
   const lastChat = useRef<string | null>(null);
-  if (focused && doc.panes[focused]?.type === "chat") lastChat.current = focused;
+  if (focused && doc.panes[focused]?.type === "chat")
+    lastChat.current = focused;
 
   // R24：pane 总数达到软上限时提示，不阻止。
   const [crowded, setCrowded] = useState(false);
-  const warnIfCrowded = () => setCrowded(Object.keys(doc.panes).length >= PANE_SOFT_LIMIT);
+  const warnIfCrowded = () =>
+    setCrowded(Object.keys(doc.panes).length >= PANE_SOFT_LIMIT);
 
   // R6：Alt+方向键按位置移动焦点。
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!e.altKey || !focused) return;
     const dir = (
-      { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" } as const
+      {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowUp: "up",
+        ArrowDown: "down",
+      } as const
     )[e.key as "ArrowLeft"];
     if (!dir) return;
     const rects = layout(active?.tree ?? null, { x: 0, y: 0, w: 1, h: 1 });
@@ -103,7 +110,11 @@ export function Workbench({
   };
 
   // R5：pointer 事件拖动。移动超过 4px 才算拖动，避免吞掉标题栏按钮的点击。
-  const [pending, setPending] = useState<{ paneId: string; x: number; y: number } | null>(null);
+  const [pending, setPending] = useState<{
+    paneId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [dragTarget, setDragTarget] = useState<DropTarget>(null);
   const [dragging, setDragging] = useState(false);
   const latest = useRef({ doc, inActive });
@@ -119,7 +130,11 @@ export function Workbench({
       setDragTarget(null);
     };
     const onMove = (e: PointerEvent) => {
-      if (!started && Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < 4) return;
+      if (
+        !started &&
+        Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < 4
+      )
+        return;
       started = true;
       setDragging(true);
       target = dropTarget(
@@ -140,7 +155,13 @@ export function Workbench({
       else
         update((d) => {
           const w = windowOf(d, t.paneId);
-          return w ? movePane(d, id, w.id, { target: t.paneId, dir: t.dir, before: t.before }) : d;
+          return w
+            ? movePane(d, id, w.id, {
+                target: t.paneId,
+                dir: t.dir,
+                before: t.before,
+              })
+            : d;
         });
     };
     const onKey = (e: KeyboardEvent) => {
@@ -245,7 +266,8 @@ export function Workbench({
     </span>
   );
 
-  const navPane = focused && doc.panes[focused]?.type === "chat" ? focused : null;
+  const navPane =
+    focused && doc.panes[focused]?.type === "chat" ? focused : null;
   const navItems = navPane ? (anchors[navPane] ?? []) : [];
   const jump = (id: string) => {
     const root = document.querySelector(`[data-pane-id="${navPane}"]`);
@@ -264,49 +286,49 @@ export function Workbench({
       className="enter relative grid min-h-0"
     >
       {(left.pinned || left.open) && (
-      <aside
-        aria-label="会话列表"
-        className={`col-start-1 row-start-1 min-h-0 overflow-auto border-r border-line bg-panel ${
-          left.open ? "absolute inset-y-0 left-0 z-20 w-[268px]" : ""
-        }`}
-      >
-        <div className="flex justify-end border-b border-line2 p-1">
-          {left.open ? (
-            <button type="button" className={btn} onClick={left.pin}>
-              固定会话列表
-            </button>
+        <aside
+          aria-label="会话列表"
+          className={`col-start-1 row-start-1 min-h-0 overflow-auto border-r border-line bg-panel ${
+            left.open ? "absolute inset-y-0 left-0 z-20 w-[268px]" : ""
+          }`}
+        >
+          <div className="flex justify-end border-b border-line2 p-1">
+            {left.open ? (
+              <button type="button" className={btn} onClick={left.pin}>
+                固定会话列表
+              </button>
+            ) : (
+              <button type="button" className={btn} onClick={left.collapse}>
+                折叠会话列表
+              </button>
+            )}
+          </div>
+          {sessions.length === 0 ? (
+            <p className="p-5 text-mute">还没有会话</p>
           ) : (
-            <button type="button" className={btn} onClick={left.collapse}>
-              折叠会话列表
-            </button>
+            <ul className="m-0 list-none p-0">
+              {sessions.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    aria-current={s.id === selected ? "true" : undefined}
+                    onClick={() => choose(s.id)}
+                    className={`grid w-full grid-cols-[8px_1fr] items-center gap-3 border-b border-line2 px-5 py-3 text-left hover:bg-ink/5 ${
+                      s.id === selected
+                        ? "bg-ink/5 shadow-[inset_3px_0_0_var(--ink)]"
+                        : ""
+                    }`}
+                  >
+                    <StatusDot running={s.running} />
+                    <span className="truncate font-semibold">
+                      {s.name ?? "未命名会话"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-        {sessions.length === 0 ? (
-          <p className="p-5 text-mute">还没有会话</p>
-        ) : (
-          <ul className="m-0 list-none p-0">
-            {sessions.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  aria-current={s.id === selected ? "true" : undefined}
-                  onClick={() => choose(s.id)}
-                  className={`grid w-full grid-cols-[8px_1fr] items-center gap-3 border-b border-line2 px-5 py-3 text-left hover:bg-ink/5 ${
-                    s.id === selected
-                      ? "bg-ink/5 shadow-[inset_3px_0_0_var(--ink)]"
-                      : ""
-                  }`}
-                >
-                  <StatusDot running={s.running} />
-                  <span className="truncate font-semibold">
-                    {s.name ?? "未命名会话"}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
+        </aside>
       )}
       <main
         className="col-start-2 row-start-1 flex min-h-0 flex-col"
@@ -411,7 +433,8 @@ export function Workbench({
         )}
         {crowded && (
           <p role="status" className="p-2 text-sm text-mute">
-            pane 已有 {Object.keys(doc.panes).length} 个，都会常驻内存，可以关掉不用的
+            pane 已有 {Object.keys(doc.panes).length}{" "}
+            个，都会常驻内存，可以关掉不用的
           </p>
         )}
         {wb.repaired && (
@@ -467,43 +490,45 @@ export function Workbench({
         </div>
       )}
       {(right.pinned || right.open) && (
-      <nav
-        aria-label="输入导航"
-        className={`col-start-3 row-start-1 min-h-0 overflow-auto border-l border-line bg-panel ${
-          right.open ? "absolute inset-y-0 right-0 z-20 w-[240px]" : ""
-        }`}
-      >
-        <div className="flex justify-end border-b border-line2 p-1">
-          {right.open ? (
-            <button type="button" className={btn} onClick={right.pin}>
-              固定输入导航
-            </button>
+        <nav
+          aria-label="输入导航"
+          className={`col-start-3 row-start-1 min-h-0 overflow-auto border-l border-line bg-panel ${
+            right.open ? "absolute inset-y-0 right-0 z-20 w-[240px]" : ""
+          }`}
+        >
+          <div className="flex justify-end border-b border-line2 p-1">
+            {right.open ? (
+              <button type="button" className={btn} onClick={right.pin}>
+                固定输入导航
+              </button>
+            ) : (
+              <button type="button" className={btn} onClick={right.collapse}>
+                折叠输入导航
+              </button>
+            )}
+          </div>
+          {navItems.length === 0 ? (
+            <p className="p-4 text-sm text-mute">没有可跳转的消息</p>
           ) : (
-            <button type="button" className={btn} onClick={right.collapse}>
-              折叠输入导航
-            </button>
+            <ol className="m-0 list-none p-0">
+              {navItems.map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    aria-label={a.text}
+                    data-text={
+                      a.text.length > NAV_MAX
+                        ? `${a.text.slice(0, NAV_MAX)}…`
+                        : a.text
+                    }
+                    onClick={() => jump(a.id)}
+                    className="w-full truncate border-b border-line2 px-4 py-2 text-left text-sm before:content-[attr(data-text)] hover:bg-ink/5"
+                  />
+                </li>
+              ))}
+            </ol>
           )}
-        </div>
-        {navItems.length === 0 ? (
-          <p className="p-4 text-sm text-mute">没有可跳转的消息</p>
-        ) : (
-          <ol className="m-0 list-none p-0">
-            {navItems.map((a) => (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  aria-label={a.text}
-                  data-text={
-                    a.text.length > NAV_MAX ? `${a.text.slice(0, NAV_MAX)}…` : a.text
-                  }
-                  onClick={() => jump(a.id)}
-                  className="w-full truncate border-b border-line2 px-4 py-2 text-left text-sm before:content-[attr(data-text)] hover:bg-ink/5"
-                />
-              </li>
-            ))}
-          </ol>
-        )}
-      </nav>
+        </nav>
       )}
     </div>
   );

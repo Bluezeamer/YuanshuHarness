@@ -56,7 +56,10 @@ export function split(
     ratios.splice(at, 0, half);
     return { ...t, children, ratios };
   }
-  return { ...t, children: t.children.map((c) => split(c, target, dir, newId, before)) };
+  return {
+    ...t,
+    children: t.children.map((c) => split(c, target, dir, newId, before)),
+  };
 }
 
 // 关闭 pane：兄弟占满空出的位置；只剩一个孩子的分割节点折叠成该孩子。
@@ -145,10 +148,14 @@ export function neighbor(
     const overlapY = o.y < r.y + r.h && o.y + o.h > r.y;
     const overlapX = o.x < r.x + r.w && o.x + o.w > r.x;
     let d: number | null = null;
-    if (dir === "right" && overlapY && o.x >= r.x + r.w - 1e-9) d = o.x - (r.x + r.w);
-    if (dir === "left" && overlapY && o.x + o.w <= r.x + 1e-9) d = r.x - (o.x + o.w);
-    if (dir === "down" && overlapX && o.y >= r.y + r.h - 1e-9) d = o.y - (r.y + r.h);
-    if (dir === "up" && overlapX && o.y + o.h <= r.y + 1e-9) d = r.y - (o.y + o.h);
+    if (dir === "right" && overlapY && o.x >= r.x + r.w - 1e-9)
+      d = o.x - (r.x + r.w);
+    if (dir === "left" && overlapY && o.x + o.w <= r.x + 1e-9)
+      d = r.x - (o.x + o.w);
+    if (dir === "down" && overlapX && o.y >= r.y + r.h - 1e-9)
+      d = o.y - (r.y + r.h);
+    if (dir === "up" && overlapX && o.y + o.h <= r.y + 1e-9)
+      d = r.y - (o.y + o.h);
     if (d !== null && (!best || d < best.d)) best = { id, d };
   }
   return best?.id ?? null;

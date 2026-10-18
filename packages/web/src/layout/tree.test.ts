@@ -47,7 +47,9 @@ test("R2 关闭 pane：兄弟占满空位，只剩一个孩子时折叠", () => 
   expect(remove(t, "a")).toEqual(leaf("b"));
   const three = split(t, "b", "h", "c");
   const r = remove(three, "b");
-  expect(r && r.kind === "split" && r.ratios.reduce((x, y) => x + y)).toBeCloseTo(1);
+  expect(
+    r && r.kind === "split" && r.ratios.reduce((x, y) => x + y),
+  ).toBeCloseTo(1);
   expect(paneIds(r)).toEqual(["a", "c"]);
 });
 
@@ -76,7 +78,11 @@ test("R16 比例之和不为 1 或长度不符：按等分修复并报告", () =
   };
   const r = repair(bad);
   expect(r.fixed).toBe(true);
-  expect(r.tree.kind === "split" && r.tree.ratios).toEqual([1 / 3, 1 / 3, 1 / 3]);
+  expect(r.tree.kind === "split" && r.tree.ratios).toEqual([
+    1 / 3,
+    1 / 3,
+    1 / 3,
+  ]);
   const good = split(leaf("a"), "a", "h", "b");
   expect(repair(good).fixed).toBe(false);
 });
@@ -94,7 +100,12 @@ test("R6 方向键按位置找相邻 pane", () => {
 import { dividers } from "./tree";
 
 test("dividers：嵌套分割各给出一条线，位置和比例正确", () => {
-  const t = split(split({ kind: "leaf", paneId: "a" }, "a", "h", "b"), "b", "v", "c");
+  const t = split(
+    split({ kind: "leaf", paneId: "a" }, "a", "h", "b"),
+    "b",
+    "v",
+    "c",
+  );
   const ds = dividers(t, { x: 0, y: 0, w: 1, h: 1 });
   expect(ds).toHaveLength(2);
   const top = ds.find((d) => d.path.length === 0);

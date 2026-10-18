@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getWorkbench, loadToken, putWorkbench } from "../api";
-import { addPane, defaultDoc, DOC_VERSION, normalize } from "./doc";
+import { addPane, DOC_VERSION, defaultDoc, normalize } from "./doc";
 import type { Registry } from "./registry";
 import type { LayoutDoc } from "./types";
 
@@ -28,10 +28,7 @@ export function initialDoc(registry: Registry): LayoutDoc {
   return addPane(d, w.id, "p-initial", entry);
 }
 
-export function useWorkbench(
-  registry: Registry,
-  onUnauthorized: () => void,
-) {
+export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
   const [doc, setDoc] = useState(() => initialDoc(registry));
   const [save, setSave] = useState<SaveState>({ kind: "ok" });
   const [repaired, setRepaired] = useState(false);

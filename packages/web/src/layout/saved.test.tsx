@@ -1,4 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi } from "../fakes";
@@ -32,7 +38,9 @@ const open = async () => {
   await flush();
 };
 const paneIdList = () =>
-  [...document.querySelectorAll("[data-pane-id]")].map((n) => n.getAttribute("data-pane-id"));
+  [...document.querySelectorAll("[data-pane-id]")].map((n) =>
+    n.getAttribute("data-pane-id"),
+  );
 
 test("R22 存当前 window、套用后 paneId 全新且会话绑定保留、可删除", async () => {
   const api = await mount();
@@ -46,7 +54,10 @@ test("R22 存当前 window、套用后 paneId 全新且会话绑定保留、可�
   fireEvent.click(screen.getByRole("button", { name: "存当前 window" }));
   await flush();
   expect(api.saved).toHaveLength(1);
-  const doc = api.saved[0]?.document as { name: string; panes: Record<string, unknown> };
+  const doc = api.saved[0]?.document as {
+    name: string;
+    panes: Record<string, unknown>;
+  };
   expect(doc.name).toBe("我的布局");
   expect(Object.keys(doc.panes).sort()).toEqual([...before].sort() as string[]);
   expect(screen.getByText("我的布局")).toBeTruthy();
@@ -56,10 +67,14 @@ test("R22 存当前 window、套用后 paneId 全新且会话绑定保留、可�
   expect(screen.getAllByRole("tab")).toHaveLength(2);
   const after = paneIdList().filter((id) => !before.includes(id));
   expect(after).toHaveLength(2);
-  expect(screen.getAllByRole("heading", { name: "乙" }).length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("heading", { name: "乙" }).length).toBeGreaterThan(
+    0,
+  );
 
   await open();
-  fireEvent.click(screen.getByRole("button", { name: "删除已存布局 我的布局" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "删除已存布局 我的布局" }),
+  );
   await flush();
   expect(api.saved).toHaveLength(0);
   expect(screen.getByText("还没有已存布局")).toBeTruthy();

@@ -19,7 +19,12 @@ const btn =
 
 const asSaved = (d: unknown, currentVersion: number): SavedWindow | null => {
   const s = d as Partial<SavedWindow & { version?: number }> | null;
-  if (!s || typeof s.name !== "string" || typeof s.panes !== "object" || !s.panes)
+  if (
+    !s ||
+    typeof s.name !== "string" ||
+    typeof s.panes !== "object" ||
+    !s.panes
+  )
     return null;
   if (typeof s.version === "number" && s.version > currentVersion) return null;
   return { name: s.name, tree: s.tree ?? null, panes: s.panes };
@@ -65,7 +70,11 @@ export function SavedLayouts({
     if (!snap) return;
     const name = window.prompt("已存布局名称", snap.name)?.trim();
     if (!name) return;
-    const r = await createSavedLayout(loadToken(), { version: 1, ...snap, name });
+    const r = await createSavedLayout(loadToken(), {
+      version: 1,
+      ...snap,
+      name,
+    });
     if (r.ok) await refresh();
     else fail(r.kind);
   };
@@ -87,10 +96,9 @@ export function SavedLayouts({
         已存布局
       </button>
       {open && (
-        <div
-          role="group"
+        <fieldset
           aria-label="已存布局"
-          className="absolute left-0 top-full z-20 w-64 border border-line bg-panel p-2"
+          className="absolute left-0 top-full z-20 m-0 w-64 min-w-0 border border-line bg-panel p-2"
         >
           <button type="button" className={btn} onClick={() => void save()}>
             存当前 window
@@ -142,7 +150,7 @@ export function SavedLayouts({
               })}
             </ul>
           )}
-        </div>
+        </fieldset>
       )}
     </span>
   );

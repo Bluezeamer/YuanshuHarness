@@ -1,4 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
@@ -53,7 +59,9 @@ function setup() {
   const ws = FakeWS.last;
   act(() => ws.serve(snapshot(1, history)));
   const boxes = () => {
-    const [a, b] = screen.getAllByLabelText("输入消息") as HTMLTextAreaElement[];
+    const [a, b] = screen.getAllByLabelText(
+      "输入消息",
+    ) as HTMLTextAreaElement[];
     if (!a || !b) throw new Error("需要两个输入框");
     return [a, b] as const;
   };
@@ -67,7 +75,11 @@ test("R12 同一会话两个 pane 只开一条连接", () => {
 
 test("R11 一个 pane 里的帧在两个 pane 里都显示", () => {
   const { ws } = setup();
-  act(() => ws.serve(frame(2, "message.ended", { role: "assistant", text: "同步的话" })));
+  act(() =>
+    ws.serve(
+      frame(2, "message.ended", { role: "assistant", text: "同步的话" }),
+    ),
+  );
   expect(screen.getAllByText("同步的话")).toHaveLength(2);
 });
 

@@ -6,7 +6,13 @@ export interface PreviewRect {
 }
 
 export type DropTarget =
-  | { kind: "edge"; paneId: string; dir: "h" | "v"; before: boolean; preview: PreviewRect }
+  | {
+      kind: "edge";
+      paneId: string;
+      dir: "h" | "v";
+      before: boolean;
+      preview: PreviewRect;
+    }
   | { kind: "window"; windowId: string; preview: PreviewRect }
   | null;
 
@@ -31,7 +37,14 @@ export function dropTarget(
   for (const tab of document.querySelectorAll('[role="tab"][data-window-id]')) {
     const r = tab.getBoundingClientRect();
     const id = tab.getAttribute("data-window-id");
-    if (id && id !== activeWindowId && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+    if (
+      id &&
+      id !== activeWindowId &&
+      x >= r.left &&
+      x <= r.right &&
+      y >= r.top &&
+      y <= r.bottom
+    )
       return { kind: "window", windowId: id, preview: box(r) };
   }
   for (const paneId of candidates) {
@@ -42,7 +55,11 @@ export function dropTarget(
     if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
     const dx = (x - r.left) / r.width;
     const dy = (y - r.top) / r.height;
-    const edge = (dir: "h" | "v", before: boolean, p: PreviewRect): DropTarget => ({
+    const edge = (
+      dir: "h" | "v",
+      before: boolean,
+      p: PreviewRect,
+    ): DropTarget => ({
       kind: "edge",
       paneId,
       dir,
@@ -51,10 +68,34 @@ export function dropTarget(
     });
     const hw = r.width / 2;
     const hh = r.height / 2;
-    if (dx < EDGE) return edge("h", true, { left: r.left, top: r.top, width: hw, height: r.height });
-    if (dx > 1 - EDGE) return edge("h", false, { left: r.left + hw, top: r.top, width: hw, height: r.height });
-    if (dy < EDGE) return edge("v", true, { left: r.left, top: r.top, width: r.width, height: hh });
-    if (dy > 1 - EDGE) return edge("v", false, { left: r.left, top: r.top + hh, width: r.width, height: hh });
+    if (dx < EDGE)
+      return edge("h", true, {
+        left: r.left,
+        top: r.top,
+        width: hw,
+        height: r.height,
+      });
+    if (dx > 1 - EDGE)
+      return edge("h", false, {
+        left: r.left + hw,
+        top: r.top,
+        width: hw,
+        height: r.height,
+      });
+    if (dy < EDGE)
+      return edge("v", true, {
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: hh,
+      });
+    if (dy > 1 - EDGE)
+      return edge("v", false, {
+        left: r.left,
+        top: r.top + hh,
+        width: r.width,
+        height: hh,
+      });
   }
   return null;
 }

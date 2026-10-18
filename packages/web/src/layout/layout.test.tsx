@@ -39,7 +39,8 @@ const registry = new Registry().register({
   },
 });
 
-const entry = () => registry.newEntry("probe") as NonNullable<ReturnType<Registry["newEntry"]>>;
+const entry = () =>
+  registry.newEntry("probe") as NonNullable<ReturnType<Registry["newEntry"]>>;
 
 function twoPanes(): LayoutDoc {
   let d = defaultDoc();
@@ -112,7 +113,13 @@ test("R3 变异检验：把 pane 放进按 window 分组的容器会触发重挂
       {doc.windows.map((w) => (
         <div key={w.id}>
           {paneIds(w.tree).map((id) => (
-            <Probe key={id} paneId={id} config={{ n: 0 }} focused={false} onUpdateConfig={() => {}} />
+            <Probe
+              key={id}
+              paneId={id}
+              config={{ n: 0 }}
+              focused={false}
+              onUpdateConfig={() => {}}
+            />
           ))}
         </div>
       ))}
@@ -135,7 +142,12 @@ test("R9 未知类型与高版本配置：渲染占位，条目原样保留", ()
     windows: [
       {
         ...(d.windows[0] as LayoutDoc["windows"][number]),
-        tree: split(split({ kind: "leaf", paneId: "x" }, "x", "h", "y"), "y", "h", "z"),
+        tree: split(
+          split({ kind: "leaf", paneId: "x" }, "x", "h", "y"),
+          "y",
+          "h",
+          "z",
+        ),
       },
     ],
   };
@@ -153,7 +165,12 @@ test("R9 配置版本较低且有迁移函数：迁移后渲染", () => {
   const doc: LayoutDoc = {
     ...d,
     panes: { m: { type: "probe", configVersion: 1, config: { n: 5 } } },
-    windows: [{ ...(d.windows[0] as LayoutDoc["windows"][number]), tree: { kind: "leaf", paneId: "m" } }],
+    windows: [
+      {
+        ...(d.windows[0] as LayoutDoc["windows"][number]),
+        tree: { kind: "leaf", paneId: "m" },
+      },
+    ],
   };
   const { getByLabelText } = render(view(doc, null));
   expect(getByLabelText("in-m")).toBeTruthy();
@@ -165,10 +182,17 @@ test("R9 迁移函数抛错：按未知类型渲染占位，条目不丢", () =>
   const doc: LayoutDoc = {
     ...d,
     panes: { m: bad },
-    windows: [{ ...(d.windows[0] as LayoutDoc["windows"][number]), tree: { kind: "leaf", paneId: "m" } }],
+    windows: [
+      {
+        ...(d.windows[0] as LayoutDoc["windows"][number]),
+        tree: { kind: "leaf", paneId: "m" },
+      },
+    ],
   };
   const { container } = render(view(doc, null));
-  expect(container.querySelector("section")?.getAttribute("aria-label")).toBe("未知 pane");
+  expect(container.querySelector("section")?.getAttribute("aria-label")).toBe(
+    "未知 pane",
+  );
   expect(normalize(doc).doc.panes.m).toEqual(bad);
 });
 
@@ -180,7 +204,12 @@ test("R8 新增类型只改注册表，布局代码不动", () => {
     defaultConfig: () => ({}),
     configVersion: 1,
   });
-  const d = addPane(defaultDoc(), defaultDoc().activeWindowId, "q", r.newEntry("extra") as never);
+  const d = addPane(
+    defaultDoc(),
+    defaultDoc().activeWindowId,
+    "q",
+    r.newEntry("extra") as never,
+  );
   expect(Object.keys(d.panes)).toEqual(["q"]);
 });
 
@@ -199,7 +228,11 @@ test("R22 套用已存布局：所有 pane 分配新 id，配置（会话绑定�
   const chatCfg = { type: "probe", configVersion: 2, config: { n: 42 } };
   src.panes.a = chatCfg;
   const w = src.windows[0] as LayoutDoc["windows"][number];
-  const d = instantiate(defaultDoc(), { name: "存", tree: w.tree, panes: src.panes });
+  const d = instantiate(defaultDoc(), {
+    name: "存",
+    tree: w.tree,
+    panes: src.panes,
+  });
   const created = d.windows.at(-1) as LayoutDoc["windows"][number];
   const ids = paneIds(created.tree);
   expect(ids).toHaveLength(2);
@@ -224,7 +257,12 @@ test("R9 迁移后的配置写回时带上新配置版本，不会再按旧版�
   const doc: LayoutDoc = {
     ...d,
     panes: { m: { type: "probe", configVersion: 1, config: { n: 5 } } },
-    windows: [{ ...(d.windows[0] as LayoutDoc["windows"][number]), tree: { kind: "leaf", paneId: "m" } }],
+    windows: [
+      {
+        ...(d.windows[0] as LayoutDoc["windows"][number]),
+        tree: { kind: "leaf", paneId: "m" },
+      },
+    ],
   };
   const resolved = registry.resolve(doc.panes.m as never);
   expect(resolved?.configVersion).toBe(2);

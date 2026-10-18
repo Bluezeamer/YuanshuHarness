@@ -20,7 +20,11 @@ export class Registry {
   newEntry(id: string): PaneEntry | null {
     const t = this.types.get(id);
     if (!t) return null;
-    return { type: id, configVersion: t.configVersion, config: t.defaultConfig() };
+    return {
+      type: id,
+      configVersion: t.configVersion,
+      config: t.defaultConfig(),
+    };
   }
 
   // 返回可渲染的配置、迁移后版本号，或 null 表示按"未知 pane"处理（原条目由调用方原样保留）。
