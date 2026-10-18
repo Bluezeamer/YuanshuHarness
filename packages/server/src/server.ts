@@ -11,12 +11,14 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
+import { workbenchApi } from "./api/workbench.js";
 import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
 import { type Db, openDatabase } from "./store/db.js";
 import { SessionStore } from "./store/sessions.js";
+import { WorkbenchStore } from "./store/workbench.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
 const PACKAGE_ROOT = new URL("../", import.meta.url);
@@ -193,6 +195,7 @@ export function createServer(
         app.register(async (scope) => {
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
+          scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {
         db.close();

@@ -62,15 +62,16 @@ describe("R1 迁移与备份", () => {
     expect(readFileSync(path.join(dir, `${DB_FILE}.bak-v0`))).toEqual(before);
   });
 
-  test("两步迁移从 v1 升到 v2：只备份 v1，且逐步升版本", () => {
+  test("多一步迁移：只备份升级前的版本，且逐步升版本", () => {
     openDatabase(dir).close();
+    const n = MIGRATIONS.length;
     const two: Migration[] = [
       ...MIGRATIONS,
       (db) => db.exec("ALTER TABLE sessions ADD COLUMN extra TEXT"),
     ];
     const db = track(openDatabase(dir, two));
-    expect(version(db)).toBe(2);
-    expect(baks()).toEqual([`${DB_FILE}.bak-v1`]);
+    expect(version(db)).toBe(n + 1);
+    expect(baks()).toEqual([`${DB_FILE}.bak-v${n}`]);
   });
 
   test("迁移中途失败：回滚、启动失败、原库不变", () => {
@@ -104,7 +105,9 @@ describe("R2 版本高于代码", () => {
     d.pragma("user_version = 999");
     d.close();
     const before = readFileSync(file);
-    expect(() => openDatabase(dir)).toThrow(/999.*高于.*1|999[\s\S]*\b1\b/);
+    expect(() => openDatabase(dir)).toThrow(
+      new RegExp(`999.*高于.*${MIGRATIONS.length}`),
+    );
     expect(readFileSync(file)).toEqual(before);
     expect(baks()).toEqual([]);
   });
