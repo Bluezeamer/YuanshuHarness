@@ -1,6 +1,6 @@
 # Intent: WebUI（一）前端工程骨架与会话列表
 Author: bluezeamer
-Status: draft
+Status: closed
 Date: 2026-10-17
 Lane: build
 Why: 前端栈（React、Tailwind）与"Server 托管静态资源"已由 ADR-0012/0013 定稿；新增的 Vite、测试库只是 web 包的开发依赖，发布物形态不变，revert 一个提交可恢复，所以不是决策档。命中"静默"的只有令牌的保存位置（隐私边界的客户端一侧），已在 Decisions 里列出请人确认；其余出错当场可见。

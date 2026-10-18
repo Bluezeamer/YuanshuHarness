@@ -1,6 +1,6 @@
 # Spec: WebUI（二）对话与停止
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 
 > 写成 delta：只写本次变更相对 [skeleton](../261017-webui-skeleton/spec.md) 新增或改变了什么。

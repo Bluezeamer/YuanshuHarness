@@ -1,6 +1,6 @@
 # Spec: WebUI（一）前端工程骨架与会话列表
 Author: bluezeamer
-Status: draft
+Status: accepted
 Date: 2026-10-17
 
 > 写成 delta：只写本次变更相对既有约定新增或改变了什么。
