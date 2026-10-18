@@ -1,6 +1,6 @@
 # Intent: WebUI 对话与停止
 Author: bluezeamer
-Status: active
+Status: closed
 Date: 2026-10-17
 Lane: build
 Why: 改动操作流式事件、排队队列与重连，命中"事件时序、队列、并发乱序"静默信号，按 hardening.md 需要失败先行、独立评审与真实运行验证。不涉及存储形状变更和外部契约（WebSocket 子协议与帧类型已由 ADR 定稿，本 intent 只在客户端实现），所以不是决策档。
