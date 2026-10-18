@@ -11,6 +11,7 @@
   --acc: #c4331b;
   --live: #1f4fd8;
   --ok: #1d6b45;
+  --acc-press: #8f2410;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --font-sans: Inter, system-ui, sans-serif;
   --font-mono:
@@ -27,6 +28,7 @@
   --color-acc: var(--acc);
   --color-live: var(--live);
   --color-ok: var(--ok);
+  --color-acc-press: var(--acc-press);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
@@ -69,6 +71,28 @@ input:focus-visible {
   }
 }
 
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
 .enter {
   animation: enter 0.5s var(--ease);
 }
@@ -81,8 +105,11 @@ input:focus-visible {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
     animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
     animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
     transition-duration: 0.01ms !important;
   }
 }

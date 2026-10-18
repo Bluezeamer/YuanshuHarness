@@ -1,5 +1,49 @@
 import { useState } from "react";
 import type { SessionInfo } from "./api";
+import { Conversation } from "./Conversation";
+import { useConversation } from "./useConversation";
+
+function ConversationView({
+  session,
+  draft,
+  onDraft,
+  onRestore,
+  onUnauthorized,
+}: {
+  session: SessionInfo;
+  draft: string;
+  onDraft: (text: string) => void;
+  onRestore: (text: string) => void;
+  onUnauthorized: () => void;
+}) {
+  const c = useConversation(session.id, onRestore, onUnauthorized);
+  return (
+    <Conversation
+      name={session.name}
+      draft={draft}
+      onDraft={onDraft}
+      messages={c.state.messages}
+      older={c.older}
+      hasEarlier={c.hasEarlier}
+      loadingEarlier={c.loadingEarlier}
+      earlierFailed={c.earlierFailed}
+      onLoadEarlier={c.loadEarlier}
+      historyLoading={c.historyLoading}
+      historyFailed={c.historyFailed}
+      partial={c.state.partial}
+      tools={c.state.tools}
+      queue={c.state.queue}
+      running={c.state.running}
+      stopPending={c.stopPending}
+      conn={c.conn}
+      notice={c.notice}
+      error={c.state.error}
+      onSend={c.send}
+      onStop={c.stop}
+      onReconnect={c.reconnect}
+    />
+  );
+}
 
 function StatusDot({ running }: { running: boolean }) {
   return (
@@ -11,9 +55,32 @@ function StatusDot({ running }: { running: boolean }) {
   );
 }
 
-export function Shell({ sessions }: { sessions: SessionInfo[] }) {
+export function Shell({
+  sessions,
+  onUnauthorized,
+}: {
+  sessions: SessionInfo[];
+  onUnauthorized: () => void;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
+  // restored：草稿是放回的未确认发送，用户还没动过，可以继续往后拼。
+  const [drafts, setDrafts] = useState<
+    Record<string, { text: string; restored: boolean }>
+  >({});
   const current = sessions.find((s) => s.id === selected);
+
+  const setDraft = (id: string, text: string) =>
+    setDrafts((d) => ({ ...d, [id]: { text, restored: false } }));
+  // 草稿为空，或仍是上次放回的原样时才写入；用户动过的草稿不覆盖。
+  const restoreDraft = (id: string, text: string) =>
+    setDrafts((d) => {
+      const cur = d[id];
+      if (!cur || cur.text === "")
+        return { ...d, [id]: { text, restored: true } };
+      if (cur.restored)
+        return { ...d, [id]: { text: `${cur.text}\n${text}`, restored: true } };
+      return d;
+    });
 
   return (
     <div className="grid h-full grid-rows-[auto_1fr]">
@@ -64,13 +131,18 @@ export function Shell({ sessions }: { sessions: SessionInfo[] }) {
             </ul>
           )}
         </aside>
-        <main className="p-7">
+        <main className="flex min-h-0 flex-col">
           {current ? (
-            <h1 className="text-[22px] font-bold leading-tight">
-              {current.name ?? "未命名会话"}
-            </h1>
+            <ConversationView
+              key={current.id}
+              session={current}
+              draft={drafts[current.id]?.text ?? ""}
+              onDraft={(text) => setDraft(current.id, text)}
+              onRestore={(text) => restoreDraft(current.id, text)}
+              onUnauthorized={onUnauthorized}
+            />
           ) : (
-            <p className="text-mute">选择会话</p>
+            <p className="p-7 text-mute">选择会话</p>
           )}
         </main>
       </div>

@@ -39,10 +39,19 @@ const message = (f: Failure, fromInput: boolean): string => {
 export function Gate({
   children,
 }: {
-  children: (sessions: SessionInfo[]) => ReactNode;
+  children: (sessions: SessionInfo[], onUnauthorized: () => void) => ReactNode;
 }) {
   const [phase, setPhase] = useState<Phase>({ name: "checking" });
   const [input, setInput] = useState("");
+
+  const onUnauthorized = useCallback(() => {
+    clearToken();
+    setPhase({
+      name: "failed",
+      failure: { kind: "unauthorized" },
+      fromInput: false,
+    });
+  }, []);
 
   const probe = useCallback(
     async (token: string | null, fromInput: boolean) => {
@@ -63,7 +72,8 @@ export function Gate({
     void probe(loadToken(), false);
   }, [probe]);
 
-  if (phase.name === "ready") return <>{children(phase.sessions)}</>;
+  if (phase.name === "ready")
+    return <>{children(phase.sessions, onUnauthorized)}</>;
   if (phase.name === "checking")
     return (
       <main className="grid h-full place-items-center text-mute">连接中…</main>

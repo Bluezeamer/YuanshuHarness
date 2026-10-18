@@ -9,6 +9,10 @@ if (!root) throw new Error("缺少 #root");
 
 createRoot(root).render(
   <StrictMode>
-    <Gate>{(sessions) => <Shell sessions={sessions} />}</Gate>
+    <Gate>
+      {(sessions, onUnauthorized) => (
+        <Shell sessions={sessions} onUnauthorized={onUnauthorized} />
+      )}
+    </Gate>
   </StrictMode>,
 );
