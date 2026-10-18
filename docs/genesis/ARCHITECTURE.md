@@ -36,6 +36,7 @@
 | 数据目录布局与版本 | `yuanshu.db` 加 `sessions/<时间>_<id>.jsonl`；`PRAGMA user_version`，高于代码版本拒绝启动，迁移前备份；JSONL 为准，索引可重建 | [ADR-0025](adr/0025-data-dir-layout-and-versioning-revised.md) |
 | 会话管理 REST | 改名、删除（运行中拒绝）、游标分页历史、单条全文 | [ADR-0024](adr/0024-session-rest-and-history.md) |
 | 访问认证 | `--token`/`YUANSHU_TOKEN` 与 `--allow-cidr`/`YUANSHU_ALLOW_CIDR`；REST 用 Bearer，WebSocket 用子协议；非回环无令牌拒绝启动；同来源多次失败限流 | [ADR-0026](adr/0026-access-token-and-source-network.md) |
+| WebUI 多 pane 布局 | 自建不引库；pane 层与布局树分离，移动与切 window 不重挂载；布局为带版本的 JSON，存 Server，`revision` 比对冲突；pane 类型注册，未知类型原样保留 | [ADR-0027](adr/0027-webui-pane-layout.md) |
 | 权限 | 三档，规则共用，模型审批，Codex 为蓝本 | [ADR-0006](adr/0006-permission-tiers.md) |
 | 凭据 | 占位符引用，Server 持有并替换 | [ADR-0007](adr/0007-private-variables.md) |
 | 能力集 | Server 集中管理 skill 与 MCP | [ADR-0008](adr/0008-capability-sets.md) |
@@ -91,3 +92,4 @@
 - 2026-10-17：持久化与恢复落地（ROADMAP 第 3 条第二块），边界与约定补按需加载与对账。
 - 2026-10-17：ADR-0026 定访问令牌、来源网段、携带方式与启动检查，接替 ADR-0018 的非回环警告。
 - 2026-10-17：访问认证落地，边界与约定补认证位置与检查顺序。
+- 2026-10-18：ADR-0027 定 WebUI 多 pane 布局的保活机制、布局文档、存储与 pane 类型注册。
