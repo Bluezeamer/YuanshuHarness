@@ -1,6 +1,6 @@
 # Browser Verification: Pane Layer Preservation (R3/R4)
 Date: 2026-10-18
-Verifier: 待人工
+Verifier: bluezeamer（人工核验，2026-10-18）
 
 > 目的：验证 pane 层在真实浏览器里经拖动、切换 window、分割、调整尺寸后保持同一 DOM 节点，iframe 不重载。
 > ADR-0027 定保活机制以此为前提，做不到则回到 ADR 重议。
