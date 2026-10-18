@@ -23,7 +23,7 @@ R2. window 内是一棵 pane 树：在任一 pane 上按水平或垂直分割出
 R3. 保活：移动 pane（同一 window 内换位、跨 window）、切换 window、分割、调整尺寸，都不得使 pane 重新挂载。可观察的判据：chat 的输入框内容与滚动位置不变，连接不重连；挂载计数不增加。所有 window 的 pane 平铺在一个固定的 pane 层，按布局树算出的矩形定位；非活动 window 的 pane 保持挂载，只设 `visibility: hidden` 与 `inert`，不用 `display: none`。
 R4. 以上由真实浏览器复核（见 Proof）：拖动与切换前后，同一 pane 的 DOM 节点标识不变，iframe 类 pane 不重新加载。做不到则回到 ADR-0027 重议，不在 spec 里绕开。
 R5. 拖动 pane：用 pointer 事件（不用 HTML5 DnD，后者在 iframe 上方丢事件）。可放到另一个 pane 的上、下、左、右边缘（分割并插入）、放到 window 栏的某个 window 标签上（移动到该 window）。拖动中显示落点预览；松手前按 `Esc` 取消，pane 回到原位。
-R6. 键盘：`Alt+方向键` 在当前 window 内按位置移动焦点 pane；焦点 pane 有可见焦点框。每个 pane 的标题栏有菜单按钮（可聚焦），菜单项：向右分割、向下分割、移动到其他 window、关闭，是拖拽的键盘等价操作。pane 的 DOM 顺序与视觉顺序（自左向右、自上向下）一致，读屏顺序不错乱。
+R6. 键盘：`Alt+方向键` 在当前 window 内按位置移动焦点 pane；焦点 pane 有可见焦点框。每个 pane 的标题栏有菜单按钮（可聚焦），菜单项：向右分割、向下分割、移动到其他 window、关闭，是拖拽的键盘等价操作。
 R7. 窗格标题栏显示 pane 的类型显示名与自己的状态（chat 显示所绑定会话名），标题栏可作为拖动手柄。
 
 ### pane 类型
@@ -44,7 +44,7 @@ R17. 刷新后恢复所有 window、pane、尺寸、当前 window、各 chat pan
 R18. Server 端点（均在 `/api/v1`，带令牌，走 ADR-0026 的检查顺序）：
   - `GET /api/v1/workbench` → `{ revision, document }`；还没有时 `revision: 0`、`document: null`（客户端用默认布局）。
   - `PUT /api/v1/workbench`，请求体 `{ baseRevision, document }`：`baseRevision` 等于当前值则写入并返回新 `{ revision }`；不等返回 409 与当前 `{ revision, document }`。
-  - `GET/POST /api/v1/saved-layouts`、`PUT/DELETE /api/v1/saved-layouts/{id}`：已存布局（名字加单个 window 的树及其引用的 pane 条目），同样用 `revision`。
+  - `GET/POST /api/v1/saved-layouts`、`PUT/DELETE /api/v1/saved-layouts/{id}`：已存布局（名字加单个 window 的树及其引用的 pane 条目）。`PUT` 同样用 `revision`；`DELETE` 不校验 `revision`，按 id 直接删除（2026-10-18 决定：误删代价只是重新保存一次布局）。
   - 校验：请求体是合法 JSON、`version` 是整数、大小不超过 256 KiB（超出返回 413）。Server 不解析文档内部结构。
 R19. 数据目录：SQLite 新增存放工作台文档与已存布局的表，`PRAGMA user_version` 加一，按 ADR-0025 迁移（迁移前备份、每步一个事务）。
 R20. 读到 `version` 高于当前代码的文档：只读展示，禁止保存（不覆盖），提示"布局来自更新的版本"。
@@ -65,7 +65,7 @@ R24. 常驻资源上限：待实测后定（pane 总数、终端回滚行数）�
 | R3 | `panelayer.test.tsx`：移动、切 window、分割、调尺寸前后 pane 的挂载计数不变、输入框内容不变；真实浏览器见 R4 | 变异：移动时按 window 重建 pane（`key` 随 window 变），必须变红 |
 | R4 | 真实浏览器（见下），写入 review.md | 无单测；jsdom 不能证明 iframe 不重载 |
 | R5 | `drag.test.tsx`：四边落点、落到 window 标签、`Esc` 取消回原位；真实浏览器复核 iframe 上方不丢事件 | 是 |
-| R6 | `workbench.test.tsx`：`Alt+方向键`、菜单项四个动作、DOM 顺序与视觉顺序一致 | 是 |
+| R6 | `workbench.test.tsx`：`Alt+方向键`、菜单项四个动作 | 是 |
 | R7 | `workbench.test.tsx`：标题栏显示类型名与会话名 | 是 |
 | R8 | `registry.test.ts`：五个类型已注册，后四个渲染"尚未可用"；注册一个测试类型，布局代码不改 | 是 |
 | R9 | `registry.test.ts`：未知类型、高版本、迁移抛错三种往返不丢 | 变异：载入时丢弃未知 pane，必须变红 |
@@ -87,6 +87,7 @@ R24. 常驻资源上限：待实测后定（pane 总数、终端回滚行数）�
 
 必测项的补充说明：
 - R3、R4：真实浏览器，起 Vite + 假 Server，记录拖动前后 pane 的 DOM 节点标识（`WeakRef` 加唯一标记）、输入框内容、滚动位置、iframe 的 `load` 次数，写入 review.md。上一轮 `tmp/spike/LayerSpike.jsx` 已有原型，结论要重做。
+  这两条 jsdom 管不到，由 [browser-verify.md](browser-verify.md) 的真实浏览器步骤证明；可用 `playwright-cli`，但需确认 `drag` 发出的是 pointer 事件（R5 不用 HTML5 DnD）。
 - R11、R12：同一会话开两个 pane，一边输入、发送，另一边的输入栏同步；连接数始终为 1。变异：每个 pane 各开一条连接，镜像用例必须变红。
 - R9：未知类型往返不丢；变异：加载时丢弃未知 pane，必须变红。
 - R18、R19：`packages/server` 的集成测试（令牌、409、413、版本迁移）；多端并发写走 `revision`。
