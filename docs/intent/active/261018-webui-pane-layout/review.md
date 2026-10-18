@@ -48,6 +48,7 @@ DELETE 的取舍：已决定删除不校验 `revision`，按 id 直接删，spec
 
 - 修复：拖动 tab 组里选中的一项时，同组其他 tab 不在落点候选里，被拖的那项又被跳过，组没有边缘可落，所以拆不出来。现在 `Workbench.tsx` 把同组 tab 也加入候选（它们与组共用同一矩形）。拆出走 `movePane`，不再用 `splitOutTab`，后者已连同无人使用的 `group` 渲染块删除。
 - 验证：web 190 个用例通过，server 396 个用例通过，两包 `tsc` 退出码 0。
-- 弱点：拖出 tab 的用例最终断言是"拆出后有 2 个 region"，比原先的"`tablist` 消失"弱；原断言为什么失败没有查清，拆出后 `tablist` 是否残留未证实。
-- 与 spec 不一致：R9a 的 Proof 行写了 `tabs.test.tsx`（切换、拆出、并入的挂载计数与变异检验），仓库里没有这个文件。当前 tab 相关覆盖在 `tree.test.ts`、`drag.test.tsx`、`saved.test.tsx` 里，R9a 的"不重挂载"和"切换 tab 只渲染选中项会变红"的变异检验都没有做。
+- 已补：拖出 tab 的用例恢复为"`data-tabstrip` 标签栏消失"。此前断言失败的原因是选择器 `[role=tablist]` 同时匹配 window 标签栏，永远不会消失，不是拆出逻辑有问题。
+- 已补：新增 `tabs.test.tsx`（3 个）：组内只有选中项可见、切换 tab 节点不被替换、关闭到只剩一个退回普通 pane。变异检验：把 `shown` 改成恒为 true，前两个变红，已还原。并入、拆出不重挂载仍只由 `drag.test.tsx` 的几何断言间接覆盖，没有挂载计数用例；spec 里"输入框内容不变"未单独验证。
+- 验证：web 193 个用例通过，`tsc` 退出码 0。
 - 仍未证明：真实浏览器里的拖动（iframe 遮罩、`pointer capture`）以及 tab 组拖出，jsdom 测不到，见 `browser-verify.md`。

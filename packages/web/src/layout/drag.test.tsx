@@ -241,16 +241,16 @@ test("R9a 拖出 tab：落到整组的右边缘即平铺成两个 pane", async (
   });
   move(250, 90);
   up();
-  expect(document.querySelector("[role=tablist]")).toBeTruthy();
+  expect(document.querySelector("[data-tabstrip]")).toBeTruthy();
   const tabB = document.querySelector(`[data-tab-id="${b}"]`) as HTMLElement;
   fireEvent.pointerDown(tabB, { clientX: 150, clientY: 60, button: 0 });
-  fireEvent.click(screen.getAllByRole("tab")[0] as HTMLElement);
   move(495, 300);
   expect(
     (document.querySelector("[data-drop-preview]") as HTMLElement)?.dataset
       .dropPreview,
   ).toBe("edge");
   up();
+  expect(document.querySelector("[data-tabstrip]")).toBeNull();
   expect(screen.getAllByRole("region")).toHaveLength(2);
   const layer = document.querySelector("[data-pane-layer]") as HTMLElement;
   const el = (id: string) =>
