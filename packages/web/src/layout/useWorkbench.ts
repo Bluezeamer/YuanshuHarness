@@ -102,19 +102,24 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
     if (!dirty.current || readonly.current) return;
     const sent = docRef.current;
     const run = async () => {
-      const r = await putWorkbench(loadToken(), revision.current, sent);
-      if (r.ok) {
-        revision.current = r.revision;
-        if (docRef.current === sent) dirty.current = false;
-        setSave({ kind: "ok" });
-      } else if (r.kind === "conflict") {
-        setSave({ kind: "conflict", current: r.current });
-      } else if (r.kind === "unauthorized") {
-        denied.current();
-      } else {
-        setSave({ kind: "failed" });
+      try {
+        const r = await putWorkbench(loadToken(), revision.current, sent);
+        if (r.ok) {
+          // revision 只升不降：pagehide 的响应可能与这里乱序到达。
+          revision.current = Math.max(revision.current, r.revision);
+          if (docRef.current === sent) dirty.current = false;
+          setSave({ kind: "ok" });
+        } else if (r.kind === "conflict") {
+          setSave({ kind: "conflict", current: r.current });
+        } else if (r.kind === "unauthorized") {
+          denied.current();
+        } else {
+          setSave({ kind: "failed" });
+        }
+      } finally {
+        // 无论回调是否抛错都要放行等待者，否则之后的保存会一直挂起。
+        flushing.current = null;
       }
-      flushing.current = null;
     };
     flushing.current = run();
     await flushing.current;
@@ -141,10 +146,12 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
       if (!dirty.current || readonly.current) return;
       // 在途的非 keepalive 请求可能被页面卸载取消，所以仍要发最新文档。
       // 页面从 bfcache 恢复时要接上新 revision。
+      // 已知限制：若在途请求先落地，这次会因 baseRevision 过期返回 409，最新改动不会保存；
+      // 卸载中无法等待在途请求，所以只能尽力而为。
       const sent = docRef.current;
       void putWorkbench(loadToken(), revision.current, sent, true).then((r) => {
         if (!r.ok) return;
-        revision.current = r.revision;
+        revision.current = Math.max(revision.current, r.revision);
         if (docRef.current === sent) dirty.current = false;
       });
     };
