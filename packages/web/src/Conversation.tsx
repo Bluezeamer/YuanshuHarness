@@ -69,7 +69,9 @@ function Message({
   text,
   tools,
   partial,
+  anchor,
 }: {
+  anchor?: string;
   who: "user" | "agent" | "queued";
   text?: string;
   tools?: Tool[];
@@ -79,7 +81,10 @@ function Message({
   const labelCls =
     who === "user" ? "text-mute" : who === "agent" ? "text-ink" : "text-live";
   return (
-    <div className="grid grid-cols-[72px_minmax(0,72ch)] gap-x-3 gap-y-2.5 animate-[in_0.6s_var(--ease)_backwards]">
+    <div
+      data-anchor={anchor}
+      className="grid grid-cols-[72px_minmax(0,72ch)] gap-x-3 gap-y-2.5 animate-[in_0.6s_var(--ease)_backwards]"
+    >
       <span
         className={`col-start-1 row-start-1 pt-[3px] text-xs font-semibold ${labelCls}`}
       >
@@ -310,11 +315,11 @@ export function Conversation({
         )}
         {empty && <p className="text-mute">还没有消息</p>}
         {older.map((m) => (
-          <Message key={`h-${m.index}`} who={whoOf(m.role)} text={m.text} />
+          <Message key={`h-${m.index}`} anchor={`h-${m.index}`} who={whoOf(m.role)} text={m.text} />
         ))}
         {messages.map((m, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: 窗口消息没有序位，只追加不重排
-          <Message key={`w-${i}`} who={whoOf(m.role)} text={m.text} />
+          <Message key={`w-${i}`} anchor={`w-${i}`} who={whoOf(m.role)} text={m.text} />
         ))}
         {partial !== null && <Message who="agent" text={partial} partial />}
         {tools.length > 0 && <Message who="agent" tools={tools} />}

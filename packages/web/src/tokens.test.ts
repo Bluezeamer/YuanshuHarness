@@ -1,12 +1,24 @@
 // @vitest-environment node
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { expect, test } from "vitest";
 
-const srcDir = new URL("./", import.meta.url);
-const sources = readdirSync(srcDir)
-  .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".test.tsx"))
-  .map((f) => ({ f, text: readFileSync(new URL(f, srcDir), "utf8") }));
+const srcDir = fileURLToPath(new URL("./", import.meta.url));
+
+// 递归读取 src/ 下所有源文件，排除测试文件与目录本身。
+function walkSources(dir: string, prefix = ""): { f: string; text: string }[] {
+  return readdirSync(dir).flatMap((name) => {
+    const fullPath = join(dir, name);
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if (statSync(fullPath).isDirectory()) return walkSources(fullPath, rel);
+    if (name.endsWith(".test.ts") || name.endsWith(".test.tsx")) return [];
+    return [{ f: rel, text: readFileSync(fullPath, "utf8") }];
+  });
+}
+
+const sources = walkSources(srcDir);
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 const config = readFileSync(

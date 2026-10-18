@@ -97,7 +97,13 @@ export interface Api {
   // 设置后，带游标的请求（加载更早）会等它完成才响应。
   pause: Promise<void> | null;
   tailPause: Promise<void> | null;
+  // 设置后，工作台 PUT 会等它完成才响应。
+  putPause: Promise<void> | null;
   calls: string[];
+  workbench: { revision: number; document: unknown };
+  puts: unknown[];
+  putStatus: number | "network";
+  saved: { id: string; revision: number; document: unknown }[];
   tokens: (string | null)[];
 }
 
@@ -112,7 +118,12 @@ export function installApi(history: ChatEntry[] = []): Api {
     messages: 200,
     pause: null,
     tailPause: null,
+    putPause: null,
     calls: [],
+    workbench: { revision: 0, document: null },
+    puts: [],
+    putStatus: 200,
+    saved: [],
     tokens: [],
   };
   vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
@@ -121,6 +132,39 @@ export function installApi(history: ChatEntry[] = []): Api {
     const reply = (status: number, body: object, headers?: HeadersInit) =>
       new Response(JSON.stringify(body), { status, headers });
 
+    if (input === "/api/v1/workbench") {
+      if (init?.method === "PUT") {
+        const b = JSON.parse(String(init.body)) as {
+          baseRevision: number;
+          document: unknown;
+        };
+        if (api.putStatus === "network") throw new TypeError("network");
+        if (api.putPause) await api.putPause;
+        if (api.putStatus !== 200) return reply(api.putStatus, {});
+        if (b.baseRevision !== api.workbench.revision)
+          return reply(409, api.workbench);
+        api.puts.push(b.document);
+        api.workbench = { revision: b.baseRevision + 1, document: b.document };
+        return reply(200, { revision: api.workbench.revision });
+      }
+      return reply(200, api.workbench);
+    }
+    if (input === "/api/v1/saved-layouts") {
+      if (init?.method === "POST") {
+        const b = JSON.parse(String(init.body)) as { document: unknown };
+        const id = `sv${api.saved.length + 1}`;
+        api.saved.push({ id, revision: 1, document: b.document });
+        return reply(201, { id, revision: 1 });
+      }
+      return reply(200, { layouts: api.saved });
+    }
+    if (input.startsWith("/api/v1/saved-layouts/") && init?.method === "DELETE") {
+      const id = input.slice("/api/v1/saved-layouts/".length);
+      const i = api.saved.findIndex((x) => x.id === id);
+      if (i < 0) return reply(404, {});
+      api.saved.splice(i, 1);
+      return new Response(null, { status: 204 });
+    }
     if (input === "/api/v1/sessions") {
       if (api.sessions === "network") throw new TypeError("network");
       const headers: Record<string, string> = {};

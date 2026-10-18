@@ -90,3 +90,128 @@ export const listMessages = (
       return { messages: b.messages, nextBefore: b.nextBefore ?? null };
     },
   );
+
+export interface Workbench {
+  revision: number;
+  document: unknown | null;
+}
+
+export const getWorkbench = (token: string | null) =>
+  get("/api/v1/workbench", token, (b: Workbench) => {
+    if (typeof b.revision !== "number") throw new Error("shape");
+    return { revision: b.revision, document: b.document ?? null };
+  });
+
+export type PutResult =
+  | { ok: true; revision: number }
+  | { ok: false; kind: "conflict"; current: Workbench }
+  | ({ ok: false } & Failure);
+
+// 409 带回当前文档，所以不走通用的 get。pagehide 期间走 keepalive。
+export async function putWorkbench(
+  token: string | null,
+  baseRevision: number,
+  document: unknown,
+  keepalive = false,
+): Promise<PutResult> {
+  let res: Response;
+  try {
+    res = await fetch("/api/v1/workbench", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ baseRevision, document }),
+      keepalive,
+    });
+  } catch {
+    return { ok: false, kind: "network" };
+  }
+  try {
+    if (res.status === 409) {
+      const b = (await res.json()) as Workbench;
+      return {
+        ok: false,
+        kind: "conflict",
+        current: { revision: b.revision, document: b.document ?? null },
+      };
+    }
+    if (!res.ok) return { ok: false, ...failure(res) };
+    const b = (await res.json()) as { revision: number };
+    if (typeof b.revision !== "number") return { ok: false, kind: "server" };
+    return { ok: true, revision: b.revision };
+  } catch {
+    return { ok: false, kind: "server" };
+  }
+}
+
+export interface SavedLayout {
+  id: string;
+  revision: number;
+  document: unknown;
+}
+
+export const listSavedLayouts = (token: string | null) =>
+  get("/api/v1/saved-layouts", token, (b: { layouts: SavedLayout[] }) => {
+    if (!Array.isArray(b.layouts)) throw new Error("shape");
+    return b.layouts;
+  });
+
+export type CreateSavedResult =
+  | { ok: true; id: string; revision: number }
+  | ({ ok: false } & Failure);
+
+export async function createSavedLayout(
+  token: string | null,
+  document: unknown,
+): Promise<CreateSavedResult> {
+  let res: Response;
+  try {
+    res = await fetch("/api/v1/saved-layouts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ document }),
+    });
+  } catch {
+    return { ok: false, kind: "network" };
+  }
+  try {
+    if (res.status === 201) {
+      const b = (await res.json()) as { id: string; revision: number };
+      if (typeof b.id !== "string" || typeof b.revision !== "number")
+        return { ok: false, kind: "server" };
+      return { ok: true, id: b.id, revision: b.revision };
+    }
+    if (!res.ok) return { ok: false, ...failure(res) };
+    return { ok: false, kind: "server" };
+  } catch {
+    return { ok: false, kind: "server" };
+  }
+}
+
+export type DeleteSavedResult =
+  | { ok: true }
+  | { ok: false; kind: "not_found" }
+  | ({ ok: false } & Failure);
+
+export async function deleteSavedLayout(
+  token: string | null,
+  id: string,
+): Promise<DeleteSavedResult> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1/saved-layouts/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    return { ok: false, kind: "network" };
+  }
+  if (res.status === 204) return { ok: true };
+  if (res.status === 404) return { ok: false, kind: "not_found" };
+  return { ok: false, ...failure(res) };
+}
