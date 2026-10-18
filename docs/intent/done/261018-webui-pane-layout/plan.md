@@ -1,6 +1,6 @@
 # Plan: WebUI 多 pane 布局
 Author: bluezeamer
-Status: accepted
+Status: closed
 Date: 2026-10-18
 
 > 补写：实现先于本文件进行，G4（代码生成前审 plan）当时被跳过；本文按已发生的顺序如实记录，请人补确认。

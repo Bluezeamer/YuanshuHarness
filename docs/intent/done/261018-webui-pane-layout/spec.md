@@ -1,6 +1,6 @@
 # Spec: WebUI 多 pane 布局
 Author: bluezeamer
-Status: draft
+Status: closed
 Date: 2026-10-18
 
 > 写成 delta：只写本次变更相对 [skeleton](../../done/261017-webui-skeleton/spec.md) 与 [conversation](../../done/261017-webui-conversation/spec.md) 新增或改变了什么。

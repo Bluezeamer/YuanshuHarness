@@ -1,6 +1,6 @@
 # Intent: WebUI 多 pane 布局
 Author: bluezeamer
-Status: draft
+Status: closed
 Date: 2026-10-18
 Lane: decide
 Why: 命中"难逆"——布局文档是写进用户数据的新形状（带版本、要迁移），pane 类型标识一经持久化就成了契约；同时命中"静默"（pane 跨 window 移动或切换时被卸载重建，状态悄悄丢失；多端写同一份布局）。不是 build 档，因为有多处难逆点要先出 ADR。
