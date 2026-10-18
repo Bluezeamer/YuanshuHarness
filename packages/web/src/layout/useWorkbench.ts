@@ -19,6 +19,12 @@ const isDoc = (d: unknown): d is LayoutDoc =>
   Array.isArray((d as LayoutDoc).windows) &&
   typeof (d as LayoutDoc).panes === "object";
 
+const isNewer = (d: unknown) =>
+  typeof d === "object" &&
+  d !== null &&
+  typeof (d as { version?: unknown }).version === "number" &&
+  (d as { version: number }).version > DOC_VERSION;
+
 // 第一次使用时的默认布局：一个 window，里面一个还没绑定会话的 chat pane。
 export function initialDoc(registry: Registry): LayoutDoc {
   const d = defaultDoc();
@@ -42,16 +48,28 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
   denied.current = onUnauthorized;
 
   const adopt = useCallback((raw: unknown, rev: number) => {
+    // 高版本文档的形状我们不认识：只读，原样不动；能渲染就展示，否则保留当前界面。
+    if (isNewer(raw)) {
+      revision.current = rev;
+      dirty.current = false;
+      readonly.current = true;
+      if (isDoc(raw)) {
+        docRef.current = raw;
+        setDoc(raw);
+      }
+      setRepaired(false);
+      setSave({ kind: "readonly" });
+      return;
+    }
     if (!isDoc(raw)) return;
     revision.current = rev;
     dirty.current = false;
-    readonly.current = raw.version > DOC_VERSION;
-    // 高版本文档只读展示，原样不动，不做修复。
-    const n = readonly.current ? { doc: raw, repaired: false } : normalize(raw);
+    readonly.current = false;
+    const n = normalize(raw);
     docRef.current = n.doc;
     setDoc(n.doc);
     setRepaired(n.repaired);
-    setSave(readonly.current ? { kind: "readonly" } : { kind: "ok" });
+    setSave({ kind: "ok" });
   }, []);
 
   useEffect(() => {
@@ -79,24 +97,27 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
     clearTimeout(timer.current);
     timer.current = undefined;
     if (!dirty.current || readonly.current) return;
-    if (flushing.current) await flushing.current;
-    if (!dirty.current) return;
+    // 多个等待者会同时醒来：循环重查，保证同一时刻只有一个请求在途。
+    while (flushing.current) await flushing.current;
+    if (!dirty.current || readonly.current) return;
     const sent = docRef.current;
-    const p = putWorkbench(loadToken(), revision.current, sent);
-    flushing.current = p.then(() => {});
-    const r = await p;
-    flushing.current = null;
-    if (r.ok) {
-      revision.current = r.revision;
-      if (docRef.current === sent) dirty.current = false;
-      setSave({ kind: "ok" });
-    } else if (r.kind === "conflict") {
-      setSave({ kind: "conflict", current: r.current });
-    } else if (r.kind === "unauthorized") {
-      denied.current();
-    } else {
-      setSave({ kind: "failed" });
-    }
+    const run = async () => {
+      const r = await putWorkbench(loadToken(), revision.current, sent);
+      if (r.ok) {
+        revision.current = r.revision;
+        if (docRef.current === sent) dirty.current = false;
+        setSave({ kind: "ok" });
+      } else if (r.kind === "conflict") {
+        setSave({ kind: "conflict", current: r.current });
+      } else if (r.kind === "unauthorized") {
+        denied.current();
+      } else {
+        setSave({ kind: "failed" });
+      }
+      flushing.current = null;
+    };
+    flushing.current = run();
+    await flushing.current;
   }, []);
 
   const update = useCallback(
@@ -117,14 +138,15 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
     const onHide = () => {
       clearTimeout(timer.current);
       timer.current = undefined;
-      if (!dirty.current || readonly.current || flushing.current) return;
+      if (!dirty.current || readonly.current) return;
+      // 在途的非 keepalive 请求可能被页面卸载取消，所以仍要发最新文档。
+      // 页面从 bfcache 恢复时要接上新 revision。
       const sent = docRef.current;
-      const p = putWorkbench(loadToken(), revision.current, sent, true).then(
-        () => {
-          flushing.current = null;
-        },
-      );
-      flushing.current = p;
+      void putWorkbench(loadToken(), revision.current, sent, true).then((r) => {
+        if (!r.ok) return;
+        revision.current = r.revision;
+        if (docRef.current === sent) dirty.current = false;
+      });
     };
     window.addEventListener("pagehide", onHide);
     return () => {
@@ -150,7 +172,9 @@ export function useWorkbench(registry: Registry, onUnauthorized: () => void) {
   const keepLocal = useCallback(() => {
     if (save.kind !== "conflict") return;
     const d = save.current.document;
-    if (isDoc(d) && d.version > DOC_VERSION) {
+    if (isNewer(d)) {
+      readonly.current = true;
+      dirty.current = false;
       setSave({ kind: "readonly" });
       return;
     }

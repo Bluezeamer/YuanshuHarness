@@ -58,6 +58,23 @@ export function Workbench({
   const left = useSide("left", LEFT_MIN_WIDTH, width);
   const right = useSide("right", RIGHT_MIN_WIDTH, width);
   const [focus, setFocus] = useState<string | null>(null);
+  const [focusReq, setFocusReq] = useState<{ id: string; n: number } | null>(
+    null,
+  );
+  // 键盘或程序触发的焦点移动：状态与 DOM 焦点一起走，否则下一次按键还落在旧 pane。
+  const goto = (id: string) => {
+    setFocus(id);
+    setFocusReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
+  };
+  useEffect(() => {
+    if (!focusReq) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-pane-id="${focusReq.id}"]`,
+    );
+    (
+      el?.querySelector<HTMLElement>("textarea,input:not([type=hidden])") ?? el
+    )?.focus();
+  }, [focusReq]);
   const [anchors, setAnchors] = useState<Record<string, Anchor[]>>({});
   const reportAnchors = useCallback((paneId: string, a: Anchor[]) => {
     setAnchors((prev) => {
@@ -106,7 +123,7 @@ export function Workbench({
     const rects = layout(active?.tree ?? null, { x: 0, y: 0, w: 1, h: 1 });
     const next = neighbor(rects, focused, dir);
     e.preventDefault();
-    if (next) setFocus(next);
+    if (next) goto(next);
   };
 
   // R5：pointer 事件拖动。移动超过 4px 才算拖动，避免吞掉标题栏按钮的点击。
@@ -167,12 +184,15 @@ export function Workbench({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") end();
     };
+    const onCancel = () => end();
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
       window.removeEventListener("keydown", onKey);
     };
   }, [pending, update]);
@@ -214,18 +234,18 @@ export function Workbench({
       update((d) =>
         addPane(d, active.id, id, { ...entry, config: { sessionId } }),
       );
-      setFocus(id);
+      goto(id);
       return;
     }
     update((d) => setPaneConfig(d, target, { sessionId }));
-    setFocus(target);
+    goto(target);
   };
 
   const split = (paneId: string, dir: "h" | "v") => {
     const w = windowOf(doc, paneId);
     if (!w) return;
     const id = newChat(w.id, { target: paneId, dir });
-    if (id) setFocus(id);
+    if (id) goto(id);
   };
 
   const menu = (paneId: string) => (

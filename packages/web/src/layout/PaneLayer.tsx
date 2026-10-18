@@ -92,6 +92,7 @@ export function PaneLayer({
             aria-label={title}
             data-pane-id={id}
             data-focused={focused}
+            tabIndex={-1}
             inert={!active || !place}
             onFocusCapture={() => onFocus(id)}
             onPointerDown={() => onFocus(id)}

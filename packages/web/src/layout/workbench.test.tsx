@@ -260,11 +260,18 @@ test("R6 Alt+方向键按位置移动焦点 pane", async () => {
   });
   const left = focusedLabel();
   expect(left).not.toBe(right);
+  // R6：DOM 焦点也要跟随，否则下一次按键还落在旧 pane 的输入框里。
+  const domPane = () =>
+    document.activeElement
+      ?.closest("[data-pane-id]")
+      ?.getAttribute("data-pane-id");
+  expect(domPane()).toBe(left);
   fireEvent.keyDown(regions()[0] as HTMLElement, {
     key: "ArrowRight",
     altKey: true,
   });
   expect(focusedLabel()).toBe(right);
+  expect(domPane()).toBe(right);
 });
 
 test("R24 pane 总数达到 12 后新建前提示，但不阻止", async () => {
@@ -408,6 +415,74 @@ test("R20 冲突返回的是更高版本文档：以本地覆盖不得覆盖它�
   await wait(SAVE_DELAY_MS + 10);
   expect(api.puts).toHaveLength(0);
   expect(screen.getByText(/来自更新的版本/)).toBeTruthy();
+});
+
+test("R20 高版本文档形状不同（只有 version）：同样只读，不保存", async () => {
+  vi.useFakeTimers();
+  const api = installApi([]);
+  api.workbench = { revision: 1, document: { version: 99 } };
+  render(<Shell sessions={sessions} onUnauthorized={() => {}} />);
+  await act(async () => {});
+  expect(screen.getByText(/来自更新的版本/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
+  await wait(SAVE_DELAY_MS * 2);
+  expect(api.puts).toHaveLength(0);
+});
+
+test("R20 冲突返回的高版本文档形状不同：以本地覆盖同样不得覆盖", async () => {
+  vi.useFakeTimers();
+  const api = await mount();
+  api.workbench = { revision: 5, document: { version: 99 } };
+  fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
+  await wait(SAVE_DELAY_MS + 10);
+  fireEvent.click(screen.getByRole("button", { name: "以本地覆盖" }));
+  await wait(SAVE_DELAY_MS + 10);
+  expect(api.puts).toHaveLength(0);
+  expect(screen.getByText(/来自更新的版本/)).toBeTruthy();
+});
+
+test("R21 在途保存期间多次改动排队：多个等待者不会带着同一 revision 同时提交", async () => {
+  vi.useFakeTimers();
+  const api = await mount();
+  let release = () => {};
+  api.putPause = new Promise<void>((r) => {
+    release = r;
+  });
+  for (let i = 0; i < 3; i++) {
+    fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
+    await wait(SAVE_DELAY_MS + 10);
+  }
+  release();
+  api.putPause = null;
+  await wait(50);
+  expect(screen.queryByText(/布局已在别处修改/)).toBeNull();
+  expect(api.workbench.revision).toBe(2);
+  expect(
+    (api.workbench.document as { windows: unknown[] }).windows,
+  ).toHaveLength(4);
+});
+
+test("R17 pagehide 时已有保存在途：仍要发出最新文档", async () => {
+  vi.useFakeTimers();
+  const api = await mount();
+  api.putPause = new Promise<void>(() => {});
+  fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
+  await wait(SAVE_DELAY_MS + 10);
+  fireEvent.click(screen.getByRole("button", { name: "新建 window" }));
+  const puts = () => api.calls.filter((c) => c === "/api/v1/workbench").length;
+  const before = puts();
+  await act(async () => {
+    window.dispatchEvent(new Event("pagehide"));
+  });
+  expect(puts()).toBe(before + 1);
+});
+
+test("R6 分割后焦点落在新 pane 内", async () => {
+  await mount();
+  fireEvent.click(screen.getByRole("button", { name: "向右分割" }));
+  const f = document.querySelector("[data-pane-id][data-focused='true']");
+  expect(f).toBeTruthy();
+  expect(document.activeElement?.closest("[data-pane-id]")).toBe(f);
 });
 
 test("R10 焦点不是 chat：优先落到最近聚焦过的 chat，而不是树里的第一个", async () => {

@@ -158,6 +158,25 @@ test("R5 落到 window 标签：pane 移到那个 window，原 window 的兄弟�
   expect(el(b).style.visibility).toBe("hidden");
 });
 
+test("R5 指针被系统取消（pointercancel）：遮罩撤掉，pane 不动", async () => {
+  const { regions, ids } = await twoPanes();
+  const [a, b] = ids as [string, string];
+  fakeGeometry({ left: a, right: b });
+  const before = orderIn();
+  fireEvent.pointerDown(header(regions[1] as HTMLElement), {
+    clientX: 700,
+    clientY: 60,
+    button: 0,
+  });
+  move(10, 200);
+  expect(document.querySelector("[data-drop-preview]")).toBeTruthy();
+  act(() => void fireEvent.pointerCancel(window));
+  expect(document.querySelector("[data-drop-preview]")).toBeNull();
+  expect(document.querySelector(".cursor-grabbing")).toBeNull();
+  up();
+  expect(orderIn()).toEqual(before);
+});
+
 test("R5 移动不足 4px 不算拖动，标题栏按钮点击不受影响", async () => {
   const { regions, ids } = await twoPanes();
   fakeGeometry({ left: ids[0] as string, right: ids[1] as string });
