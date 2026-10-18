@@ -33,7 +33,7 @@ R5. SDK 事件按下表映射为 Server 事件；表外的 SDK 事件不下发�
 R6. 一次运行失败（`prompt` 抛错或 `agent_settled` 之前出现不可恢复错误）时，必须下发 `run.failed`，`data` 为 `{ message }`；不得吞掉，也不得让连接断开。
 
 **快照与衔接**
-R7. 连接建立后的第一条消息必须是 `snapshot`，`data` 为：`{ messages: [{ role, text }]（最近 50 条）, running, activeTools: [{ toolCallId, toolName }], partial: { role, text } | null（正在流式生成的消息）, queue: string[] }`，信封的 `seq` 为快照对应的序号。之后的事件序号必须从快照 `seq` + 1 起连续，快照与首个事件之间不得丢事件、不得重复。
+R7. 连接建立后的第一条消息必须是 `snapshot`，`data` 为：`{ messages: [{ role, text }]（最近 50 条）, startIndex（messages[0] 的序位，与 REST 的 index 一致；后续在 261017-webui-conversation 追加）, running, activeTools: [{ toolCallId, toolName }], partial: { role, text } | null（正在流式生成的消息）, queue: string[] }`，信封的 `seq` 为快照对应的序号。之后的事件序号必须从快照 `seq` + 1 起连续，快照与首个事件之间不得丢事件、不得重复。
 R8. 对某会话的任意连接发 `resync`，必须收到新的 `snapshot`，之后事件从其 `seq` + 1 续上。
 
 **命令**

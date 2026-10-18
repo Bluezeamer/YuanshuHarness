@@ -47,14 +47,23 @@ check_health() {
     || die "/healthz 响应体不符：$body（期望版本 $2）"
 }
 
-# check_placeholder_page <base-url>：GET / 为 200 且是占位页
-check_placeholder_page() {
-  local out status body
+# check_web_page <base-url>：GET / 为 200，是前端应用页（有根节点、无旧占位文案），且它引用的第一个脚本能取到
+check_web_page() {
+  local out status body asset css
   out="$(http_get "$1/")" || die "$1/ 连不上"
   status="${out%%$'\n'*}"
   body="${out#*$'\n'}"
   [[ "$status" == 200 ]] || die "GET / 状态码应为 200，实际 $status"
-  [[ "$body" == *"元枢 YuanshuHarness"* ]] || die "GET / 返回的不是占位页"
+  [[ "$body" == *'id="root"'* ]] || die "GET / 返回的不是前端应用页（缺少 #root）"
+  [[ "$body" != *"占位页"* ]] || die "GET / 返回的还是旧占位页"
+  asset="$(printf '%s' "$body" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/<script[^>]*\ssrc="([^"]+)"/);if(m)process.stdout.write(m[1])})')"
+  [[ -n "$asset" ]] || die "GET / 没有引用任何脚本"
+  out="$(http_get "$1$asset")" || die "$1$asset 连不上"
+  [[ "${out%%$'\n'*}" == 200 ]] || die "页面引用的脚本 $asset 状态码应为 200，实际 ${out%%$'\n'*}"
+  css="$(printf '%s' "$body" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"/);if(m)process.stdout.write(m[1])})')"
+  [[ -n "$css" ]] || die "GET / 没有引用样式表"
+  out="$(http_get "$1$css")" || die "$1$css 连不上"
+  [[ "${out%%$'\n'*}" == 200 ]] || die "页面引用的样式 $css 状态码应为 200，实际 ${out%%$'\n'*}"
 }
 
 # wait_exit <pid> <秒数>：等进程在限定时间内退出；超时返回非零

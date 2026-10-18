@@ -66,8 +66,8 @@ describe("npm 包结构（R10）", () => {
     ).toBe(true);
   });
 
-  test("web 占位静态页存在", () => {
-    expect(existsSync(`${repo}packages/web/public/index.html`)).toBe(true);
+  test("web 的入口页存在且有应用根节点", () => {
+    expect(read("packages/web/index.html")).toContain('id="root"');
   });
 
   test("web 的构建不再用 tsc 发射", () => {

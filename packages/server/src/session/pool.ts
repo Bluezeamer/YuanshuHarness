@@ -86,6 +86,8 @@ export interface EntryOptions {
   updatedAt?: string;
   // 恢复时用 JSONL 里最近的消息播种窗口。
   seed?: ChatMessage[];
+  // 恢复时会话里已有的消息总数（含窗口之外的）；缺省等于 seed 的条数。
+  seedTotal?: number;
   // 恢复时发现悬挂的工具调用：下一次发送前先附加“上次被中断”的通知。
   interrupted?: boolean;
   // 每次运行结束后调用（持久化索引）；抛错不影响事件流。
@@ -108,6 +110,8 @@ export class SessionEntry {
   private readonly subscribers = new Set<Subscriber>();
   // 快照里的一切都由同一条事件流推出，所以快照与 seq 天然一致。
   private readonly recent: ChatMessage[] = [];
+  // 会话里累计的 user/assistant 消息数，与 REST 的 index 同一套；窗口第一条的序位是 total - recent.length。
+  private total = 0;
   private partial: ChatMessage | null = null;
   private readonly activeTools = new Map<string, string>();
   private queue: string[] = [];
@@ -124,6 +128,7 @@ export class SessionEntry {
     this.updatedAt = opts.updatedAt ?? this.createdAt;
     this.interrupted = opts.interrupted === true;
     this.recent.push(...(opts.seed ?? []).slice(-WINDOW));
+    this.total = opts.seedTotal ?? this.recent.length;
     this.unsubscribeSdk = session.subscribe((e) => {
       try {
         this.onSdkEvent(e);
@@ -219,6 +224,7 @@ export class SessionEntry {
           typeof data.text === "string"
         ) {
           this.recent.push({ role: data.role, text: data.text });
+          this.total += 1;
           if (this.recent.length > WINDOW) this.recent.shift();
         }
         break;
@@ -302,6 +308,7 @@ export class SessionEntry {
           this.partial.text.length > Math.max(limit, 1024));
       const data = {
         messages,
+        startIndex: this.total - messages.length,
         ...(truncated ? { truncated: true } : {}),
         running: this.running,
         activeTools,
@@ -469,15 +476,16 @@ export class SessionPool {
     const file = findSessionFile(sessionDir, id);
     if (!file) return null;
     let seed: ChatMessage[];
+    let seedTotal: number;
     let interrupted: boolean;
     let createdAt: string;
     try {
       const header = readHeader(file, id);
       if (!header) throw new Error("会话文件头无效");
       createdAt = header.createdAt;
-      seed = readMessages(file, sessionDir, id)
-        .slice(-WINDOW)
-        .map(({ role, text }) => ({ role, text }));
+      const all = readMessages(file, sessionDir, id);
+      seedTotal = all.length;
+      seed = all.slice(-WINDOW).map(({ role, text }) => ({ role, text }));
       interrupted = hasDanglingToolCall(file, sessionDir, id);
     } catch (err) {
       throw new PoolError("load_failed", reason(err));
@@ -499,6 +507,7 @@ export class SessionPool {
       createdAt: row?.createdAt ?? createdAt,
       updatedAt: row?.updatedAt,
       seed,
+      seedTotal,
       interrupted,
       ...this.entryOptions(),
     });

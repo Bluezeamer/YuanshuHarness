@@ -10,6 +10,10 @@ YuanshuHarness（元枢）：基于 Pi SDK 的常驻 Agent Server。愿景见 [d
 - 评审一律交给新开的、空上下文的 subagent；写代码的 agent 不批准自己的代码。
 - `Status` 字段是事实，目录是视图：closed 的变更整夹移入 `done/`。
 
+## WebUI 风格
+
+- 写或改 `packages/web` 的任何界面、样式、动效、弹窗，先用 `yuanshu-webui-style` 技能；风格取向是改良版瑞士国际主义，视觉参考见该技能的 `assets/reference.html`。
+
 ## 协作文件里的敏感信息
 
 协作文件指git追踪的仓库里的一切，以及 MR 与评论里的文字：`docs/`、intent、spec、review、AGENTS.md、提交信息、MR 描述。

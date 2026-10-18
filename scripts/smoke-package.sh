@@ -55,7 +55,7 @@ wait_http "$BASE/healthz" 15 || die "15 秒内 /healthz 没有返回 200"
 
 echo "== 探测"
 check_health "$BASE" "$VERSION"
-check_placeholder_page "$BASE"
+check_web_page "$BASE"
 
 echo "== yuanshu sessions"
 sessions_out="$("$WORK/app/node_modules/.bin/yuanshu" sessions --url "$BASE")" \
