@@ -81,7 +81,7 @@ WebUI 现在是"左侧会话列表 + 单个对话窗口"（`packages/web/src/She
 - ROADMAP 位置：并入现有第 4 条（WebUI 基础），不新增条目，其余编号与引用不变。第 4 条的文字改写与 ADR 链接单独走批准，并记入调整记录。
 - 在 ROADMAP 第 4 条内的次序：skeleton、conversation、reconnect、本变更、dialog。
 
-难逆（出 ADR）：
+难逆（已出 [ADR-0027](../../../genesis/adr/0027-webui-pane-layout.md)，四项均按下面的建议定，布局存 Server 经 bluezeamer 确认，2026-10-18）：
 1. **保活机制**。候选：
    - A. 所有 window 的 pane 都常驻挂载，非活动 window 用 CSS 隐藏。代价：内存随 pane 数增长；pane 在 React 树里换父节点仍会重挂载，所以跨 window 移动仍丢状态。
    - B. pane 层与布局树分离：所有 pane 实例平铺挂在一个固定的"pane 层"，布局树只算每个 pane 的矩形，pane 按矩形定位。移动、分割、切 window 都只改矩形，pane 不换父节点。代价：自己做定位与可见性，焦点与无障碍顺序要自己维护。
