@@ -177,6 +177,27 @@ test("R5 指针被系统取消（pointercancel）：遮罩撤掉，pane 不动",
   expect(orderIn()).toEqual(before);
 });
 
+test("R5 拖动时显示跟随鼠标的标签，禁止划选文字", async () => {
+  const { regions } = await twoPanes();
+  fakeGeometry({ left: "p1", right: "p2" });
+  fireEvent.pointerDown(header(regions[1] as HTMLElement), {
+    clientX: 700,
+    clientY: 60,
+    button: 0,
+  });
+  move(750, 100);
+  const ghost = document.querySelector("[data-drag-ghost]") as HTMLElement;
+  expect(ghost).toBeTruthy();
+  expect(ghost.textContent).toContain("对话");
+  const left = Number.parseFloat(ghost.style.left);
+  const top = Number.parseFloat(ghost.style.top);
+  expect(left).toBeCloseTo(750 + 14, 1);
+  expect(top).toBeCloseTo(100 + 14, 1);
+  expect(document.body.style.userSelect).toBe("none");
+  up();
+  expect(document.body.style.userSelect).toBe("");
+});
+
 test("R5 移动不足 4px 不算拖动，标题栏按钮点击不受影响", async () => {
   const { regions, ids } = await twoPanes();
   fakeGeometry({ left: ids[0] as string, right: ids[1] as string });
@@ -189,4 +210,51 @@ test("R5 移动不足 4px 不算拖动，标题栏按钮点击不受影响", asy
   expect(document.querySelector("[data-drop-preview]")).toBeNull();
   up();
   expect(screen.getAllByRole("region")).toHaveLength(2);
+});
+
+// 标题栏 30px、tab 栏 30px 的几何；pane 从 y=80 开始，tab 栏在 50-80。
+function chromeGeometry(left: string, right: string) {
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: Element) {
+      const pid = this.getAttribute("data-pane-id");
+      if (pid === left) return rect(0, 80, 500, 400);
+      if (pid === right) return rect(500, 80, 500, 400);
+      if (this.tagName === "HEADER") {
+        const p = (this.parentElement as Element).getAttribute("data-pane-id");
+        return p === left ? rect(0, 80, 500, 30) : rect(500, 80, 500, 30);
+      }
+      if (this.hasAttribute("data-tabstrip")) return rect(0, 50, 500, 30);
+      return rect(0, 0, 0, 0);
+    },
+  );
+}
+
+test("R9a 拖出 tab：落到整组的右边缘即平铺成两个 pane", async () => {
+  const { regions, ids } = await twoPanes();
+  const [a, b] = ids as [string, string];
+  chromeGeometry(a, b);
+  // 把 b 的标题栏拖到 a 的标题栏上：并入 tab 组。
+  fireEvent.pointerDown(header(regions[1] as HTMLElement), {
+    clientX: 700,
+    clientY: 90,
+    button: 0,
+  });
+  move(250, 90);
+  up();
+  expect(document.querySelector("[role=tablist]")).toBeTruthy();
+  const tabB = document.querySelector(`[data-tab-id="${b}"]`) as HTMLElement;
+  fireEvent.pointerDown(tabB, { clientX: 150, clientY: 60, button: 0 });
+  fireEvent.click(screen.getAllByRole("tab")[0] as HTMLElement);
+  move(495, 300);
+  expect(
+    (document.querySelector("[data-drop-preview]") as HTMLElement)?.dataset
+      .dropPreview,
+  ).toBe("edge");
+  up();
+  expect(screen.getAllByRole("region")).toHaveLength(2);
+  const layer = document.querySelector("[data-pane-layer]") as HTMLElement;
+  const el = (id: string) =>
+    layer.querySelector(`[data-pane-id="${id}"]`) as HTMLElement;
+  expect(el(a).style.width).toBe("50%");
+  expect(el(b).style.width).toBe("50%");
 });

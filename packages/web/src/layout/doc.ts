@@ -1,7 +1,17 @@
-import { containsPane, paneIds, remove, repair, split } from "./tree";
+import {
+  addTab,
+  containsPane,
+  paneIds,
+  remove,
+  repair,
+  selectTab,
+  split,
+  tabGroupOf,
+} from "./tree";
 import type { LayoutDoc, LayoutWindow, PaneEntry, TreeNode } from "./types";
 
-export const DOC_VERSION = 1;
+// 2：叶子可带 tabs（R9a）。1 的文档没有 tabs，原样可读，读入时升到 2。
+export const DOC_VERSION = 2;
 
 let counter = 0;
 export const newId = (prefix: string): string =>
@@ -121,6 +131,47 @@ export function movePane(
   });
 }
 
+// R9a：把 paneId 并入 target 所在的 tab 组。只改树，panes 表不动，实例不重挂载。
+export function moveToTab(
+  d: LayoutDoc,
+  paneId: string,
+  target: string,
+): LayoutDoc {
+  const from = windowOf(d, paneId);
+  const to = windowOf(d, target);
+  if (!from || !to) return d;
+  const group = to.tree ? tabGroupOf(to.tree, target) : null;
+  if (paneId === target || group?.includes(paneId)) return d;
+  const detached = mapWindow(d, from.id, (w) => ({
+    ...w,
+    tree: remove(w.tree, paneId),
+  }));
+  return mapWindow(detached, to.id, (w) => ({
+    ...w,
+    tree: w.tree ? addTab(w.tree, target, paneId) : w.tree,
+  }));
+}
+
+// 空名字表示恢复默认标题。
+export function renamePane(
+  d: LayoutDoc,
+  paneId: string,
+  name: string,
+): LayoutDoc {
+  const e = d.panes[paneId];
+  if (!e) return d;
+  const { name: _old, ...rest } = e;
+  const next = name.trim() ? { ...rest, name: name.trim() } : rest;
+  return { ...d, panes: { ...d.panes, [paneId]: next } };
+}
+
+export const selectPaneTab = (d: LayoutDoc, paneId: string): LayoutDoc => {
+  const w = windowOf(d, paneId);
+  if (!w?.tree) return d;
+  const tree = selectTab(w.tree, paneId);
+  return tree === w.tree ? d : mapWindow(d, w.id, (x) => ({ ...x, tree }));
+};
+
 export function setTree(
   d: LayoutDoc,
   windowId: string,
@@ -162,7 +213,10 @@ export function normalize(d: LayoutDoc): { doc: LayoutDoc; repaired: boolean } {
   const active = windows.some((w) => w.id === d.activeWindowId)
     ? d.activeWindowId
     : (windows[0]?.id ?? "");
-  return { doc: { ...d, windows, activeWindowId: active }, repaired };
+  return {
+    doc: { ...d, version: DOC_VERSION, windows, activeWindowId: active },
+    repaired,
+  };
 }
 
 // 已存布局：套用到新 window 时所有 pane 分配新 paneId，配置（含会话绑定）保留。
@@ -177,9 +231,18 @@ export function instantiate(
   const map = new Map<string, string>();
   const rewrite = (n: TreeNode): TreeNode => {
     if (n.kind === "leaf") {
-      const id = newId("p");
-      map.set(n.paneId, id);
-      return { kind: "leaf", paneId: id };
+      const fresh = (old: string) => {
+        const id = newId("p");
+        map.set(old, id);
+        return id;
+      };
+      if (!n.tabs) return { kind: "leaf", paneId: fresh(n.paneId) };
+      const tabs = n.tabs.map(fresh);
+      return {
+        kind: "leaf",
+        paneId: tabs[n.tabs.indexOf(n.paneId)] ?? (tabs[0] as string),
+        tabs,
+      };
     }
     return { ...n, children: n.children.map(rewrite) };
   };

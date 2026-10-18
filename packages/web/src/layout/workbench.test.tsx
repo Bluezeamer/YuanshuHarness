@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
@@ -296,11 +297,6 @@ const chat = (sessionId: string | null) => ({
   configVersion: 1,
   config: { sessionId },
 });
-const boundIds = () =>
-  [...document.querySelectorAll("[data-pane-id]")].map((n) =>
-    n.getAttribute("data-pane-id"),
-  );
-
 test("R17 保存失败（5xx 或网络）：提示且本地改动保留，下次改动后重试成功则提示消失", async () => {
   for (const status of [500, "network"] as const) {
     cleanup();
@@ -320,47 +316,15 @@ test("R17 保存失败（5xx 或网络）：提示且本地改动保留，下次
   }
 });
 
-test("R10 焦点不是 chat：点击会话落到本 window 内的 chat pane", async () => {
-  await mountDoc({
-    version: 1,
-    activeWindowId: "w1",
-    windows: [
-      {
-        id: "w1",
-        name: "a",
-        tree: {
-          kind: "split",
-          dir: "h",
-          ratios: [0.5, 0.5],
-          children: [
-            { kind: "leaf", paneId: "f" },
-            { kind: "leaf", paneId: "c" },
-          ],
-        },
-      },
-    ],
-    panes: {
-      f: { type: "file_preview", configVersion: 1, config: {} },
-      c: chat("s1"),
-    },
-  });
-  expect(document.querySelector("[data-pane-id='f']")).toBeTruthy();
-  fireEvent.focus(document.querySelector("[data-pane-id='f']") as HTMLElement);
-  fireEvent.click(screen.getByRole("button", { name: /乙/ }));
-  expect(boundIds().sort()).toEqual(["c", "f"]);
-  expect(screen.getByRole("heading", { name: "乙" })).toBeTruthy();
-});
-
-test("R10 本 window 没有 chat pane：点击会话新建一个", async () => {
+test("R10 会话列表属于 chat pane：非 chat pane 没有列表", async () => {
   await mountDoc({
     version: 1,
     activeWindowId: "w1",
     windows: [{ id: "w1", name: "a", tree: { kind: "leaf", paneId: "f" } }],
     panes: { f: { type: "file_preview", configVersion: 1, config: {} } },
   });
-  fireEvent.click(screen.getByRole("button", { name: /乙/ }));
-  expect(boundIds()).toHaveLength(2);
-  expect(screen.getByRole("heading", { name: "乙" })).toBeTruthy();
+  expect(screen.queryByRole("complementary", { name: "会话列表" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /乙/ })).toBeNull();
 });
 
 test("R6 菜单：向下分割、移动到其他 window", async () => {
@@ -485,7 +449,7 @@ test("R6 分割后焦点落在新 pane 内", async () => {
   expect(document.activeElement?.closest("[data-pane-id]")).toBe(f);
 });
 
-test("R10 焦点不是 chat：优先落到最近聚焦过的 chat，而不是树里的第一个", async () => {
+test("R10 每个 chat pane 自带会话列表：选择只改本 pane 的绑定", async () => {
   await mountDoc({
     version: 1,
     activeWindowId: "w1",
@@ -496,28 +460,21 @@ test("R10 焦点不是 chat：优先落到最近聚焦过的 chat，而不是树
         tree: {
           kind: "split",
           dir: "h",
-          ratios: [0.3, 0.3, 0.4],
+          ratios: [0.5, 0.5],
           children: [
             { kind: "leaf", paneId: "c1" },
             { kind: "leaf", paneId: "c2" },
-            { kind: "leaf", paneId: "f" },
           ],
         },
       },
     ],
-    panes: {
-      c1: chat("s1"),
-      c2: chat("s1"),
-      f: { type: "file_preview", configVersion: 1, config: {} },
-    },
+    panes: { c1: chat("s1"), c2: chat("s1") },
   });
   const pane = (id: string) =>
     document.querySelector(`[data-pane-id='${id}']`) as HTMLElement;
-  fireEvent.focus(pane("c2"));
-  fireEvent.focus(pane("f"));
-  fireEvent.click(screen.getByRole("button", { name: /乙/ }));
-  expect(screen.getAllByRole("heading", { name: "乙" })).toHaveLength(1);
+  fireEvent.click(within(pane("c2")).getByRole("button", { name: /乙/ }));
   expect(pane("c2").querySelector("h1")?.textContent).toBe("乙");
+  expect(pane("c1").querySelector("h1")?.textContent).toBe("甲");
 });
 
 test("R7 chat 标题栏显示所绑定的会话名，region 的名字随之带上", async () => {
@@ -528,4 +485,18 @@ test("R7 chat 标题栏显示所绑定的会话名，region 的名字随之带�
     panes: { c: chat("s2") },
   });
   expect(screen.getByRole("region", { name: "对话 · 乙" })).toBeTruthy();
+});
+
+test("pane 双击标题改名，留空恢复默认", async () => {
+  const answers = ["我的对话", ""];
+  vi.stubGlobal("prompt", () => answers.shift());
+  await mount();
+  const title = () =>
+    screen
+      .getAllByRole("region")[0]
+      ?.querySelector("header span") as HTMLElement;
+  fireEvent.doubleClick(title());
+  expect(screen.getByRole("region", { name: "我的对话" })).toBeTruthy();
+  fireEvent.doubleClick(title());
+  expect(screen.queryByRole("region", { name: "我的对话" })).toBeNull();
 });

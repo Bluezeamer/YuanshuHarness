@@ -29,6 +29,10 @@ R7. 窗格标题栏显示 pane 的类型显示名与自己的状态（chat 显�
 ### pane 类型
 R8. 注册表以类型标识为键，注册项含：类型标识、显示名、渲染组件、默认配置、当前配置版本、配置迁移函数。第一期注册 `chat`、`filediscovery`、`terminal`、`file_preview`、`web_preview`。后四个渲染"尚未可用"。新增类型只改注册表，布局代码不动（用一个测试类型证明）。
 R9. 载入时未知类型，或配置版本高于注册项：渲染"未知 pane"占位，原样保留 `config` 与 `configVersion`，保存时原样写回。配置版本低于注册项时调该类型的迁移函数后再用。迁移函数抛错时按未知类型处理，不丢弃。
+R9a. pane 内 tab：树的叶子从 `{ paneId }` 扩为 `{ paneId, tabs?: string[] }`。无 `tabs` 时与现在相同；有 `tabs` 时，叶子是一个 tab 组，`tabs` 是组内所有 `paneId`（含 `paneId` 自己，它是当前选中项），其他 tab 的内容仍是 `panes` 表里的普通条目。不另设 `tabs` 类型，不嵌套条目：所有内容 pane 仍平铺在 pane 层，按 `paneId` 保活，所以 R3 对 tab 同样成立（切换 tab、把 tab 拆出为独立 pane、把 pane 并入 tab 组，都不得重新挂载）。
+  - 显示：组的矩形内上方是 tab 栏（`role="tablist"`，每项 `role="tab"` 与 `aria-selected`），选中项的 pane 占满其余区域；未选中项 `visibility: hidden` 与 `inert`。tab 显示类型显示名和状态（chat 为会话名）。
+  - 操作：点击切换；关闭一个 tab（组内只剩一个时退回普通叶子）；拖动 tab 到另一个 pane 的边缘即拆出为独立 pane（R5 的落点规则），拖到另一个 pane 的标题栏中间则并入那个 pane 的 tab 组；键盘等价：pane 菜单增加"拆出为独立 pane"和"并入其他 pane 的 tab"。
+  - 持久化：属 R16 的文档形状扩展，需把 `version` 升为 2 并提供 1→2 迁移（旧文档无 `tabs`，原样可用）；ADR-0027 写了文档形状，需补一条记录。已存布局（R22）套用时，`tabs` 里的 `paneId` 随叶子一起换新。
 
 ### chat pane、会话列表、镜像
 R10. 会话列表仍是固定左栏。点击会话：绑定到当前焦点的 chat pane（更新其配置里的会话 id）；当前 window 没有 chat pane 时，新建一个。同一会话可以同时开在多个 pane 里。焦点 pane 不是 chat 时，点击会话改为聚焦当前 window 内最近一个 chat pane，没有则新建。
@@ -69,6 +73,7 @@ R24. 常驻资源上限：待实测后定（pane 总数、终端回滚行数）�
 | R7 | `workbench.test.tsx`：标题栏显示类型名与会话名 | 是 |
 | R8 | `registry.test.ts`：五个类型已注册，后四个渲染"尚未可用"；注册一个测试类型，布局代码不改 | 是 |
 | R9 | `registry.test.ts`：未知类型、高版本、迁移抛错三种往返不丢 | 变异：载入时丢弃未知 pane，必须变红 |
+| R9a | `tree.test.ts`：并入 tab 组、拆出、关闭到只剩一个退回普通叶子、旧文档（无 `tabs`）可读；`tabs.test.tsx`：切换 tab 时各 pane 挂载计数不变、输入框内容不变，拆出与并入同样不重挂载，`tablist` / `tab` 属性；`saved.test.tsx`：套用后 `tabs` 里的 id 全部换新 | 变异：切换 tab 时只渲染选中项，保活用例必须变红 |
 | R10 | `sessions.test.tsx`：点击绑定焦点 chat pane；无 chat pane 时新建；焦点不是 chat 时聚焦最近的 chat pane；同一会话可开两个 pane | 是 |
 | R11 | `sessions.test.tsx`：两个 pane 同会话，一边输入另一边同步，一边发送两边都清空，历史与提示一致；各自滚动独立 | 变异：每个 pane 各持一份草稿，必须变红 |
 | R12 | `sessions.test.tsx`：两个 pane 只有一条 WebSocket；关掉一个连接仍在，关掉最后一个才关闭；隐藏 window 里连接保持；未确认发送放回同一份草稿。conversation 的现有用例整体通过 | 变异：每个 pane 各开一条连接，必须变红 |

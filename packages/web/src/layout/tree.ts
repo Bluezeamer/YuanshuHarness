@@ -4,14 +4,89 @@ export const MIN_RATIO = 0.05;
 
 const leaf = (paneId: string): TreeNode => ({ kind: "leaf", paneId });
 
+type Leaf = Extract<TreeNode, { kind: "leaf" }>;
+const idsOf = (l: Leaf): string[] => l.tabs ?? [l.paneId];
+
+// 全部 pane，含 tab 组里没被选中的。
 export function paneIds(t: TreeNode | null): string[] {
   if (!t) return [];
-  return t.kind === "leaf" ? [t.paneId] : t.children.flatMap(paneIds);
+  return t.kind === "leaf" ? idsOf(t) : t.children.flatMap(paneIds);
+}
+
+// 当前看得见的 pane：每个 tab 组只算选中项。
+export function visibleIds(t: TreeNode | null): string[] {
+  if (!t) return [];
+  return t.kind === "leaf" ? [t.paneId] : t.children.flatMap(visibleIds);
+}
+
+// 规整 tab 组：去重；选中项不在 tabs 里或只剩一项时退回普通叶子。
+const tidy = (l: Leaf): Leaf => {
+  if (!l.tabs) return l;
+  const tabs = [...new Set(l.tabs)];
+  if (!tabs.includes(l.paneId) || tabs.length < 2)
+    return { kind: "leaf", paneId: l.paneId };
+  return { kind: "leaf", paneId: l.paneId, tabs };
+};
+
+// 把 target 所在的叶子变成 tab 组（或加入已有的组），新 tab 成为选中项。
+export function addTab(t: TreeNode, target: string, newId: string): TreeNode {
+  if (t.kind === "leaf") {
+    if (!idsOf(t).includes(target)) return t;
+    return { kind: "leaf", paneId: newId, tabs: [...idsOf(t), newId] };
+  }
+  return { ...t, children: t.children.map((c) => addTab(c, target, newId)) };
+}
+
+// target 所在叶子的 tab 组成员；不是 tab 组时为 null。
+export function tabGroupOf(t: TreeNode, target: string): string[] | null {
+  if (t.kind === "leaf") return t.tabs?.includes(target) ? t.tabs : null;
+  for (const c of t.children) {
+    const g = tabGroupOf(c, target);
+    if (g) return g;
+  }
+  return null;
+}
+
+export function selectTab(t: TreeNode, id: string): TreeNode {
+  if (t.kind === "leaf") {
+    return t.tabs?.includes(id) ? { ...t, paneId: id } : t;
+  }
+  return { ...t, children: t.children.map((c) => selectTab(c, id)) };
+}
+
+export interface TabGroup {
+  rect: Rect;
+  selected: string;
+  tabs: string[];
+}
+
+export function tabGroups(t: TreeNode | null, box: Rect): TabGroup[] {
+  const out: TabGroup[] = [];
+  const walk = (n: TreeNode, r: Rect) => {
+    if (n.kind === "leaf") {
+      if (n.tabs) out.push({ rect: r, selected: n.paneId, tabs: n.tabs });
+      return;
+    }
+    let off = 0;
+    n.children.forEach((c, i) => {
+      const f = n.ratios[i];
+      if (f === undefined) return;
+      walk(
+        c,
+        n.dir === "h"
+          ? { x: r.x + off * r.w, y: r.y, w: f * r.w, h: r.h }
+          : { x: r.x, y: r.y + off * r.h, w: r.w, h: f * r.h },
+      );
+      off += f;
+    });
+  };
+  if (t) walk(t, box);
+  return out;
 }
 
 // 比例之和不为 1 或长度与子节点不符时按等分修复；返回是否修过。
 export function repair(t: TreeNode): { tree: TreeNode; fixed: boolean } {
-  if (t.kind === "leaf") return { tree: t, fixed: false };
+  if (t.kind === "leaf") return { tree: tidy(t), fixed: false };
   let fixed = false;
   const children = t.children.map((c) => {
     const r = repair(c);
@@ -37,12 +112,12 @@ export function split(
   before = false,
 ): TreeNode {
   if (t.kind === "leaf") {
-    if (t.paneId !== target) return t;
+    if (!idsOf(t).includes(target)) return t;
     const kids = before ? [leaf(newId), t] : [t, leaf(newId)];
     return { kind: "split", dir, children: kids, ratios: [0.5, 0.5] };
   }
   const i = t.children.findIndex(
-    (c) => c.kind === "leaf" && c.paneId === target,
+    (c) => c.kind === "leaf" && idsOf(c).includes(target),
   );
   if (i >= 0 && t.dir === dir) {
     const at = before ? i : i + 1;
@@ -65,7 +140,17 @@ export function split(
 // 关闭 pane：兄弟占满空出的位置；只剩一个孩子的分割节点折叠成该孩子。
 export function remove(t: TreeNode | null, paneId: string): TreeNode | null {
   if (!t) return null;
-  if (t.kind === "leaf") return t.paneId === paneId ? null : t;
+  if (t.kind === "leaf") {
+    if (!t.tabs) return t.paneId === paneId ? null : t;
+    const i = t.tabs.indexOf(paneId);
+    if (i < 0) return t;
+    const tabs = t.tabs.filter((x) => x !== paneId);
+    const sel =
+      t.paneId === paneId
+        ? (tabs[Math.min(i, tabs.length - 1)] as string)
+        : t.paneId;
+    return tidy({ kind: "leaf", paneId: sel, tabs });
+  }
   const kept: { node: TreeNode; ratio: number }[] = [];
   t.children.forEach((c, i) => {
     const n = remove(c, paneId);

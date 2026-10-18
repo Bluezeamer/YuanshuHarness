@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { SessionInfo } from "../api";
-import type { Anchor } from "../ChatView";
 import type { SessionHub } from "../sessions/hub";
 import {
   addPane,
@@ -10,53 +10,53 @@ import {
   DOC_VERSION,
   instantiate,
   movePane,
+  moveToTab,
   newId,
+  renamePane,
   renameWindow,
+  selectPaneTab,
   selectWindow,
   setPaneConfig,
   setTree,
   windowOf,
 } from "./doc";
 import { type DropTarget, dropTarget } from "./drag";
+import { CloseIcon, SplitDownIcon, SplitRightIcon } from "./icons";
 import { PaneLayer } from "./PaneLayer";
 import { type ChatConfig, defaultRegistry, EnvContext } from "./panes";
 import { SavedLayouts } from "./SavedLayouts";
-import { layout, neighbor, paneIds, resize } from "./tree";
-import { LEFT_MIN_WIDTH, RIGHT_MIN_WIDTH, useSide, useWidth } from "./useSide";
+import {
+  layout,
+  neighbor,
+  paneIds,
+  resize,
+  tabGroupOf,
+  visibleIds,
+} from "./tree";
 import { useWorkbench } from "./useWorkbench";
-
-function StatusDot({ running }: { running: boolean }) {
-  return (
-    <span
-      role="img"
-      aria-label={running ? "运行中" : "空闲"}
-      className={`size-2 rounded-full ${running ? "dot-run bg-live" : "bg-ok"}`}
-    />
-  );
-}
 
 const btn =
   "border border-line px-2 py-0.5 text-xs font-semibold hover:bg-ink hover:text-bg";
+const iconBtn =
+  "grid size-6 place-items-center border border-line hover:bg-ink hover:text-bg";
 
 export const PANE_SOFT_LIMIT = 12;
-const NAV_MAX = 24;
 
 export function Workbench({
   hub,
   sessions,
   onUnauthorized,
+  tabsHost,
 }: {
   hub: SessionHub;
   sessions: SessionInfo[];
   onUnauthorized: () => void;
+  // 顶栏里放 window 标签的位置；没有时标签行留在工作台内。
+  tabsHost?: HTMLElement | null;
 }) {
   const registry = useMemo(defaultRegistry, []);
   const wb = useWorkbench(registry, onUnauthorized);
   const { doc, update } = wb;
-  const [root, setRoot] = useState<HTMLDivElement | null>(null);
-  const width = useWidth(root);
-  const left = useSide("left", LEFT_MIN_WIDTH, width);
-  const right = useSide("right", RIGHT_MIN_WIDTH, width);
   const [focus, setFocus] = useState<string | null>(null);
   const [focusReq, setFocusReq] = useState<{ id: string; n: number } | null>(
     null,
@@ -75,33 +75,16 @@ export function Workbench({
       el?.querySelector<HTMLElement>("textarea,input:not([type=hidden])") ?? el
     )?.focus();
   }, [focusReq]);
-  const [anchors, setAnchors] = useState<Record<string, Anchor[]>>({});
-  const reportAnchors = useCallback((paneId: string, a: Anchor[]) => {
-    setAnchors((prev) => {
-      const old = prev[paneId];
-      const same =
-        old?.length === a.length &&
-        old.every((x, i) => x.id === a[i]?.id && x.text === a[i]?.text);
-      return same ? prev : { ...prev, [paneId]: a };
-    });
-  }, []);
-  const env = useMemo(
-    () => ({ hub, sessions, reportAnchors }),
-    [hub, sessions, reportAnchors],
-  );
+  const env = useMemo(() => ({ hub, sessions }), [hub, sessions]);
 
   const active = doc.windows.find((w) => w.id === doc.activeWindowId);
-  const inActive = paneIds(active?.tree ?? null);
+  const inActive = visibleIds(active?.tree ?? null);
   const focused =
     focus && inActive.includes(focus) ? focus : (inActive[0] ?? null);
   const sessionOf = (paneId: string | null) => {
     const e = paneId ? doc.panes[paneId] : undefined;
     return e?.type === "chat" ? (e.config as ChatConfig).sessionId : null;
   };
-  const selected = sessionOf(focused);
-  const lastChat = useRef<string | null>(null);
-  if (focused && doc.panes[focused]?.type === "chat")
-    lastChat.current = focused;
 
   // R24：pane 总数达到软上限时提示，不阻止。
   const [crowded, setCrowded] = useState(false);
@@ -134,6 +117,11 @@ export function Workbench({
   } | null>(null);
   const [dragTarget, setDragTarget] = useState<DropTarget>(null);
   const [dragging, setDragging] = useState(false);
+  const [ghost, setGhost] = useState<{
+    x: number;
+    y: number;
+    label: string;
+  } | null>(null);
   const latest = useRef({ doc, inActive });
   latest.current = { doc, inActive };
 
@@ -141,10 +129,20 @@ export function Workbench({
     if (!pending) return;
     let started = false;
     let target: DropTarget = null;
+    const label =
+      document
+        .querySelector(`[data-pane-id="${pending.paneId}"]`)
+        ?.getAttribute("aria-label") ?? "";
+    // 拖动期间禁用划选，并清掉已经选中的文字。
+    const body = document.body.style;
+    const prevSelect = body.userSelect;
+    body.userSelect = "none";
+    window.getSelection?.()?.removeAllRanges();
     const end = () => {
       setPending(null);
       setDragging(false);
       setDragTarget(null);
+      setGhost(null);
     };
     const onMove = (e: PointerEvent) => {
       if (
@@ -154,11 +152,23 @@ export function Workbench({
         return;
       started = true;
       setDragging(true);
+      setGhost({ x: e.clientX, y: e.clientY, label });
       target = dropTarget(
         e.clientX,
         e.clientY,
         pending.paneId,
-        latest.current.inActive,
+        // 被拖的是 tab 组里选中的一项时，组内其他 tab 也算落点：
+        // 它们和组共用同一个矩形，这样才能拖到自己所在组的边缘把它拆出来。
+        [
+          ...latest.current.inActive,
+          ...(tabGroupOf(
+            windowOf(latest.current.doc, pending.paneId)?.tree ?? {
+              kind: "leaf",
+              paneId: "",
+            },
+            pending.paneId,
+          ) ?? []),
+        ],
         latest.current.doc.activeWindowId,
       );
       setDragTarget(target);
@@ -169,6 +179,7 @@ export function Workbench({
       end();
       if (!started || !t) return;
       if (t.kind === "window") update((d) => movePane(d, id, t.windowId));
+      else if (t.kind === "tab") update((d) => moveToTab(d, id, t.paneId));
       else
         update((d) => {
           const w = windowOf(d, t.paneId);
@@ -190,6 +201,7 @@ export function Workbench({
     window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKey);
     return () => {
+      body.userSelect = prevSelect;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
@@ -216,31 +228,6 @@ export function Workbench({
     return id;
   };
 
-  // R10：绑定到焦点 chat pane；焦点不是 chat 则找本 window 内的 chat pane，没有就新建。
-  const choose = (sessionId: string) => {
-    left.close();
-    if (!active) return;
-    const isChat = (id: string) => doc.panes[id]?.type === "chat";
-    const recent = lastChat.current;
-    const target =
-      (focused && isChat(focused) ? focused : null) ??
-      (recent && inActive.includes(recent) && isChat(recent) ? recent : null) ??
-      inActive.find(isChat);
-    if (!target) {
-      const entry = registry.newEntry("chat");
-      if (!entry) return;
-      warnIfCrowded();
-      const id = newId("p");
-      update((d) =>
-        addPane(d, active.id, id, { ...entry, config: { sessionId } }),
-      );
-      goto(id);
-      return;
-    }
-    update((d) => setPaneConfig(d, target, { sessionId }));
-    goto(target);
-  };
-
   const split = (paneId: string, dir: "h" | "v") => {
     const w = windowOf(doc, paneId);
     if (!w) return;
@@ -250,11 +237,23 @@ export function Workbench({
 
   const menu = (paneId: string) => (
     <span className="flex items-center gap-1">
-      <button type="button" className={btn} onClick={() => split(paneId, "h")}>
-        向右分割
+      <button
+        type="button"
+        className={iconBtn}
+        title="向右分割"
+        aria-label="向右分割"
+        onClick={() => split(paneId, "h")}
+      >
+        <SplitRightIcon />
       </button>
-      <button type="button" className={btn} onClick={() => split(paneId, "v")}>
-        向下分割
+      <button
+        type="button"
+        className={iconBtn}
+        title="向下分割"
+        aria-label="向下分割"
+        onClick={() => split(paneId, "v")}
+      >
+        <SplitDownIcon />
       </button>
       {doc.windows.length > 1 && (
         <select
@@ -278,158 +277,83 @@ export function Workbench({
       )}
       <button
         type="button"
-        className={btn}
+        className={iconBtn}
+        title="关闭"
+        aria-label="关闭"
         onClick={() => update((d) => closePane(d, paneId))}
       >
-        关闭
+        <CloseIcon />
       </button>
     </span>
   );
 
-  const navPane =
-    focused && doc.panes[focused]?.type === "chat" ? focused : null;
-  const navItems = navPane ? (anchors[navPane] ?? []) : [];
-  const jump = (id: string) => {
-    const root = document.querySelector(`[data-pane-id="${navPane}"]`);
-    const el = [...(root?.querySelectorAll("[data-anchor]") ?? [])].find(
-      (n) => n.getAttribute("data-anchor") === id,
-    );
-    el?.scrollIntoView?.({ block: "start" });
-  };
-
-  return (
+  const tablist = (
     <div
-      ref={setRoot}
-      style={{
-        gridTemplateColumns: `${left.pinned ? "268px" : "0px"} minmax(0,1fr) ${right.pinned ? "200px" : "0px"}`,
-      }}
-      className="enter relative grid min-h-0"
+      role="tablist"
+      aria-label="window"
+      className="flex items-stretch gap-1"
     >
-      {(left.pinned || left.open) && (
-        <aside
-          aria-label="会话列表"
-          className={`col-start-1 row-start-1 min-h-0 overflow-auto border-r border-line bg-panel ${
-            left.open ? "absolute inset-y-0 left-0 z-20 w-[268px]" : ""
-          }`}
-        >
-          <div className="flex justify-end border-b border-line2 p-1">
-            {left.open ? (
-              <button type="button" className={btn} onClick={left.pin}>
-                固定会话列表
-              </button>
-            ) : (
-              <button type="button" className={btn} onClick={left.collapse}>
-                折叠会话列表
-              </button>
-            )}
-          </div>
-          {sessions.length === 0 ? (
-            <p className="p-5 text-mute">还没有会话</p>
-          ) : (
-            <ul className="m-0 list-none p-0">
-              {sessions.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    aria-current={s.id === selected ? "true" : undefined}
-                    onClick={() => choose(s.id)}
-                    className={`grid w-full grid-cols-[8px_1fr] items-center gap-3 border-b border-line2 px-5 py-3 text-left hover:bg-ink/5 ${
-                      s.id === selected
-                        ? "bg-ink/5 shadow-[inset_3px_0_0_var(--ink)]"
-                        : ""
-                    }`}
-                  >
-                    <StatusDot running={s.running} />
-                    <span className="truncate font-semibold">
-                      {s.name ?? "未命名会话"}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
-      )}
-      <main
-        className="col-start-2 row-start-1 flex min-h-0 flex-col"
-        onKeyDown={onKeyDown}
-      >
-        <div
-          role="tablist"
-          aria-label="window"
-          className="flex items-center gap-1 border-b border-line bg-panel px-3"
-        >
-          {!left.pinned && (
-            <button
-              type="button"
-              className={btn}
-              aria-expanded={left.open}
-              onClick={left.toggleOpen}
-            >
-              {left.open ? "收起会话列表" : "展开会话列表"}
-            </button>
-          )}
-          {doc.windows.map((w) => (
-            <span key={w.id} className="flex items-center">
-              <button
-                type="button"
-                role="tab"
-                data-window-id={w.id}
-                aria-selected={w.id === doc.activeWindowId}
-                onClick={() => update((d) => selectWindow(d, w.id))}
-                onDoubleClick={() => {
-                  const name = window.prompt("window 名称", w.name)?.trim();
-                  if (name) update((d) => renameWindow(d, w.id, name));
-                }}
-                className={`px-3 py-2 text-sm font-semibold ${w.id === doc.activeWindowId ? "border-b-2 border-ink" : "text-mute"}`}
-              >
-                {w.name}
-              </button>
-              {doc.windows.length > 1 && (
-                <button
-                  type="button"
-                  aria-label={`关闭 ${w.name}`}
-                  className="px-1 text-xs text-mute hover:text-ink"
-                  onClick={() => update((d) => closeWindow(d, w.id))}
-                >
-                  ×
-                </button>
-              )}
-            </span>
-          ))}
+      {doc.windows.map((w) => (
+        <span key={w.id} className="flex items-stretch">
           <button
             type="button"
-            aria-label="新建 window"
-            className={btn}
-            onClick={() => update(addWindow)}
-          >
-            +
-          </button>
-          <SavedLayouts
-            currentVersion={DOC_VERSION}
-            snapshot={() => {
-              if (!active) return null;
-              const panes = Object.fromEntries(
-                paneIds(active.tree).flatMap((id) =>
-                  doc.panes[id] ? [[id, doc.panes[id]]] : [],
-                ),
-              );
-              return { name: active.name, tree: active.tree, panes };
+            role="tab"
+            data-window-id={w.id}
+            aria-selected={w.id === doc.activeWindowId}
+            onClick={() => update((d) => selectWindow(d, w.id))}
+            onDoubleClick={() => {
+              const name = window.prompt("window 名称", w.name)?.trim();
+              if (name) update((d) => renameWindow(d, w.id, name));
             }}
-            onApply={(sv) => update((d) => instantiate(d, sv))}
-            onUnauthorized={onUnauthorized}
-          />
-          {!right.pinned && (
+            className={`px-3.5 py-3.5 font-semibold ${w.id === doc.activeWindowId ? "border-b-[3px] border-ink" : "border-b-[3px] border-transparent text-mute"}`}
+          >
+            {w.name}
+          </button>
+          {doc.windows.length > 1 && (
             <button
               type="button"
-              className={`${btn} ml-auto`}
-              aria-expanded={right.open}
-              onClick={right.toggleOpen}
+              aria-label={`关闭 ${w.name}`}
+              className="self-center px-1 text-xs text-mute hover:text-ink"
+              onClick={() => update((d) => closeWindow(d, w.id))}
             >
-              {right.open ? "收起输入导航" : "展开输入导航"}
+              ×
             </button>
           )}
-        </div>
+        </span>
+      ))}
+      <button
+        type="button"
+        aria-label="新建 window"
+        className={`${btn} self-center`}
+        onClick={() => update(addWindow)}
+      >
+        +
+      </button>
+      <SavedLayouts
+        currentVersion={DOC_VERSION}
+        snapshot={() => {
+          if (!active) return null;
+          const panes = Object.fromEntries(
+            paneIds(active.tree).flatMap((id) =>
+              doc.panes[id] ? [[id, doc.panes[id]]] : [],
+            ),
+          );
+          return { name: active.name, tree: active.tree, panes };
+        }}
+        onApply={(sv) => update((d) => instantiate(d, sv))}
+        onUnauthorized={onUnauthorized}
+      />
+    </div>
+  );
+
+  return (
+    <div className="enter relative flex min-h-0 flex-col">
+      {tabsHost ? (
+        createPortal(tablist, tabsHost)
+      ) : (
+        <div className="border-b border-line bg-panel px-3">{tablist}</div>
+      )}
+      <main className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
         {wb.save.kind === "readonly" && (
           <p role="alert" className="p-2 text-sm text-acc">
             布局来自更新的版本，只读展示，不会保存
@@ -486,6 +410,16 @@ export function Workbench({
             }}
             menu={menu}
             dragHandle={dragHandle}
+            onSelectTab={(id) => {
+              update((d) => selectPaneTab(d, id));
+              goto(id);
+            }}
+            onCloseTab={(id) => update((d) => closePane(d, id))}
+            onRename={(id) => {
+              const cur = doc.panes[id]?.name ?? "";
+              const name = window.prompt("pane 名称（留空恢复默认）", cur);
+              if (name !== null) update((d) => renamePane(d, id, name));
+            }}
             onResize={(windowId, path, index, delta) =>
               update((d) => {
                 const w = d.windows.find((x) => x.id === windowId);
@@ -507,48 +441,16 @@ export function Workbench({
               className="pointer-events-none fixed border-2 border-live bg-live/20"
             />
           )}
-        </div>
-      )}
-      {(right.pinned || right.open) && (
-        <nav
-          aria-label="输入导航"
-          className={`col-start-3 row-start-1 min-h-0 overflow-auto border-l border-line bg-panel ${
-            right.open ? "absolute inset-y-0 right-0 z-20 w-[240px]" : ""
-          }`}
-        >
-          <div className="flex justify-end border-b border-line2 p-1">
-            {right.open ? (
-              <button type="button" className={btn} onClick={right.pin}>
-                固定输入导航
-              </button>
-            ) : (
-              <button type="button" className={btn} onClick={right.collapse}>
-                折叠输入导航
-              </button>
-            )}
-          </div>
-          {navItems.length === 0 ? (
-            <p className="p-4 text-sm text-mute">没有可跳转的消息</p>
-          ) : (
-            <ol className="m-0 list-none p-0">
-              {navItems.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    aria-label={a.text}
-                    data-text={
-                      a.text.length > NAV_MAX
-                        ? `${a.text.slice(0, NAV_MAX)}…`
-                        : a.text
-                    }
-                    onClick={() => jump(a.id)}
-                    className="w-full truncate border-b border-line2 px-4 py-2 text-left text-sm before:content-[attr(data-text)] hover:bg-ink/5"
-                  />
-                </li>
-              ))}
-            </ol>
+          {ghost && (
+            <div
+              data-drag-ghost
+              style={{ left: ghost.x + 14, top: ghost.y + 14 }}
+              className="pointer-events-none fixed max-w-60 truncate border border-ink bg-panel px-2 py-1 text-xs font-semibold opacity-90"
+            >
+              {ghost.label}
+            </div>
           )}
-        </nav>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  addTab,
   layout,
   MIN_RATIO,
   neighbor,
@@ -7,7 +8,10 @@ import {
   remove,
   repair,
   resize,
+  selectTab,
   split,
+  tabGroups,
+  visibleIds,
 } from "./tree";
 import type { TreeNode } from "./types";
 
@@ -113,4 +117,59 @@ test("dividers：嵌套分割各给出一条线，位置和比例正确", () => 
   const inner = ds.find((d) => d.path.length === 1);
   expect(inner?.dir).toBe("v");
   expect(inner?.rect).toEqual({ x: 0.5, y: 0.5, w: 0.5, h: 0 });
+});
+
+// R9a：tab 组
+const grp = (sel: string, tabs: string[]): TreeNode => ({
+  kind: "leaf",
+  paneId: sel,
+  tabs,
+});
+
+test("R9a tab 组：paneIds 含全部 tab，visibleIds 只含选中项", () => {
+  const t: TreeNode = {
+    kind: "split",
+    dir: "h",
+    children: [grp("b", ["a", "b"]), leaf("c")],
+    ratios: [0.5, 0.5],
+  };
+  expect(paneIds(t)).toEqual(["a", "b", "c"]);
+  expect(visibleIds(t)).toEqual(["b", "c"]);
+  expect(layout(t, box).has("a")).toBe(false);
+  expect(tabGroups(t, box)).toEqual([
+    { rect: { x: 0, y: 0, w: 0.5, h: 1 }, selected: "b", tabs: ["a", "b"] },
+  ]);
+});
+
+test("R9a addTab：并入目标所在的叶子并选中新 tab；普通叶子变 tab 组", () => {
+  const t = addTab(leaf("a"), "a", "b");
+  expect(t).toEqual(grp("b", ["a", "b"]));
+  expect(addTab(t, "a", "c")).toEqual(grp("c", ["a", "b", "c"]));
+});
+
+test("R9a selectTab：只换选中项", () => {
+  expect(selectTab(grp("b", ["a", "b"]), "a")).toEqual(grp("a", ["a", "b"]));
+});
+
+test("R9a remove：关掉选中 tab 改选相邻；剩一个退回普通叶子；组空了消失", () => {
+  expect(remove(grp("b", ["a", "b", "c"]), "b")).toEqual(grp("c", ["a", "c"]));
+  expect(remove(grp("c", ["a", "b", "c"]), "c")).toEqual(grp("b", ["a", "b"]));
+  expect(remove(grp("a", ["a", "b", "c"]), "b")).toEqual(grp("a", ["a", "c"]));
+  expect(remove(grp("b", ["a", "b"]), "b")).toEqual(leaf("a"));
+});
+
+test("R9a split 以 tab 组里的任一 pane 为目标，都分割整个组", () => {
+  const t = split(grp("b", ["a", "b"]), "a", "h", "c");
+  expect(t).toEqual({
+    kind: "split",
+    dir: "h",
+    children: [grp("b", ["a", "b"]), leaf("c")],
+    ratios: [0.5, 0.5],
+  });
+});
+
+test("R9a repair：tabs 不含选中项或有重复时退化为普通叶子/去重", () => {
+  expect(repair(grp("z", ["a", "b"])).tree).toEqual(leaf("z"));
+  expect(repair(grp("a", ["a", "a", "b"])).tree).toEqual(grp("a", ["a", "b"]));
+  expect(repair(grp("a", ["a"])).tree).toEqual(leaf("a"));
 });

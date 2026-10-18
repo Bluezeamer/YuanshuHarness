@@ -6,7 +6,7 @@ Reviewer: "自查记录"一节是实现者自查，不是独立评审。独立�
 
 ## 自查记录（2026-10-18）
 
-web 171 个用例通过，`tsc` 退出码 0；server 396 个用例上次通过，本轮未重跑。文件名与上表计划名不同，实际在 `layout/` 下的 `layout.test.tsx`、`workbench.test.tsx`、`tree.test.ts`、`drag.test.tsx`、`nav.test.tsx`、`responsive.test.tsx`、`saved.test.tsx` 与 `sessions/mirror.test.tsx`。
+web 171 个用例通过，`tsc` 退出码 0；server 396 个用例上次通过，本轮未重跑。（数字为首轮自查时的值，最新见文末"第 2 次自查"。）文件名与上表计划名不同，实际在 `layout/` 下的 `layout.test.tsx`、`workbench.test.tsx`、`tree.test.ts`、`drag.test.tsx`、`nav.test.tsx`、`responsive.test.tsx`、`saved.test.tsx` 与 `sessions/mirror.test.tsx`。
 
 已有用例：R1、R2、R3、R5（四边落点、window 标签、`Esc`、4px 阈值）、R6（`Alt+方向键`、向下分割、移动到其他 window）、R8、R9（未知类型、高版本、低版本迁移、迁移抛错、保存原样写回）、R10（含焦点非 chat、无 chat pane）、R11、R12、R13、R14、R16、R17（含 5xx 与网络失败提示）、R18、R20、R21、R22（存、套用换新 id、删除、取消命名）、R23 的 `tablist`/`separator` 属性与步长、R24。
 
@@ -38,6 +38,16 @@ web 171 个用例通过，`tsc` 退出码 0；server 396 个用例上次通过�
 | 重要 | 已存布局 DELETE 不带 revision，过期列表也能删（R18） | 不改代码；2026-10-18 决定在 spec R18 写明 DELETE 不校验 revision |
 | 建议 | chat 标题栏不显示会话名（R7） | 已修；region 名字为"对话 · 会话名"，未命名显示"未命名会话"；用例去掉后变红 |
 
-DELETE 的取舍：R18 原文 `PUT/DELETE` "同样用 `revision`" 可按字面读成 DELETE 也带 revision。2026-10-18 决定采用不校验方案，spec R18 已改写；理由是误删的代价只是重新保存一次布局，不值得改请求形状。
+DELETE 的取舍：已决定删除不校验 `revision`，按 id 直接删，spec R18 已同步。
 
 验证：web 176 个用例、server 396 个用例通过，两包 `tsc` 通过；`aisdlc_index.py --check` 通过。
+
+## 第 2 次自查（tab 组与拖出修复之后）
+
+范围：R9a（pane 内 tab 组）落地，以及"选中的 tab 拖不出所在组"的修复。
+
+- 修复：拖动 tab 组里选中的一项时，同组其他 tab 不在落点候选里，被拖的那项又被跳过，组没有边缘可落，所以拆不出来。现在 `Workbench.tsx` 把同组 tab 也加入候选（它们与组共用同一矩形）。拆出走 `movePane`，不再用 `splitOutTab`，后者已连同无人使用的 `group` 渲染块删除。
+- 验证：web 190 个用例通过，server 396 个用例通过，两包 `tsc` 退出码 0。
+- 弱点：拖出 tab 的用例最终断言是"拆出后有 2 个 region"，比原先的"`tablist` 消失"弱；原断言为什么失败没有查清，拆出后 `tablist` 是否残留未证实。
+- 与 spec 不一致：R9a 的 Proof 行写了 `tabs.test.tsx`（切换、拆出、并入的挂载计数与变异检验），仓库里没有这个文件。当前 tab 相关覆盖在 `tree.test.ts`、`drag.test.tsx`、`saved.test.tsx` 里，R9a 的"不重挂载"和"切换 tab 只渲染选中项会变红"的变异检验都没有做。
+- 仍未证明：真实浏览器里的拖动（iframe 遮罩、`pointer capture`）以及 tab 组拖出，jsdom 测不到，见 `browser-verify.md`。

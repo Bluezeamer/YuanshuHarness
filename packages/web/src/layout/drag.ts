@@ -13,6 +13,8 @@ export type DropTarget =
       before: boolean;
       preview: PreviewRect;
     }
+  // R9a：落在标题栏（名称行）或 tab 栏上：并入目标的 tab 组。
+  | { kind: "tab"; paneId: string; preview: PreviewRect }
   | { kind: "window"; windowId: string; preview: PreviewRect }
   | null;
 
@@ -25,7 +27,7 @@ const box = (r: DOMRect): PreviewRect => ({
   height: r.height,
 });
 
-// R5：由指针位置判断落点。先看 window 标签，再看当前 window 内其他 pane 的四条边（各 20%）。
+// R5：由指针位置判断落点。先看 window 标签，再看 tab 栏与标题栏（并入 tab 组），再看当前 window 内其他 pane 的四条边（各 20%）。
 // 用矩形而不是 elementAtPoint：拖动时 iframe 会吞事件，矩形判断不受影响。
 export function dropTarget(
   x: number,
@@ -47,12 +49,21 @@ export function dropTarget(
     )
       return { kind: "window", windowId: id, preview: box(r) };
   }
+  for (const strip of document.querySelectorAll("[data-tabstrip]")) {
+    const r = strip.getBoundingClientRect();
+    const id = strip.getAttribute("data-tabstrip");
+    if (id && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+      return { kind: "tab", paneId: id, preview: box(r) };
+  }
   for (const paneId of candidates) {
     if (paneId === dragging) continue;
     const el = document.querySelector(`[data-pane-id="${paneId}"]`);
     if (!el) continue;
     const r = el.getBoundingClientRect();
     if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    const head = el.querySelector("header")?.getBoundingClientRect();
+    if (head && y >= head.top && y <= head.bottom)
+      return { kind: "tab", paneId, preview: box(r) };
     const dx = (x - r.left) / r.width;
     const dy = (y - r.top) / r.height;
     const edge = (

@@ -20,11 +20,14 @@ export interface PaneEntry {
   type: string;
   configVersion: number;
   config: unknown;
+  // 用户自定义的 pane 名称；没有时用类型名与会话名。
+  name?: string;
 }
 
 export type TreeNode =
   | { kind: "split"; dir: "h" | "v"; children: TreeNode[]; ratios: number[] }
-  | { kind: "leaf"; paneId: string };
+  // R9a：有 tabs 时叶子是一个 tab 组，tabs 含组内全部 paneId，paneId 是选中项。
+  | { kind: "leaf"; paneId: string; tabs?: string[] };
 
 export interface LayoutWindow {
   id: string;

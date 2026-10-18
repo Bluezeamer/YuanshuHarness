@@ -44,67 +44,76 @@ afterEach(() => {
 });
 
 const mount = async () => {
-  installApi([]);
+  const api = installApi([]);
+  api.workbench = {
+    revision: 1,
+    document: {
+      version: 1,
+      activeWindowId: "w1",
+      windows: [{ id: "w1", name: "a", tree: { kind: "leaf", paneId: "c" } }],
+      panes: {
+        c: { type: "chat", configVersion: 1, config: { sessionId: null } },
+      },
+    },
+  };
   render(<Shell sessions={sessions} onUnauthorized={() => {}} />);
   await act(async () => {});
 };
 const list = () => screen.queryByRole("complementary", { name: "会话列表" });
 const nav = () => screen.queryByRole("navigation", { name: "输入导航" });
-const cols = () =>
-  (document.querySelector(".enter.relative") as HTMLElement).style
-    .gridTemplateColumns;
+const body = () => document.querySelector("[data-chat-body]") as HTMLElement;
 
-test("R14 宽度足够：两侧固定；跨阈值默认折叠，再变宽又固定", async () => {
+test("R14 按 chat pane 自己的宽度：两侧固定；跨阈值默认折叠，再变宽又固定", async () => {
   await mount();
-  fire(1400);
-  expect(list()).toBeTruthy();
-  expect(nav()).toBeTruthy();
   fire(1000);
   expect(list()).toBeTruthy();
-  expect(nav()).toBeNull();
+  expect(nav()).toBeTruthy();
   fire(800);
+  expect(list()).toBeTruthy();
+  expect(nav()).toBeNull();
+  fire(500);
   expect(list()).toBeNull();
-  fire(1400);
+  fire(1000);
   expect(list()).toBeTruthy();
   expect(nav()).toBeTruthy();
 });
 
-test("R14 折叠后展开是悬浮：不改网格列，不挤压 pane 层", async () => {
+test("R14 折叠后展开是悬浮：不占位，不挤压会话区", async () => {
   await mount();
-  fire(800);
-  const before = cols();
+  fire(500);
+  const before = body().children.length;
   fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
   expect(list()).toBeTruthy();
   expect(list()?.className).toContain("absolute");
-  expect(cols()).toBe(before);
+  expect(list()?.className).toContain("inset-y-0");
   fireEvent.click(screen.getByRole("button", { name: "展开输入导航" }));
   expect(nav()?.className).toContain("absolute");
-  expect(cols()).toBe(before);
+  expect(body().children.length).toBe(before + 2);
 });
 
 test("R14 手动设置后宽度变化不覆盖，刷新后仍记得", async () => {
   await mount();
-  fire(1400);
+  fire(1000);
   fireEvent.click(screen.getByRole("button", { name: "折叠会话列表" }));
   expect(list()).toBeNull();
-  fire(1500);
+  fire(1100);
   expect(list()).toBeNull();
 
   cleanup();
   await mount();
-  fire(1500);
+  fire(1100);
   expect(list()).toBeNull();
 
-  fire(700);
+  fire(500);
   fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
   fireEvent.click(screen.getByRole("button", { name: "固定会话列表" }));
-  fire(700);
+  fire(500);
   expect(list()).toBeTruthy();
 });
 
 test("R14 悬浮展开时选择会话后自动收起", async () => {
   await mount();
-  fire(800);
+  fire(500);
   fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
   fireEvent.click(screen.getByRole("button", { name: /甲/ }));
   expect(list()).toBeNull();

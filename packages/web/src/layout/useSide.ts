@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-export const LEFT_MIN_WIDTH = 960;
-export const RIGHT_MIN_WIDTH = 1280;
+export const LEFT_MIN_WIDTH = 640;
+export const RIGHT_MIN_WIDTH = 900;
 
 const key = (side: string) => `yuanshu.side.${side}`;
 const read = (side: string): boolean | null => {
@@ -13,7 +13,7 @@ const read = (side: string): boolean | null => {
   }
 };
 
-// 容器宽度。量不到（没有 ResizeObserver，或还没回报）时返回 null，按宽度足够处理。
+// 容器宽度（chat pane 自己的宽度）。量不到（没有 ResizeObserver，或还没回报）时返回 null，按宽度足够处理。
 export function useWidth(el: HTMLElement | null): number | null {
   const [w, setW] = useState<number | null>(null);
   useEffect(() => {

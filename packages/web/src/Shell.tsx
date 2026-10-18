@@ -10,6 +10,7 @@ export function Shell({
   sessions: SessionInfo[];
   onUnauthorized: () => void;
 }) {
+  const [tabsHost, setTabsHost] = useState<HTMLDivElement | null>(null);
   const [hub] = useState(() => new SessionHub());
   useEffect(() => {
     hub.onUnauthorized = onUnauthorized;
@@ -22,15 +23,7 @@ export function Shell({
           <i className="size-3 bg-acc" />
           元枢
         </div>
-        <nav className="flex" aria-label="主导航">
-          <button
-            type="button"
-            aria-current="page"
-            className="border-b-[3px] border-ink px-3.5 py-3.5 font-semibold"
-          >
-            对话
-          </button>
-        </nav>
+        <div ref={setTabsHost} className="flex items-stretch" />
         <div className="ml-auto flex items-center gap-2 font-medium">
           <i className="size-2 rounded-full bg-ok" />
           Server 在线
@@ -40,6 +33,7 @@ export function Shell({
         hub={hub}
         sessions={sessions}
         onUnauthorized={onUnauthorized}
+        tabsHost={tabsHost}
       />
     </div>
   );
