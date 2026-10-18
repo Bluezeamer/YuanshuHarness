@@ -16,6 +16,21 @@ export const MIGRATIONS: Migration[] = [
          updated_at TEXT NOT NULL
        )`,
     ),
+  // 工作台布局文档（单行）与已存布局；文档是不透明 JSON，revision 用于多端写入的乐观并发。
+  (db) =>
+    db.exec(
+      `CREATE TABLE workbench (
+         id INTEGER PRIMARY KEY CHECK (id = 1),
+         revision INTEGER NOT NULL,
+         document TEXT NOT NULL
+       );
+       CREATE TABLE saved_layouts (
+         id TEXT PRIMARY KEY,
+         revision INTEGER NOT NULL,
+         document TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       )`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";
