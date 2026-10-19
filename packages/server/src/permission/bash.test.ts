@@ -3,6 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { LocalEnv } from "../env/local.js";
 import {
   analyzeCommand,
   isReadOnlyCommand,
@@ -253,6 +254,6 @@ describe("评审 R2：operandsInside 的路径操作数", () => {
     ["ls -la && cat ../x", false],
     ["cat a\nb", false],
   ])("%s -> %s", async (c, ok) => {
-    expect(await operandsInside(c, cwd)).toBe(ok);
+    expect(await operandsInside(c, cwd, new LocalEnv())).toBe(ok);
   });
 });

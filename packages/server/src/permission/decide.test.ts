@@ -8,6 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { LocalEnv } from "../env/local.js";
 import {
   analyzeCommand,
   isReadOnlyCommand,
@@ -33,14 +34,17 @@ const ctx = (over: Partial<Ctx> = {}): Ctx => ({
   commandRules: [],
   ...over,
 });
-const target = (p: string) => {
-  const r = resolveTarget(p, cwd) as string;
+const target = async (p: string) => {
+  const r = (await resolveTarget(p, cwd, new LocalEnv())) as string;
   return { path: r, dir: path.dirname(r) };
 };
-const pathAct = (p: string, access: "read" | "write" = "read"): Action => ({
+const pathAct = async (
+  p: string,
+  access: "read" | "write" = "read",
+): Promise<Action> => ({
   kind: "path",
   access,
-  targets: [target(p)],
+  targets: [await target(p)],
 });
 const cmdAct = async (line: string): Promise<Action> => {
   const a = await analyzeCommand(line);
@@ -64,17 +68,14 @@ describe("R3 路径判定", () => {
     ["用 .. 逃出 cwd", "../outside/secret.txt", "ask"],
     ["符号链接逃出 cwd", "link/secret.txt", "ask"],
     ["符号链接下尚不存在的文件", "link/new.txt", "ask"],
-  ])("%s", (_n, p, want) => {
-    expect(decide(pathAct(p), ctx()).verdict).toBe(want);
+  ])("%s", async (_n, p, want) => {
+    expect(decide(await pathAct(p), ctx()).verdict).toBe(want);
   });
 
-  test("full 放行一切，含敏感路径", () => {
-    expect(decide(pathAct("/etc/passwd"), ctx({ tier: "full" })).verdict).toBe(
-      "allow",
-    );
-    expect(decide(pathAct(".env"), ctx({ tier: "full" })).verdict).toBe(
-      "allow",
-    );
+  test("full 放行一切，含敏感路径", async () => {
+    const full = ctx({ tier: "full" });
+    expect(decide(await pathAct("/etc/passwd"), full).verdict).toBe("allow");
+    expect(decide(await pathAct(".env"), full).verdict).toBe("allow");
   });
 
   test("isInside 不把同前缀兄弟目录当作内部", () => {
@@ -97,14 +98,14 @@ describe("R4 敏感路径", () => {
     "id_ed25519.pub",
     "c.pem",
     "c.key",
-  ])("%s 在 cwd 内也要问且不可记住", (p) => {
-    const d = decide(pathAct(p, "write"), ctx());
+  ])("%s 在 cwd 内也要问且不可记住", async (p) => {
+    const d = decide(await pathAct(p, "write"), ctx());
     expect(d).toEqual({ verdict: "ask", remember: null, reviewable: false });
   });
 
-  test("已记住的目录规则不放行敏感路径", () => {
+  test("已记住的目录规则不放行敏感路径", async () => {
     const d = decide(
-      pathAct(".env"),
+      await pathAct(".env"),
       ctx({ pathRules: [{ access: "write", value: cwd }] }),
     );
     expect(d.verdict).toBe("ask");
@@ -153,17 +154,17 @@ describe("R4 敏感命令变体", () => {
 
 describe("R6 记住规则", () => {
   const f = path.join(outside, "secret.txt");
-  test("读规则只放行读，写规则放行读写", () => {
+  test("读规则只放行读，写规则放行读写", async () => {
     const read = ctx({ pathRules: [{ access: "read", value: outside }] });
     const write = ctx({ pathRules: [{ access: "write", value: outside }] });
-    expect(decide(pathAct(f, "read"), read).verdict).toBe("allow");
-    expect(decide(pathAct(f, "write"), read).verdict).toBe("ask");
-    expect(decide(pathAct(f, "read"), write).verdict).toBe("allow");
-    expect(decide(pathAct(f, "write"), write).verdict).toBe("allow");
+    expect(decide(await pathAct(f, "read"), read).verdict).toBe("allow");
+    expect(decide(await pathAct(f, "write"), read).verdict).toBe("ask");
+    expect(decide(await pathAct(f, "read"), write).verdict).toBe("allow");
+    expect(decide(await pathAct(f, "write"), write).verdict).toBe("allow");
   });
 
-  test("路径动作记住目标所在目录", () => {
-    const d = decide(pathAct(f, "write"), ctx());
+  test("路径动作记住目标所在目录", async () => {
+    const d = decide(await pathAct(f, "write"), ctx());
     expect(d).toMatchObject({
       verdict: "ask",
       remember: { kind: "path", access: "write", value: outside },

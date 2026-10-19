@@ -1,42 +1,55 @@
-// 路径解析与敏感路径判定（ADR-0030）。
-import { type Dirent, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
+// 路径解析与敏感路径判定（ADR-0030；ADR-0034：文件系统访问走环境原语）。
 import path from "node:path";
+import type { ExecEnv } from "../env/types.js";
+
+/** 判定所用的文件系统视图：本机与 ssh 环境同一套接口。 */
+export type PathEnv = Pick<
+  ExecEnv,
+  "kind" | "homedir" | "stat" | "lstat" | "realpath" | "readdir"
+>;
+
+/** ssh 环境一律按 POSIX 路径处理（Windows 远端经 Git Bash，路径形如 /c/Users）。 */
+export const pathOf = (env: Pick<ExecEnv, "kind">): path.PlatformPath =>
+  env.kind === "ssh" ? path.posix : path;
 
 /**
  * 相对 cwd 解析并解析符号链接；尚不存在的路径取最近已存在祖先的真实路径再拼回尾部。
- * 悬空链接、循环链接、权限等任何无法可靠解析的情况返回 null，调用方须按 cwd 外处理（不放行）。
+ * 悬空链接、循环链接、权限、连接失败等任何无法可靠解析的情况返回 null，调用方须按 cwd 外处理（不放行）。
  */
-export function resolveTarget(raw: string, cwd: string): string | null {
-  let p = raw.startsWith("@") ? raw.slice(1) : raw;
-  if (p === "~" || p.startsWith("~/")) p = path.join(homedir(), p.slice(1));
-  const abs = path.resolve(cwd, p);
-  let head = abs;
-  const tail: string[] = [];
-  // 用 lstat 而非 existsSync：悬空链接本身也算“存在”，交给 realpath 判失败
-  for (;;) {
-    try {
-      lstatSync(head);
-      break;
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code;
-      const up = path.dirname(head);
-      if ((code !== "ENOENT" && code !== "ENOTDIR") || up === head) return null;
-      tail.unshift(path.basename(head));
+export async function resolveTarget(
+  raw: string,
+  cwd: string,
+  env: PathEnv,
+): Promise<string | null> {
+  const pm = pathOf(env);
+  try {
+    let p = raw.startsWith("@") ? raw.slice(1) : raw;
+    if (p === "~" || p.startsWith("~/"))
+      p = pm.join(await env.homedir(), p.slice(1));
+    let head = pm.resolve(cwd, p);
+    const tail: string[] = [];
+    // lstat 而非 stat：悬空链接本身也算“存在”，交给 realpath 判失败
+    while ((await env.lstat(head)) === null) {
+      const up = pm.dirname(head);
+      if (up === head) return null;
+      tail.unshift(pm.basename(head));
       head = up;
     }
-  }
-  try {
-    return path.join(realpathSync(head), ...tail);
+    const real = await env.realpath(head);
+    return real === null ? null : pm.join(real, ...tail);
   } catch {
     return null;
   }
 }
 
 /** p 是否在 dir 内（含自身）；二者都应已解析。 */
-export function isInside(dir: string, p: string): boolean {
-  const rel = path.relative(dir, p);
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+export function isInside(
+  dir: string,
+  p: string,
+  pm: path.PlatformPath = path,
+): boolean {
+  const rel = pm.relative(dir, p);
+  return rel === "" || (!rel.startsWith("..") && !pm.isAbsolute(rel));
 }
 
 const SENSITIVE_SEGMENT = /^(\.env(\..*)?|\.ssh|\.aws|\.kube|\.gnupg)$/;
@@ -182,21 +195,26 @@ const SKIP_DIRS = new Set(["node_modules", ".git"]);
  * 在目录树内找首个敏感名条目（不跟随符号链接，最多看 limit 个条目）；
  * grep/find 不带选择器时会连隐藏文件一起读，用它判断是否会扫到敏感文件。超限视为有。
  */
-export function findSensitiveBelow(dir: string, limit = 5000): string | null {
+export async function findSensitiveBelow(
+  dir: string,
+  env: PathEnv,
+  limit = 5000,
+): Promise<string | null> {
+  const pm = pathOf(env);
   const queue = [dir];
   let seen = 0;
   for (let d = queue.shift(); d !== undefined; d = queue.shift()) {
-    let entries: Dirent[];
+    let entries: Awaited<ReturnType<PathEnv["readdir"]>>;
     try {
-      entries = readdirSync(d, { withFileTypes: true });
+      entries = await env.readdir(d);
     } catch {
       continue;
     }
     for (const e of entries) {
       if (++seen > limit) return ".env";
       if (segmentSensitive(e.name)) return e.name;
-      if (e.isDirectory() && !SKIP_DIRS.has(e.name))
-        queue.push(path.join(d, e.name));
+      if (e.isDirectory && !SKIP_DIRS.has(e.name))
+        queue.push(pm.join(d, e.name));
     }
   }
   return null;

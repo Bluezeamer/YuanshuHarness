@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { LocalEnv } from "../env/local.js";
 import { permissionExtension } from "./extension.js";
 
 // 直接驱动扩展的 tool_call 处理器，模拟 SDK 里并未注册的自定义/MCP 工具。
@@ -7,7 +8,7 @@ function harness(review: () => Promise<{ decision: "allow" }>) {
   const reviewed: string[] = [];
   const asked: Array<{ title: string }> = [];
   const ext = permissionExtension({
-    cwd: "/tmp/ws",
+    where: () => ({ env: new LocalEnv(), cwd: "/tmp/ws" }),
     tier: () => "auto",
     rules: () => ({ path: [], command: [] }),
     addRule: () => {},

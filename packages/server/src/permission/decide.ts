@@ -1,4 +1,5 @@
 // 权限判定：纯函数（ADR-0030 判定顺序）。路径已解析、命令已解析、规则与档位由调用方传入。
+import type { PlatformPath } from "node:path";
 import type { Tier } from "../store/workspaces.js";
 import {
   isInside,
@@ -41,6 +42,8 @@ export interface Ctx {
   cwd: string;
   pathRules: { access: Access; value: string }[];
   commandRules: string[];
+  /** 路径方言：ssh 环境为 posix；缺省按本机平台。 */
+  pm?: PlatformPath;
 }
 
 export type RememberRule =
@@ -60,7 +63,9 @@ export type Decision =
 /** 目标已有的规则目录是否覆盖它：读规则只放行读，写规则放行读写。 */
 function covered(ctx: Ctx, access: Access, t: string): boolean {
   return ctx.pathRules.some(
-    (r) => (r.access === "write" || access === "read") && isInside(r.value, t),
+    (r) =>
+      (r.access === "write" || access === "read") &&
+      isInside(r.value, t, ctx.pm),
   );
 }
 
@@ -84,7 +89,9 @@ export function decide(action: Action, ctx: Ctx): Decision {
     // 选择器指向 cwd 外：无法落成一个目录，按规则外处理且不可记住
     if (action.selectors?.some(selectorEscapes)) return ask(null, true);
     const open = action.targets.filter(
-      (t) => !isInside(ctx.cwd, t.path) && !covered(ctx, action.access, t.path),
+      (t) =>
+        !isInside(ctx.cwd, t.path, ctx.pm) &&
+        !covered(ctx, action.access, t.path),
     );
     const first = open[0];
     if (!first) return { verdict: "allow" };

@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { LocalEnv } from "../env/local.js";
 import type { PromptSpec } from "../session/prompts.js";
 import { type PermissionDeps, permissionExtension } from "./extension.js";
 
@@ -23,11 +24,14 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 type Result = { block?: boolean; reason?: string } | undefined;
 
-function harness(over: Partial<PermissionDeps> = {}) {
+function harness({
+  cwd: dir = cwd,
+  ...over
+}: Partial<PermissionDeps> & { cwd?: string } = {}) {
   const asked: PromptSpec[] = [];
   let handler: (e: unknown) => Promise<Result> = async () => undefined;
   permissionExtension({
-    cwd,
+    where: () => ({ env: new LocalEnv(), cwd: dir }),
     tier: () => "rules",
     rules: () => ({ path: [], command: [] }),
     addRule: () => {},

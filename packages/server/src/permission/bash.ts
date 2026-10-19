@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { Language, type Node, Parser } from "web-tree-sitter";
-import { isInside, resolveTarget } from "./paths.js";
+import { isInside, type PathEnv, pathOf, resolveTarget } from "./paths.js";
 
 const require = createRequire(import.meta.url);
 
@@ -414,17 +414,23 @@ function withOptionValues(words: string[]): string[] {
 export async function operandsInside(
   command: string,
   cwd: string,
+  env: PathEnv,
 ): Promise<boolean> {
   const segs = await parseCommand(command);
   if (!segs) return false;
-  return segs.every(([, ...args]) =>
-    args.every((a) => {
+  const pm = pathOf(env);
+  for (const [, ...args] of segs) {
+    for (const a of args) {
       // 递归并跟随符号链接的选项会越出 cwd
       if (/^-[^-]*R/.test(a) || a === "--dereference-recursive") return false;
       if (a === "-L" || a === "-follow" || a === "--dereference") return false;
-      if (a.startsWith("-")) return !a.includes("/");
-      const p = resolveTarget(a, cwd);
-      return p !== null && isInside(cwd, p);
-    }),
-  );
+      if (a.startsWith("-")) {
+        if (a.includes("/")) return false;
+        continue;
+      }
+      const p = await resolveTarget(a, cwd, env);
+      if (p === null || !isInside(cwd, p, pm)) return false;
+    }
+  }
+  return true;
 }

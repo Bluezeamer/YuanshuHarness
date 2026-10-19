@@ -1,6 +1,15 @@
 import path from "node:path";
-import { Client, type SFTPWrapper } from "ssh2";
+import { Client, type SFTPWrapper, type Stats } from "ssh2";
+import type { DirEntry, FileStat } from "../env/types.js";
 import type { SecretStore } from "../store/secrets.js";
+
+const toFileStat = (st: Stats): FileStat => ({
+  isDirectory: st.isDirectory(),
+  isFile: st.isFile(),
+  isSymlink: st.isSymbolicLink(),
+  size: st.size,
+  mtimeMs: st.mtime * 1000,
+});
 
 export interface SshConfig {
   host: string;
@@ -168,6 +177,116 @@ export class SshConnection {
         s.mkdir(cur, (e) => (e ? fail(e) : ok())),
       );
     }
+  }
+
+  isConnected(): boolean {
+    return this.client !== null;
+  }
+
+  // 流式执行：stdout 与 stderr 按到达顺序交给 onData。中止与超时先发 TERM，2 秒后仍未退出就关闭通道。
+  execStream(
+    command: string,
+    opts: {
+      onData: (d: Buffer) => void;
+      signal?: AbortSignal;
+      timeoutMs?: number;
+    },
+  ): Promise<{
+    exitCode: number | null;
+    signal: string | null;
+    aborted: boolean;
+    timedOut: boolean;
+  }> {
+    return new Promise((ok, fail) => {
+      const client = this.requireClient();
+      if (opts.signal?.aborted) {
+        ok({ exitCode: null, signal: null, aborted: true, timedOut: false });
+        return;
+      }
+      client.exec(command, (err, stream) => {
+        if (err) return fail(err);
+        let aborted = false;
+        let timedOut = false;
+        let killTimer: NodeJS.Timeout | undefined;
+        const stop = () => {
+          stream.signal("TERM");
+          killTimer ??= setTimeout(() => stream.close(), 2000);
+        };
+        const onAbort = () => {
+          aborted = true;
+          stop();
+        };
+        const timer = opts.timeoutMs
+          ? setTimeout(() => {
+              timedOut = true;
+              stop();
+            }, opts.timeoutMs)
+          : undefined;
+        opts.signal?.addEventListener("abort", onAbort, { once: true });
+        stream.on("data", opts.onData);
+        stream.stderr.on("data", opts.onData);
+        stream.once(
+          "close",
+          (code: number | null | undefined, sig: string | null | undefined) => {
+            clearTimeout(timer);
+            clearTimeout(killTimer);
+            opts.signal?.removeEventListener("abort", onAbort);
+            ok({
+              exitCode: typeof code === "number" ? code : null,
+              signal: sig ?? null,
+              aborted,
+              timedOut,
+            });
+          },
+        );
+      });
+    });
+  }
+
+  private async attrs(
+    remotePath: string,
+    follow: boolean,
+  ): Promise<FileStat | null> {
+    const s = await this.sftp();
+    return new Promise((ok) => {
+      const cb = (e: Error | null | undefined, st?: Stats) =>
+        ok(e || !st ? null : toFileStat(st));
+      if (follow) s.stat(remotePath, cb);
+      else s.lstat(remotePath, cb);
+    });
+  }
+
+  stat(remotePath: string): Promise<FileStat | null> {
+    return this.attrs(remotePath, true);
+  }
+
+  lstat(remotePath: string): Promise<FileStat | null> {
+    return this.attrs(remotePath, false);
+  }
+
+  // 服务端完整规范化（含中间目录的符号链接）；失败返回 null。
+  async canonical(remotePath: string): Promise<string | null> {
+    const s = await this.sftp();
+    return new Promise((ok) =>
+      s.realpath(remotePath, (e, p) => ok(e ? null : p)),
+    );
+  }
+
+  async readdirEntries(remotePath: string): Promise<DirEntry[]> {
+    const s = await this.sftp();
+    return new Promise((ok, fail) =>
+      s.readdir(remotePath, (e, list) =>
+        e
+          ? fail(e)
+          : ok(
+              list.map((x) => ({
+                name: x.filename,
+                isDirectory: x.attrs.isDirectory(),
+                isSymlink: x.attrs.isSymbolicLink(),
+              })),
+            ),
+      ),
+    );
   }
 
   // 递归解析符号链接(最多40层)；悬空、循环或不存在都返回 null。

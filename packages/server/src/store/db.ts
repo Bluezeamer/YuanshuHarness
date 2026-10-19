@@ -82,6 +82,23 @@ export const MIGRATIONS: Migration[] = [
          created_at TEXT NOT NULL
        )`,
     ),
+  // workspace 唯一性改为 (environment_id, path)（ADR-0034）。重建表保留数据。
+  (db) => {
+    db.exec(
+      `CREATE TABLE workspaces_new (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL,
+         path TEXT NOT NULL,
+         environment_id TEXT NOT NULL DEFAULT 'local',
+         tier TEXT NOT NULL DEFAULT 'rules',
+         created_at TEXT NOT NULL,
+         UNIQUE(environment_id, path)
+       );
+       INSERT INTO workspaces_new SELECT * FROM workspaces;
+       DROP TABLE workspaces;
+       ALTER TABLE workspaces_new RENAME TO workspaces`,
+    );
+  },
 ];
 
 export const DB_FILE = "yuanshu.db";
@@ -130,11 +147,20 @@ export function openDatabase(
         n: number;
       };
       if (hasData.n > 0) copyFileSync(file, backupPath(file, current));
-      for (let v = current; v < target; v++) {
-        db.transaction(() => {
-          migrations[v]?.(db);
-          db.pragma(`user_version = ${v + 1}`);
-        })();
+      // 重建表的迁移需要外键关闭（事务内无法切换，且 DROP 会触发级联删除）；迁完校验再恢复。
+      db.pragma("foreign_keys = OFF");
+      try {
+        for (let v = current; v < target; v++) {
+          db.transaction(() => {
+            migrations[v]?.(db);
+            db.pragma(`user_version = ${v + 1}`);
+          })();
+        }
+        const bad = db.pragma("foreign_key_check") as unknown[];
+        if (bad.length > 0)
+          throw new Error(`迁移后外键校验失败（${bad.length} 处）`);
+      } finally {
+        db.pragma("foreign_keys = ON");
       }
     }
     return db;

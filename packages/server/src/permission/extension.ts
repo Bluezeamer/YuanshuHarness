@@ -1,6 +1,4 @@
 // 权限扩展：拦截 tool_call，按 decide 放行或弹审批（ADR-0030）。任何异常、拒绝、超时、撤销都 block。
-import { statSync } from "node:fs";
-import path from "node:path";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { PromptResult, PromptSpec } from "../session/prompts.js";
 import type { Tier } from "../store/workspaces.js";
@@ -19,7 +17,12 @@ import {
   decide,
   type RememberRule,
 } from "./decide.js";
-import { findSensitiveBelow, resolveTarget } from "./paths.js";
+import {
+  findSensitiveBelow,
+  type PathEnv,
+  pathOf,
+  resolveTarget,
+} from "./paths.js";
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["edit", "write"]);
@@ -32,8 +35,14 @@ export type ReviewVerdict =
   | { decision: "ask"; reason?: string }
   | { decision: "deny"; reason: string };
 
-export interface PermissionDeps {
+/** 会话此刻所在的环境与工作目录；每次工具调用即时读取，切换 workspace 立刻生效。 */
+export interface Where {
+  env: PathEnv;
   cwd: string;
+}
+
+export interface PermissionDeps {
+  where: () => Where;
   /** 每次调用即时读取，档位改动立刻生效。 */
   tier: () => Tier;
   rules: () => { path: { access: Access; value: string }[]; command: string[] };
@@ -51,19 +60,15 @@ const clip = (s: string) =>
   s.length > SUMMARY_MAX ? `${s.slice(0, SUMMARY_MAX)}…` : s;
 
 /** 记住时的目录：目标是目录取自身，否则取父目录。 */
-function dirOf(p: string): string {
-  try {
-    if (statSync(p).isDirectory()) return p;
-  } catch {
-    // 尚不存在：按文件处理
-  }
-  return path.dirname(p);
+async function dirOf(p: string, env: PathEnv): Promise<string> {
+  if ((await env.stat(p).catch(() => null))?.isDirectory) return p;
+  return pathOf(env).dirname(p);
 }
 
 async function classify(
   tool: string,
   input: Record<string, unknown>,
-  cwd: string,
+  { env, cwd }: Where,
 ): Promise<{ action: Action | null; summary: string }> {
   if (COMMAND_TOOLS.has(tool)) {
     const line = typeof input.command === "string" ? input.command : "";
@@ -78,7 +83,8 @@ async function classify(
         opaque,
         // 只读白名单还要求路径操作数都在 cwd 内；出界的转规则外审批（可按原规则记住）
         readOnly:
-          (await isReadOnlyCommand(line)) && (await operandsInside(line, cwd)),
+          (await isReadOnlyCommand(line)) &&
+          (await operandsInside(line, cwd, env)),
         normalized: await normalizeCommand(line),
         rememberable: await rememberable(line),
         sudo: segs
@@ -90,7 +96,7 @@ async function classify(
   const access: Access = WRITE_TOOLS.has(tool) ? "write" : "read";
   const raw =
     typeof input.path === "string" && input.path !== "" ? input.path : cwd;
-  const p = resolveTarget(raw, cwd);
+  const p = await resolveTarget(raw, cwd, env);
   // 悬空/循环链接等无法解析：按 cwd 外处理，只交人工、不可记住
   if (p === null) return { summary: clip(raw), action: null };
   // 决定实际读哪些文件的选择器：grep 的 glob、find 的 pattern（grep 的 pattern 是内容正则，不是路径）
@@ -100,27 +106,24 @@ async function classify(
     typeof sel === "string" && sel !== ""
       ? [sel]
       : // 无选择器的 grep/find 会连隐藏文件一起读：目录树里有敏感文件就按敏感处理
-        (tool === "grep" || tool === "find") && isDirectory(p)
-        ? [findSensitiveBelow(p)].filter((x): x is string => x !== null)
+        (tool === "grep" || tool === "find") && (await isDirectory(p, env))
+        ? [await findSensitiveBelow(p, env)].filter(
+            (x): x is string => x !== null,
+          )
         : [];
   return {
     summary: clip(p),
     action: {
       kind: "path",
       access,
-      targets: [{ path: p, dir: dirOf(p) }],
+      targets: [{ path: p, dir: await dirOf(p, env) }],
       ...(selectors.length ? { selectors } : {}),
     },
   };
 }
 
-const isDirectory = (p: string): boolean => {
-  try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-};
+const isDirectory = async (p: string, env: PathEnv): Promise<boolean> =>
+  (await env.stat(p).catch(() => null))?.isDirectory === true;
 
 const sizeOf = (v: unknown): number =>
   typeof v === "string"
@@ -159,15 +162,17 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
         let d: ReturnType<typeof decide>;
         let summary: string;
         if (known) {
-          const r = await classify(e.toolName, input, deps.cwd);
+          const where = deps.where();
+          const r = await classify(e.toolName, input, where);
           summary = r.summary;
           const rules = deps.rules();
           d = r.action
             ? decide(r.action, {
                 tier,
-                cwd: deps.cwd,
+                cwd: where.cwd,
                 pathRules: rules.path,
                 commandRules: rules.command,
+                pm: pathOf(where.env),
               })
             : { verdict: "ask", remember: null, reviewable: false };
         } else {

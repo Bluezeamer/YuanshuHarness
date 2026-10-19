@@ -8,7 +8,10 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { LocalEnv } from "../env/local.js";
 import { isSensitive, isSensitiveSelector, resolveTarget } from "./paths.js";
+
+const env = new LocalEnv();
 
 const root = mkdtempSync(path.join(tmpdir(), "yuanshu-paths-"));
 const cwd = path.join(root, "proj");
@@ -26,12 +29,12 @@ describe("resolveTarget：无法可靠解析一律返回 null（不放行）", (
     ["悬空链接下的子路径", "dangling/sub/x.txt"],
     ["循环链接", "loop1"],
     ["循环链接下的子路径", "loop1/x.txt"],
-  ])("%s", (_n, p) => {
-    expect(resolveTarget(p, cwd)).toBeNull();
+  ])("%s", async (_n, p) => {
+    expect(await resolveTarget(p, cwd, env)).toBeNull();
   });
 
-  test("尚不存在的路径照常解析", () => {
-    expect(resolveTarget("x/y/z.txt", cwd)).toBe(
+  test("尚不存在的路径照常解析", async () => {
+    expect(await resolveTarget("x/y/z.txt", cwd, env)).toBe(
       path.join(realpathSync(cwd), "x/y/z.txt"),
     );
   });
