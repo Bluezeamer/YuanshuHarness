@@ -79,7 +79,11 @@ export async function modelsApi(
     if (typeof p === "string") return bad(reply, p);
     let secretId: string | null = null;
     if (p.apiKey) {
-      const s = secrets.create(`model:${p.name}:${uuidv7().slice(-8)}`, "password", p.apiKey);
+      const s = secrets.create(
+        `model:${p.name}:${uuidv7().slice(-8)}`,
+        "password",
+        p.apiKey,
+      );
       secretId = s?.id ?? null;
     }
     const entry: ModelEntry = {

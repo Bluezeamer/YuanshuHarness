@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -36,7 +42,9 @@ async function launch() {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-  return { call, dataDir };
+  const json = async (method: string, url: string, body?: unknown) =>
+    (await call(method, url, body)).json() as Promise<any>;
+  return { call, json, dataDir };
 }
 
 const body = (over: Record<string, unknown> = {}) => ({
@@ -54,32 +62,42 @@ describe("模型登记", () => {
     const res = await call("POST", "", body());
     expect(res.status).toBe(201);
     const created = await res.json();
-    expect(created).toMatchObject({ name: "本地", isDefault: true, hasKey: true });
+    expect(created).toMatchObject({
+      name: "本地",
+      isDefault: true,
+      hasKey: true,
+    });
     expect(JSON.stringify(created)).not.toContain("sk-super-secret");
     for (const f of readdirSync(path.join(dataDir, "models"))) {
-      expect(readFileSync(path.join(dataDir, "models", f), "utf8")).not.toContain(
-        "sk-super-secret",
-      );
+      expect(
+        readFileSync(path.join(dataDir, "models", f), "utf8"),
+      ).not.toContain("sk-super-secret");
     }
   });
 
   test("切换默认只留一个；删除默认后另一条顶上", async () => {
-    const { call } = await launch();
-    const a = await (await call("POST", "", body({ name: "a" }))).json();
-    const b = await (await call("POST", "", body({ name: "b" }))).json();
+    const { call, json } = await launch();
+    const a = await json("POST", "", body({ name: "a" }));
+    const b = await json("POST", "", body({ name: "b" }));
     await call("PATCH", `/${b.id}`, { isDefault: true });
-    let list = (await (await call("GET", "")).json()).models;
-    expect(list.filter((m: { isDefault: boolean }) => m.isDefault)).toHaveLength(1);
-    expect(list.find((m: { id: string }) => m.id === b.id).isDefault).toBe(true);
+    let list = (await json("GET", "")).models;
+    expect(
+      list.filter((m: { isDefault: boolean }) => m.isDefault),
+    ).toHaveLength(1);
+    expect(list.find((m: { id: string }) => m.id === b.id).isDefault).toBe(
+      true,
+    );
     expect((await call("DELETE", `/${b.id}`)).status).toBe(204);
-    list = (await (await call("GET", "")).json()).models;
+    list = (await json("GET", "")).models;
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ id: a.id, isDefault: true });
   });
 
   test("字段非法返回 400；不存在的 id 返回 404", async () => {
     const { call } = await launch();
-    expect((await call("POST", "", body({ baseUrl: "ftp://x" }))).status).toBe(400);
+    expect((await call("POST", "", body({ baseUrl: "ftp://x" }))).status).toBe(
+      400,
+    );
     expect((await call("POST", "", body({ api: "nope" }))).status).toBe(400);
     expect((await call("DELETE", "/missing")).status).toBe(404);
   });
@@ -88,7 +106,7 @@ describe("模型登记", () => {
     const { call, dataDir } = await launch();
     const res = await call("POST", "/test", body());
     expect(res.status).toBe(200);
-    const out = await res.json();
+    const out = (await res.json()) as { ok: boolean; error: unknown };
     expect(out.ok).toBe(false);
     expect(typeof out.error).toBe("string");
     expect(readdirSync(path.join(dataDir, "models"))).toEqual([]);

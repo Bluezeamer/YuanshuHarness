@@ -436,7 +436,12 @@ describe("数据目录（R4）", () => {
     const { server } = await launch(cfg({ dataDir }));
     await server.stop();
     const { readdir } = await import("node:fs/promises");
-    expect(await readdir(dataDir)).toEqual(["models", "secret.key", "sessions", "yuanshu.db"]);
+    expect(await readdir(dataDir)).toEqual([
+      "models",
+      "secret.key",
+      "sessions",
+      "yuanshu.db",
+    ]);
   });
 });
 

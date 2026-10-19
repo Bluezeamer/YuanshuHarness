@@ -210,7 +210,10 @@ export function createServer(
         );
         if (created)
           app.log.info({ path: created.path }, "已登记默认 workspace");
-        const secrets = new SecretStore(db as Db, loadMasterKey(config.dataDir));
+        const secrets = new SecretStore(
+          db as Db,
+          loadMasterKey(config.dataDir),
+        );
         const models = new ModelStore(config.dataDir);
         const agentDir = path.join(config.dataDir, "agent");
         const pool = new SessionPool({

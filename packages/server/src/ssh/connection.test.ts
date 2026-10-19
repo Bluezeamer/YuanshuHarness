@@ -1,7 +1,21 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from "vitest";
 import { hasSshd, startSshd, type TestSshd } from "../../test/support/sshd.js";
 import { type Db, openDatabase } from "../store/db.js";
 import { loadMasterKey, SecretStore } from "../store/secrets.js";
@@ -28,7 +42,12 @@ describe.skipIf(!hasSshd)("SshConnection（真实 sshd）", () => {
     secrets = new SecretStore(db, loadMasterKey(dir));
     const key = secrets.create("k", "ssh_key", sshd.privateKey);
     conn = new SshConnection(
-      { host: "127.0.0.1", port: sshd.port, username: sshd.user, secretId: key?.id ?? null },
+      {
+        host: "127.0.0.1",
+        port: sshd.port,
+        username: sshd.user,
+        secretId: key?.id ?? null,
+      },
       secrets,
     );
     await conn.connect();
@@ -105,7 +124,12 @@ describe.skipIf(!hasSshd)("SshConnection（真实 sshd）", () => {
 
   test("引用的密码不存在时连接失败并说明原因", async () => {
     const bad = new SshConnection(
-      { host: "127.0.0.1", port: sshd.port, username: sshd.user, secretId: "nope" },
+      {
+        host: "127.0.0.1",
+        port: sshd.port,
+        username: sshd.user,
+        secretId: "nope",
+      },
       secrets,
     );
     await expect(bad.connect()).rejects.toThrow("密码不存在");
@@ -114,7 +138,12 @@ describe.skipIf(!hasSshd)("SshConnection（真实 sshd）", () => {
   test("密钥错误时认证失败", async () => {
     const other = secrets.create("wrong", "password", "not-a-key");
     const bad = new SshConnection(
-      { host: "127.0.0.1", port: sshd.port, username: sshd.user, secretId: other?.id ?? null },
+      {
+        host: "127.0.0.1",
+        port: sshd.port,
+        username: sshd.user,
+        secretId: other?.id ?? null,
+      },
       secrets,
     );
     await expect(bad.connect()).rejects.toThrow();

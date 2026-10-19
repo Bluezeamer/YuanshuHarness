@@ -52,7 +52,9 @@ export class ModelStore {
       if (!f.endsWith(".json")) continue;
       try {
         out.push(
-          JSON.parse(readFileSync(path.join(this.dir, f), "utf8")) as ModelEntry,
+          JSON.parse(
+            readFileSync(path.join(this.dir, f), "utf8"),
+          ) as ModelEntry,
         );
       } catch {
         // 损坏的文件跳过，不拖垮其余模型。
@@ -70,7 +72,8 @@ export class ModelStore {
     if (this.list().every((m) => m.id === entry.id)) entry.isDefault = true;
     if (entry.isDefault) {
       for (const m of this.list()) {
-        if (m.id !== entry.id && m.isDefault) this.write({ ...m, isDefault: false });
+        if (m.id !== entry.id && m.isDefault)
+          this.write({ ...m, isDefault: false });
       }
     }
     this.write(entry);
@@ -91,9 +94,13 @@ export class ModelStore {
   }
 
   private write(m: ModelEntry): void {
-    writeFileSync(path.join(this.dir, `${m.id}.json`), JSON.stringify(m, null, 2), {
-      mode: 0o600,
-    });
+    writeFileSync(
+      path.join(this.dir, `${m.id}.json`),
+      JSON.stringify(m, null, 2),
+      {
+        mode: 0o600,
+      },
+    );
   }
 }
 
@@ -120,7 +127,9 @@ export async function buildRuntime(
               id: entry.modelId,
               reasoning: entry.reasoning,
               input: entry.image ? ["text", "image"] : ["text"],
-              ...(entry.contextWindow ? { contextWindow: entry.contextWindow } : {}),
+              ...(entry.contextWindow
+                ? { contextWindow: entry.contextWindow }
+                : {}),
             },
           ],
         },
@@ -133,7 +142,8 @@ export async function buildRuntime(
     modelsPath,
   });
   {
-    const key = keyOverride ?? (entry.secretId ? secrets.reveal(entry.secretId) : null);
+    const key =
+      keyOverride ?? (entry.secretId ? secrets.reveal(entry.secretId) : null);
     if (key) await runtime.setRuntimeApiKey(entry.id, key);
   }
   const model = runtime.getModel(entry.id, entry.modelId);

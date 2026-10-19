@@ -90,7 +90,11 @@ export class SshConnection {
     return new Promise((ok, fail) => {
       const client = this.requireClient();
       if (opts.signal?.aborted) {
-        ok({ exitCode: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+        ok({
+          exitCode: null,
+          stdout: Buffer.alloc(0),
+          stderr: Buffer.alloc(0),
+        });
         return;
       }
       client.exec(command, (err, stream) => {
@@ -174,15 +178,18 @@ export class SshConnection {
     for (let i = 0; i < 40; i++) {
       if (visited.has(current)) return null;
       visited.add(current);
-      const info = await new Promise<{ exists: boolean; link: boolean; target?: string }>(
-        (ok) =>
-          s.lstat(current, (e, st) => {
-            if (e) return ok({ exists: false, link: false });
-            if (!st.isSymbolicLink()) return ok({ exists: true, link: false });
-            s.readlink(current, (e2, t) =>
-              ok({ exists: true, link: true, target: e2 || !t ? undefined : t }),
-            );
-          }),
+      const info = await new Promise<{
+        exists: boolean;
+        link: boolean;
+        target?: string;
+      }>((ok) =>
+        s.lstat(current, (e, st) => {
+          if (e) return ok({ exists: false, link: false });
+          if (!st.isSymbolicLink()) return ok({ exists: true, link: false });
+          s.readlink(current, (e2, t) =>
+            ok({ exists: true, link: true, target: e2 || !t ? undefined : t }),
+          );
+        }),
       );
       if (!info.exists) return null;
       if (!info.link) return current;

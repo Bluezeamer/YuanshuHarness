@@ -49,7 +49,8 @@ export async function environmentsApi(
     "/api/v1/secrets/:id",
     async (req, reply) => {
       const r = secrets.remove(req.params.id);
-      if (r === "not_found") return reply.code(404).send({ error: "not_found" });
+      if (r === "not_found")
+        return reply.code(404).send({ error: "not_found" });
       if (r === "in_use") return reply.code(409).send({ error: "in_use" });
       return reply.code(204).send();
     },
@@ -63,7 +64,9 @@ export async function environmentsApi(
   function parse(
     body: Record<string, unknown>,
     partial: boolean,
-  ): { ok: true; value: Partial<EnvironmentInput> } | { ok: false; error: string } {
+  ):
+    | { ok: true; value: Partial<EnvironmentInput> }
+    | { ok: false; error: string } {
     const v: Partial<EnvironmentInput> = {};
     if (!partial || body.name !== undefined) {
       const n = cleanName(body.name);
@@ -127,7 +130,8 @@ export async function environmentsApi(
     "/api/v1/environments/:id",
     async (req, reply) => {
       const r = environments.remove(req.params.id);
-      if (r === "not_found") return reply.code(404).send({ error: "not_found" });
+      if (r === "not_found")
+        return reply.code(404).send({ error: "not_found" });
       if (r === "in_use") return reply.code(409).send({ error: "in_use" });
       return reply.code(204).send();
     },

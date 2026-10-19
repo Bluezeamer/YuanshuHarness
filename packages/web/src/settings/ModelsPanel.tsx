@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  type CallResult,
   createModel,
   deleteModel,
   listModels,
   loadToken,
-  type CallResult,
   type ModelApiKind,
   type ModelInfo,
   type ModelInput,
@@ -100,10 +100,20 @@ function AddForm({
     >
       <h2 className="m-0 text-base font-bold">添加模型</h2>
       <Field label="名称" id="m-name">
-        <input id="m-name" value={f.name} onChange={(e) => set("name", e.target.value)} className={field} />
+        <input
+          id="m-name"
+          value={f.name}
+          onChange={(e) => set("name", e.target.value)}
+          className={field}
+        />
       </Field>
       <Field label="协议" id="m-api">
-        <select id="m-api" value={f.api} onChange={(e) => set("api", e.target.value as ModelApiKind)} className={field}>
+        <select
+          id="m-api"
+          value={f.api}
+          onChange={(e) => set("api", e.target.value as ModelApiKind)}
+          className={field}
+        >
           {APIS.map((a) => (
             <option key={a.id} value={a.id}>
               {a.label}
@@ -112,34 +122,74 @@ function AddForm({
         </select>
       </Field>
       <Field label="接口地址" id="m-url">
-        <input id="m-url" value={f.baseUrl} placeholder="接口根地址，含 /v1" onChange={(e) => set("baseUrl", e.target.value)} className={field} />
+        <input
+          id="m-url"
+          value={f.baseUrl}
+          placeholder="接口根地址，含 /v1"
+          onChange={(e) => set("baseUrl", e.target.value)}
+          className={field}
+        />
       </Field>
       <Field label="模型 ID" id="m-model">
-        <input id="m-model" value={f.modelId} onChange={(e) => set("modelId", e.target.value)} className={field} />
+        <input
+          id="m-model"
+          value={f.modelId}
+          onChange={(e) => set("modelId", e.target.value)}
+          className={field}
+        />
       </Field>
       <Field label="API Key（本地无鉴权可留空）" id="m-key">
-        <input id="m-key" type="password" autoComplete="off" value={f.apiKey} onChange={(e) => set("apiKey", e.target.value)} className={field} />
+        <input
+          id="m-key"
+          type="password"
+          autoComplete="off"
+          value={f.apiKey}
+          onChange={(e) => set("apiKey", e.target.value)}
+          className={field}
+        />
       </Field>
       <Field label="上下文窗口（可选）" id="m-ctx">
-        <input id="m-ctx" inputMode="numeric" value={f.contextWindow} onChange={(e) => set("contextWindow", e.target.value)} className={field} />
+        <input
+          id="m-ctx"
+          inputMode="numeric"
+          value={f.contextWindow}
+          onChange={(e) => set("contextWindow", e.target.value)}
+          className={field}
+        />
       </Field>
       <div className="flex gap-6 text-sm">
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={f.reasoning} onChange={(e) => set("reasoning", e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={f.reasoning}
+            onChange={(e) => set("reasoning", e.target.checked)}
+          />
           支持推理
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={f.image} onChange={(e) => set("image", e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={f.image}
+            onChange={(e) => set("image", e.target.checked)}
+          />
           支持图片输入
         </label>
       </div>
       {msg && (
-        <p role={msg.ok ? "status" : "alert"} className={`m-0 font-semibold ${msg.ok ? "text-ok" : "text-acc"}`}>
+        <p
+          role={msg.ok ? "status" : "alert"}
+          className={`m-0 font-semibold ${msg.ok ? "text-ok" : "text-acc"}`}
+        >
           {msg.text}
         </p>
       )}
       <div className="flex gap-3">
-        <button type="button" disabled={busy || !valid} onClick={() => void test()} className={actionBtn}>
+        <button
+          type="button"
+          disabled={busy || !valid}
+          onClick={() => void test()}
+          className={actionBtn}
+        >
           测试连接
         </button>
         <button type="submit" disabled={busy || !valid} className={actionBtn}>
@@ -150,7 +200,15 @@ function AddForm({
   );
 }
 
-function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+function Field({
+  label,
+  id,
+  children,
+}: {
+  label: string;
+  id: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-xs font-semibold">
@@ -161,8 +219,14 @@ function Field({ label, id, children }: { label: string; id: string; children: R
   );
 }
 
-export function ModelsPanel({ onUnauthorized }: { onUnauthorized: () => void }) {
-  const [models, setModels] = useState<ModelInfo[] | "loading" | "failed">("loading");
+export function ModelsPanel({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
+  const [models, setModels] = useState<ModelInfo[] | "loading" | "failed">(
+    "loading",
+  );
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -194,16 +258,23 @@ export function ModelsPanel({ onUnauthorized }: { onUnauthorized: () => void }) 
         </p>
       )}
       {Array.isArray(models) && models.length === 0 && (
-        <p className="m-0 text-mute">还没有登记模型。添加后，新建的会话会使用默认模型。</p>
+        <p className="m-0 text-mute">
+          还没有登记模型。添加后，新建的会话会使用默认模型。
+        </p>
       )}
       {Array.isArray(models) && models.length > 0 && (
         <ul className="m-0 flex max-w-[640px] list-none flex-col gap-2 p-0">
           {models.map((m) => (
-            <li key={m.id} className="flex items-center justify-between gap-3 border border-line px-3 py-2">
+            <li
+              key={m.id}
+              className="flex items-center justify-between gap-3 border border-line px-3 py-2"
+            >
               <div className="min-w-0">
                 <div className="font-semibold">
                   {m.name}
-                  {m.isDefault && <span className="ml-2 text-xs text-ok">默认</span>}
+                  {m.isDefault && (
+                    <span className="ml-2 text-xs text-ok">默认</span>
+                  )}
                 </div>
                 <div className="truncate text-xs text-mute">
                   {m.modelId} · {m.baseUrl}
@@ -211,11 +282,22 @@ export function ModelsPanel({ onUnauthorized }: { onUnauthorized: () => void }) 
               </div>
               <div className="flex shrink-0 gap-2">
                 {!m.isDefault && (
-                  <button type="button" className={actionBtn} onClick={() => void act(() => setDefaultModel(loadToken(), m.id))}>
+                  <button
+                    type="button"
+                    className={actionBtn}
+                    onClick={() =>
+                      void act(() => setDefaultModel(loadToken(), m.id))
+                    }
+                  >
                     设为默认
                   </button>
                 )}
-                <button type="button" aria-label={`删除 ${m.name}`} className={dangerBtn} onClick={() => void act(() => deleteModel(loadToken(), m.id))}>
+                <button
+                  type="button"
+                  aria-label={`删除 ${m.name}`}
+                  className={dangerBtn}
+                  onClick={() => void act(() => deleteModel(loadToken(), m.id))}
+                >
                   删除
                 </button>
               </div>

@@ -2,8 +2,8 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   getAgentDir,
+  SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { buildRuntime, type ModelStore } from "../store/models.js";
 import type { SecretStore } from "../store/secrets.js";
 import type { SessionFactory } from "./pool.js";
@@ -34,9 +34,7 @@ export function createSessionFactory(deps?: {
       agentDir: getAgentDir(),
       resourceLoader,
       sessionManager,
-      ...(picked
-        ? { modelRuntime: picked.runtime, model: picked.model }
-        : {}),
+      ...(picked ? { modelRuntime: picked.runtime, model: picked.model } : {}),
     });
     return session;
   };

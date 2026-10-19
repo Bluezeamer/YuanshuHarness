@@ -1,5 +1,11 @@
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -29,11 +35,21 @@ function freePort(): Promise<number> {
 export async function startSshd(): Promise<TestSshd> {
   const dir = mkdtempSync(path.join(tmpdir(), "yuanshu-sshd-"));
   const gen = (name: string) =>
-    execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", path.join(dir, name)]);
+    execFileSync("ssh-keygen", [
+      "-q",
+      "-t",
+      "ed25519",
+      "-N",
+      "",
+      "-f",
+      path.join(dir, name),
+    ]);
   gen("host");
   gen("client");
   const auth = path.join(dir, "authorized_keys");
-  writeFileSync(auth, readFileSync(path.join(dir, "client.pub")), { mode: 0o600 });
+  writeFileSync(auth, readFileSync(path.join(dir, "client.pub")), {
+    mode: 0o600,
+  });
   const port = await freePort();
   const config = path.join(dir, "sshd_config");
   writeFileSync(
@@ -51,7 +67,9 @@ export async function startSshd(): Promise<TestSshd> {
     ].join("\n"),
   );
   // -D 前台运行，由测试进程持有并负责结束。
-  const child = spawn(SSHD_BIN, ["-D", "-e", "-f", config], { stdio: "ignore" });
+  const child = spawn(SSHD_BIN, ["-D", "-e", "-f", config], {
+    stdio: "ignore",
+  });
   await new Promise<void>((ok, fail) => {
     const deadline = Date.now() + 5000;
     const probe = () => {
@@ -61,7 +79,9 @@ export async function startSshd(): Promise<TestSshd> {
         ok();
       });
       c.once("error", () =>
-        Date.now() > deadline ? fail(new Error("sshd 未能启动")) : setTimeout(probe, 50),
+        Date.now() > deadline
+          ? fail(new Error("sshd 未能启动"))
+          : setTimeout(probe, 50),
       );
     };
     probe();

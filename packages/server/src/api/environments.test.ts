@@ -128,7 +128,11 @@ describe("环境", () => {
       url: `/api/v1/environments/${r.json().id}`,
       payload: { os: "windows", port: 2222 },
     });
-    expect(p.json()).toMatchObject({ os: "windows", port: 2222, host: "10.0.0.5" });
+    expect(p.json()).toMatchObject({
+      os: "windows",
+      port: 2222,
+      host: "10.0.0.5",
+    });
     expect(
       (
         await post("/api/v1/environments", {
@@ -146,7 +150,10 @@ describe("环境", () => {
     [{ name: "a", host: "h", username: "u", port: 0 }, "invalid_port"],
     [{ name: "a", host: "h", username: "u", port: 22.5 }, "invalid_port"],
     [{ name: "a", host: "h", username: "u", os: "mac" }, "invalid_os"],
-    [{ name: "a", host: "h", username: "u", secretId: "nope" }, "invalid_secret"],
+    [
+      { name: "a", host: "h", username: "u", secretId: "nope" },
+      "invalid_secret",
+    ],
   ])("非法输入 %j → 400", async (body, error) => {
     const r = await post("/api/v1/environments", body);
     expect(r.statusCode).toBe(400);

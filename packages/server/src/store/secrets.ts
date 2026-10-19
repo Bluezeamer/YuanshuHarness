@@ -1,8 +1,4 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-} from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { uuidv7 } from "../id.js";
@@ -54,7 +50,9 @@ export class SecretStore {
   list(): SecretMeta[] {
     return (
       this.db
-        .prepare("SELECT id, name, kind, created_at FROM secrets ORDER BY created_at")
+        .prepare(
+          "SELECT id, name, kind, created_at FROM secrets ORDER BY created_at",
+        )
         .all() as Row[]
     ).map(toMeta);
   }

@@ -401,16 +401,28 @@ export interface ModelInput {
 }
 
 export const listModels = (token: string | null) =>
-  call("GET", "/api/v1/models", token, undefined, (b: { models: ModelInfo[] }) => {
-    if (!Array.isArray(b.models)) throw new Error("shape");
-    return b.models;
-  });
+  call(
+    "GET",
+    "/api/v1/models",
+    token,
+    undefined,
+    (b: { models: ModelInfo[] }) => {
+      if (!Array.isArray(b.models)) throw new Error("shape");
+      return b.models;
+    },
+  );
 
 export const createModel = (token: string | null, input: ModelInput) =>
   call("POST", "/api/v1/models", token, input, (b: ModelInfo) => b);
 
 export const setDefaultModel = (token: string | null, id: string) =>
-  call("PATCH", `/api/v1/models/${enc(id)}`, token, { isDefault: true }, (b: ModelInfo) => b);
+  call(
+    "PATCH",
+    `/api/v1/models/${enc(id)}`,
+    token,
+    { isDefault: true },
+    (b: ModelInfo) => b,
+  );
 
 export const deleteModel = (token: string | null, id: string) =>
   call("DELETE", `/api/v1/models/${enc(id)}`, token, undefined, () => {});

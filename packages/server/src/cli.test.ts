@@ -117,7 +117,12 @@ describe("serve（R7）", () => {
     h.controller.abort();
     expect(await done).toBe(0);
     expect(Date.now() - started).toBeLessThan(5000);
-    expect(await readdir(dataDir)).toEqual(["models", "secret.key", "sessions", "yuanshu.db"]);
+    expect(await readdir(dataDir)).toEqual([
+      "models",
+      "secret.key",
+      "sessions",
+      "yuanshu.db",
+    ]);
     await expect(fetch(`http://127.0.0.1:${port}/healthz`)).rejects.toThrow();
   });
 
