@@ -1,6 +1,9 @@
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 import { CLIENT_COMMANDS, runClient } from "./client/command.js";
 import { parseConfig } from "./config.js";
 import { createServer } from "./server.js";
+import { createSessionFactory } from "./session/factory.js";
 
 export interface Deps {
   env: Record<string, string | undefined>;
@@ -53,9 +56,13 @@ export async function execute(argv: string[], deps: Deps): Promise<number> {
     return EXIT_USAGE;
   }
 
+  // 默认 workspace 固定为 ~/yuanshu-workspace，不存在则创建。
+  const defaultDir = path.join(deps.home, "yuanshu-workspace");
+  mkdirSync(defaultDir, { recursive: true });
   const server = createServer(parsed.config, {
     webRoot: deps.webRoot,
-    startDir: deps.cwd,
+    startDir: defaultDir,
+    sessionFactory: createSessionFactory(),
     logStream: deps.logStream,
   });
   try {
