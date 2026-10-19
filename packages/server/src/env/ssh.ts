@@ -97,6 +97,14 @@ export class SshEnv implements ExecEnv {
     await (await this.c()).mkdirp(p);
   }
 
+  async readStream(p: string) {
+    return (await this.c()).readStream(p);
+  }
+
+  async writeStream(p: string) {
+    return (await this.c()).writeStream(p);
+  }
+
   async exec(command: string, cwd: string, opts: ExecOptions) {
     const conn = await this.c();
     const exports = Object.entries(opts.env ?? {})

@@ -1,4 +1,4 @@
-import type { Stats } from "node:fs";
+import { createReadStream, createWriteStream, type Stats } from "node:fs";
 import {
   lstat,
   mkdir,
@@ -45,6 +45,8 @@ export class LocalEnv implements ExecEnv {
   mkdirp = async (p: string) => {
     await mkdir(p, { recursive: true });
   };
+  readStream = async (p: string) => createReadStream(p);
+  writeStream = async (p: string) => createWriteStream(p);
 
   async readdir(p: string): Promise<DirEntry[]> {
     const list = await readdir(p, { withFileTypes: true });

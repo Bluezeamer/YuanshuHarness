@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Readable, Writable } from "node:stream";
 import { Client, type SFTPWrapper, type Stats } from "ssh2";
 import type { DirEntry, FileStat } from "../env/types.js";
 import type { SecretStore } from "../store/secrets.js";
@@ -142,6 +143,14 @@ export class SshConnection {
     return new Promise((ok, fail) =>
       s.writeFile(remotePath, content, (e) => (e ? fail(e) : ok())),
     );
+  }
+
+  async readStream(remotePath: string): Promise<Readable> {
+    return (await this.sftp()).createReadStream(remotePath);
+  }
+
+  async writeStream(remotePath: string): Promise<Writable> {
+    return (await this.sftp()).createWriteStream(remotePath);
   }
 
   async readdir(remotePath: string): Promise<string[]> {

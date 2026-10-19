@@ -1,4 +1,5 @@
 // 环境原语（ADR-0034）：工具与权限判定只依赖这组接口，本机与 ssh 各一个实现。
+import type { Readable, Writable } from "node:stream";
 import type { OsType } from "../store/environments.js";
 
 export interface FileStat {
@@ -37,6 +38,9 @@ export interface ExecEnv {
   readFile(p: string): Promise<Buffer>;
   writeFile(p: string, data: Buffer | string): Promise<void>;
   mkdirp(p: string): Promise<void>;
+  /** 流式读写，供跨环境传输使用，避免大文件整个进内存。 */
+  readStream(p: string): Promise<Readable>;
+  writeStream(p: string): Promise<Writable>;
   /** 命令原样执行；stdout 与 stderr 合并交给 onData。被信号终止报 128+n。 */
   exec(
     command: string,
