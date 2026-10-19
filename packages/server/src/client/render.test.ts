@@ -97,3 +97,35 @@ describe("渲染（R5、R6）", () => {
     expect(out).toBe("[排队] 2 条\n[排队] 0 条\n");
   });
 });
+
+describe("弹窗渲染（prompt-dialog R10）", () => {
+  const q = {
+    promptId: "p1",
+    source: "question",
+    kind: "choice",
+    title: "选哪个？",
+    options: [
+      { id: "0", label: "甲" },
+      { id: "1", label: "乙" },
+    ],
+  };
+  test("requested 显示问题与编号选项并登记待答；resolved 清掉", () => {
+    const { out, r } = run([f("prompt.requested", q)]);
+    expect(out).toContain("[提问] 选哪个？");
+    expect(out).toContain("1. 甲");
+    expect(out).toContain("2. 乙");
+    expect(r.pendingPrompts).toHaveLength(1);
+    const x = r.render(
+      f("prompt.resolved", { promptId: "p1", outcome: "timeout" }),
+    );
+    expect(x.out).toContain("已超时");
+    expect(r.pendingPrompts).toHaveLength(0);
+  });
+  test("快照里的 prompts 取代本地待答集合", () => {
+    const { r } = run([
+      f("prompt.requested", q),
+      f("snapshot", { messages: [], partial: null, queue: [], prompts: [] }),
+    ]);
+    expect(r.pendingPrompts).toHaveLength(0);
+  });
+});

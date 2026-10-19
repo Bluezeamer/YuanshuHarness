@@ -103,8 +103,10 @@ describe("R6/R8/R15 索引与列表", () => {
         "createdAt",
         "id",
         "name",
+        "reviewPolicy",
         "running",
         "updatedAt",
+        "workspaceId",
       ]);
   });
 

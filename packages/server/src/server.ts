@@ -12,13 +12,17 @@ import Fastify, {
 } from "fastify";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { workbenchApi } from "./api/workbench.js";
+import { workspacesApi } from "./api/workspaces.js";
 import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
+import type { ReviewerFactory } from "./permission/review.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
 import { type Db, openDatabase } from "./store/db.js";
+import { RuleStore } from "./store/rules.js";
 import { SessionStore } from "./store/sessions.js";
 import { WorkbenchStore } from "./store/workbench.js";
+import { WorkspaceStore } from "./store/workspaces.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
 const PACKAGE_ROOT = new URL("../", import.meta.url);
@@ -28,6 +32,12 @@ export interface ServerOptions {
   logStream?: { write(msg: string): void };
   // 未提供时会话创建返回 501（真实模型接入在后续能力里）。
   sessionFactory?: SessionFactory;
+  // 注入的审核会话工厂（ADR-0031）；未提供时 auto 档同 rules。
+  reviewerFactory?: ReviewerFactory;
+  // 仅供测试缩短审核超时。
+  reviewTimeoutMs?: number;
+  // 首次启动登记为默认 workspace 的目录；缺省取进程工作目录。
+  startDir?: string;
   // 仅供测试注入限流的时钟与数值。
   authLimiter?: Partial<RateLimitOptions>;
   // 仅供测试缩短心跳与背压阈值。
@@ -181,9 +191,24 @@ export function createServer(
         const store = new SessionStore(db);
         const r = store.reconcile(sessionDir, (m) => app.log.warn(m));
         app.log.info(r, "会话索引对账完成");
+        const workspaces = new WorkspaceStore(db);
+        const rules = new RuleStore(db);
+        const created = workspaces.ensureDefault(
+          options.startDir ?? process.cwd(),
+        );
+        if (created)
+          app.log.info({ path: created.path }, "已登记默认 workspace");
         const pool = new SessionPool({
           factory: options.sessionFactory ?? null,
+          ...(options.reviewerFactory
+            ? { reviewerFactory: options.reviewerFactory }
+            : {}),
+          ...(options.reviewTimeoutMs
+            ? { reviewTimeoutMs: options.reviewTimeoutMs }
+            : {}),
           store,
+          workspaces,
+          rules,
           sessionDir,
         });
         const { hook } = createAuthHook({
@@ -195,6 +220,7 @@ export function createServer(
         app.register(async (scope) => {
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
+          scope.register(workspacesApi, { workspaces, rules, pool });
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {

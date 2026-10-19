@@ -8,7 +8,7 @@ export const CLIENT_COMMANDS = ["sessions", "new", "attach"] as const;
 export const CLIENT_USAGE = `客户端命令（服务地址取 --url，其次环境变量 YUANSHU_URL，默认 http://127.0.0.1:7420）：
   yuanshu sessions [--url <地址>]        列出会话
   yuanshu new [--url <地址>]             创建会话，只向 stdout 打印会话 id
-  yuanshu attach <id> [--url <地址>]     接入会话：输入一行发一条消息，/stop 中止运行，/quit 退出
+  yuanshu attach <id> [--url <地址>]     接入会话：输入一行发一条消息，/stop 中止运行，/answer <编号或文本> 回答弹窗，/quit 退出
 访问令牌只读环境变量 YUANSHU_TOKEN。
 `;
 

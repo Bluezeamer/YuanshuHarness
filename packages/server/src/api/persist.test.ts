@@ -366,8 +366,10 @@ describe("R13-R17 REST", () => {
       "createdAt",
       "id",
       "name",
+      "reviewPolicy",
       "running",
       "updatedAt",
+      "workspaceId",
     ]);
   });
 });

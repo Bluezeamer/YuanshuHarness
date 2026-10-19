@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { RawData, WebSocket } from "ws";
+import { POLICY_MAX } from "../permission/review.js";
 import {
   type ImageInput,
   PoolError,
@@ -81,14 +82,26 @@ export async function sessionsApi(
     throw err;
   };
 
-  app.post("/api/v1/sessions", async (_req, reply) => {
+  app.post("/api/v1/sessions", async (req, reply) => {
     if (!pool?.canCreate) {
       return reply.code(501).send({ error: "no_session_backend" });
     }
+    const body = req.body as { workspaceId?: unknown } | null | undefined;
+    const workspaceId = body?.workspaceId;
+    if (workspaceId !== undefined && typeof workspaceId !== "string")
+      return reply.code(400).send({ error: "bad_request" });
     try {
-      const info = await pool.create();
-      return reply.code(201).send({ id: info.id, createdAt: info.createdAt });
+      const info = await pool.create(
+        workspaceId === undefined ? {} : { workspaceId },
+      );
+      return reply.code(201).send({
+        id: info.id,
+        createdAt: info.createdAt,
+        workspaceId: info.workspaceId,
+      });
     } catch (err) {
+      if (err instanceof PoolError && err.code === "bad_request")
+        return reply.code(400).send({ error: "bad_request" });
       if (err instanceof PoolError)
         return reply.code(503).send({ error: err.code });
       app.log.error({ err }, "创建会话失败");
@@ -110,11 +123,30 @@ export async function sessionsApi(
   app.patch<{ Params: { id: string }; Body: unknown }>(
     "/api/v1/sessions/:id",
     async (req, reply) => {
-      const name = (req.body as { name?: unknown } | null)?.name;
-      if (typeof name !== "string")
+      const body = req.body as {
+        name?: unknown;
+        reviewPolicy?: unknown;
+      } | null;
+      const { name, reviewPolicy } = body ?? {};
+      if (
+        (name === undefined && reviewPolicy === undefined) ||
+        (name !== undefined && typeof name !== "string") ||
+        (reviewPolicy !== undefined && typeof reviewPolicy !== "string")
+      )
         return reply.code(400).send({ error: "bad_request" });
       try {
-        const info = await pool?.rename(req.params.id, name);
+        // 先校验再改：两个字段同时给时任一非法都不应产生部分修改。
+        if (
+          typeof reviewPolicy === "string" &&
+          reviewPolicy.trim().length > POLICY_MAX
+        )
+          return reply.code(400).send({ error: "bad_request" });
+        let info = await pool?.info(req.params.id);
+        if (!info) return reply.code(404).send({ error: "not_found" });
+        if (typeof name === "string")
+          info = await pool?.rename(req.params.id, name);
+        if (typeof reviewPolicy === "string")
+          info = await pool?.setReviewPolicy(req.params.id, reviewPolicy);
         if (!info) return reply.code(404).send({ error: "not_found" });
         return info;
       } catch (err) {
@@ -329,6 +361,18 @@ export async function sessionsApi(
                   "text 必须是字符串，images 必须是 {mimeType, data} 数组",
               });
             entry.send(msg.text, images);
+            return ack(id);
+          }
+          case "answer_prompt": {
+            if (typeof msg.promptId !== "string" || msg.promptId === "")
+              return ack(id, {
+                code: "bad_request",
+                message: "promptId 必须是字符串",
+              });
+            entry.answerPrompt(msg.promptId, {
+              optionId: msg.optionId,
+              text: msg.text,
+            });
             return ack(id);
           }
           case "stop":

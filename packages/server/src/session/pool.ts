@@ -1,21 +1,38 @@
-import { randomBytes } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import {
   type AgentSession,
   type AgentSessionEvent,
+  type ExtensionFactory,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { uuidv7 } from "../id.js";
+import { permissionExtension } from "../permission/extension.js";
+import {
+  type Evidence,
+  POLICY_MAX,
+  type ReviewerFactory,
+  runReview,
+} from "../permission/review.js";
 import {
   type ChatEntry,
   hasDanglingToolCall,
   readMessages,
+  readToolOutputs,
 } from "../store/history.js";
+import type { RuleStore } from "../store/rules.js";
 import {
   findSessionFile,
+  type IndexRow,
   readHeader,
+  readName,
   type SessionStore,
   UUID_RE,
 } from "../store/sessions.js";
+import {
+  resolveDirectory,
+  type Workspace,
+  type WorkspaceStore,
+} from "../store/workspaces.js";
 import {
   type ChatMessage,
   cut,
@@ -27,12 +44,18 @@ import {
   SNAPSHOT_MESSAGE_MAX,
   sanitizeData,
 } from "./events.js";
+import { type PromptResult, type PromptSpec, PromptTable } from "./prompts.js";
+import { askUserExtension } from "./tools.js";
 
 export interface FactoryOptions {
   id: string;
   sessionDir: string;
+  // 会话所属 workspace 的绝对路径，即工具的工作目录。
+  cwd: string;
   // 恢复已有会话时给出其 JSONL 路径；新建时缺省。
   file?: string;
+  // 池提供的扩展（ask_user、权限拦截），由工厂交给资源加载器的 extensionFactories。
+  extensions: ExtensionFactory[];
 }
 export type SessionFactory = (opts: FactoryOptions) => Promise<AgentSession>;
 
@@ -49,6 +72,8 @@ export interface SessionInfo {
   createdAt: string;
   updatedAt: string;
   running: boolean;
+  workspaceId: string;
+  reviewPolicy: string | null;
 }
 
 export interface ImageInput {
@@ -58,7 +83,13 @@ export interface ImageInput {
 
 export class PoolError extends Error {
   constructor(
-    readonly code: "bad_request" | "disposed" | "load_failed" | "delete_failed",
+    readonly code:
+      | "bad_request"
+      | "disposed"
+      | "load_failed"
+      | "delete_failed"
+      | "prompt_resolved"
+      | "prompt_unknown",
     message: string,
   ) {
     super(message);
@@ -67,16 +98,6 @@ export class PoolError extends Error {
 
 const WINDOW = 50;
 
-// UUIDv7：48 位毫秒时间戳加随机位。客户端当不透明字符串用。
-function uuidv7(): string {
-  const b = randomBytes(16);
-  b.writeUIntBE(Date.now(), 0, 6);
-  b.writeUInt8((b.readUInt8(6) & 0x0f) | 0x70, 6);
-  b.writeUInt8((b.readUInt8(8) & 0x3f) | 0x80, 8);
-  const h = b.toString("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
 const reason = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
@@ -84,6 +105,8 @@ export interface EntryOptions {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  workspaceId?: string;
+  reviewPolicy?: string | null;
   // 恢复时用 JSONL 里最近的消息播种窗口。
   seed?: ChatMessage[];
   // 恢复时会话里已有的消息总数（含窗口之外的）；缺省等于 seed 的条数。
@@ -92,6 +115,8 @@ export interface EntryOptions {
   interrupted?: boolean;
   // 每次运行结束后调用（持久化索引）；抛错不影响事件流。
   onRunEnded?: (entry: SessionEntry) => void;
+  // 弹窗超时（毫秒），缺省 30 分钟；测试用。
+  promptTimeoutMs?: number;
 }
 
 const INTERRUPTED_NOTICE =
@@ -100,6 +125,8 @@ const INTERRUPTED_NOTICE =
 export class SessionEntry {
   readonly id: string;
   readonly createdAt: string;
+  readonly workspaceId: string;
+  reviewPolicy: string | null;
   updatedAt: string;
   running = false;
   // send 已接受但 SDK 尚未发出 agent_start 的窗口；删除必须把它当作运行中。
@@ -118,6 +145,8 @@ export class SessionEntry {
   private runError: string | undefined;
   private readonly unsubscribeSdk: () => void;
   private disposed = false;
+  // 弹窗只存内存；表的钩子负责占 seq 广播。
+  readonly prompts: PromptTable;
 
   constructor(
     private readonly session: AgentSession,
@@ -126,7 +155,16 @@ export class SessionEntry {
     this.id = opts.id ?? uuidv7();
     this.createdAt = opts.createdAt ?? new Date().toISOString();
     this.updatedAt = opts.updatedAt ?? this.createdAt;
+    this.workspaceId = opts.workspaceId ?? "";
+    this.reviewPolicy = opts.reviewPolicy ?? null;
     this.interrupted = opts.interrupted === true;
+    this.prompts = new PromptTable(
+      {
+        requested: (d) => this.emit("prompt.requested", { ...d }),
+        resolved: (d) => this.emit("prompt.resolved", d),
+      },
+      opts.promptTimeoutMs,
+    );
     this.recent.push(...(opts.seed ?? []).slice(-WINDOW));
     this.total = opts.seedTotal ?? this.recent.length;
     this.unsubscribeSdk = session.subscribe((e) => {
@@ -190,7 +228,27 @@ export class SessionEntry {
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       running: this.running,
+      workspaceId: this.workspaceId,
+      reviewPolicy: this.reviewPolicy,
     };
+  }
+
+  // 自动审核取证：用户消息与已解决弹窗问答可信；助手输出不可信。
+  evidence(history: ChatEntry[], toolOutputs: string[] = []): Evidence {
+    const trusted = history
+      .filter((m) => m.role === "user")
+      .map((m) => `用户：${m.text}`);
+    for (const r of this.prompts.history()) {
+      if (r.outcome !== "answered") continue;
+      const ans = r.optionLabel ?? r.text ?? "";
+      trusted.push(`弹窗「${r.title}」用户回答：${ans}`);
+    }
+    const untrusted = history
+      .filter((m) => m.role === "assistant")
+      .map((m) => `助手：${m.text}`);
+    // 近期工具输出同属不可信；条数封顶，总量由送审时的尾部截断兜底
+    untrusted.push(...toolOutputs.slice(-TOOL_OUTPUT_MAX));
+    return { trusted, untrusted };
   }
 
   // 先改状态，再分配序号并广播：序号 N 的快照就是事件 N 之后的状态。
@@ -314,6 +372,7 @@ export class SessionEntry {
         activeTools,
         partial,
         queue: this.queue,
+        prompts: this.prompts.list(),
       };
       if (
         limit === 0 ||
@@ -380,13 +439,39 @@ export class SessionEntry {
       });
   }
 
+  // 发弹窗并等结果；会话已关闭时直接视为撤销。
+  ask(spec: PromptSpec): Promise<PromptResult> {
+    if (this.disposed) return Promise.resolve({ outcome: "cancelled" });
+    return this.prompts.ask(spec);
+  }
+
+  answerPrompt(
+    promptId: string,
+    a: { optionId?: unknown; text?: unknown },
+  ): void {
+    if (this.disposed) throw new PoolError("disposed", "会话已关闭");
+    const failure = this.prompts.answer(promptId, a);
+    if (failure === "bad_request")
+      throw new PoolError("bad_request", "答复与弹窗不匹配");
+    if (failure)
+      throw new PoolError(
+        failure,
+        failure === "prompt_resolved"
+          ? "弹窗已被答复、超时或撤销"
+          : "弹窗不存在",
+      );
+  }
+
   async stop(): Promise<void> {
     if (this.disposed) throw new PoolError("disposed", "会话已关闭");
+    // 先撤销弹窗，让卡在审批/提问上的工具调用按拒绝收场，abort 才能结束运行。
+    this.prompts.cancelAll();
     await this.session.abort();
   }
 
   dispose(): void {
     if (this.disposed) return;
+    this.prompts.cancelAll();
     this.disposed = true;
     this.unsubscribeSdk();
     for (const sub of this.subscribers) {
@@ -403,14 +488,26 @@ export interface PoolDeps {
   // 未提供时不能创建或加载会话，但索引、列表、改名、删除、历史仍可用。
   factory: SessionFactory | null;
   store: SessionStore;
+  workspaces: WorkspaceStore;
+  rules: RuleStore;
   sessionDir: string;
+  // 弹窗超时（毫秒），缺省 30 分钟；测试用。
+  promptTimeoutMs?: number;
+  // 注入的审核会话工厂；缺省时 auto 档同 rules。
+  reviewerFactory?: ReviewerFactory;
+  // 审核超时（毫秒），缺省 60 秒；测试用。
+  reviewTimeoutMs?: number;
 }
 
 const NAME_MAX = 200;
+// 送审带的近期工具输出条数上限（每条另截断 200 字符）。
+const TOOL_OUTPUT_MAX = 10;
 
 export class SessionPool {
   private readonly entries = new Map<string, SessionEntry>();
   private readonly loading = new Map<string, Promise<SessionEntry | null>>();
+  // 创建中预占的会话数（按 workspace）：工厂完成前删除 workspace 要拒绝。
+  private readonly pending = new Map<string, number>();
   private disposed = false;
 
   constructor(private readonly deps: PoolDeps) {}
@@ -419,8 +516,76 @@ export class SessionPool {
     return this.deps.factory !== null;
   }
 
-  private entryOptions(): Pick<EntryOptions, "onRunEnded"> {
-    return { onRunEnded: (e) => this.persist(e) };
+  // 会话创建时会话条目还不存在，扩展按 id 惰性取。
+  private extensions(id: string, ws: Workspace): ExtensionFactory[] {
+    const ask = (spec: PromptSpec) =>
+      this.entries.get(id)?.ask(spec) ??
+      Promise.resolve<PromptResult>({ outcome: "cancelled" });
+    const { workspaces, rules, reviewerFactory } = this.deps;
+    return [
+      askUserExtension(ask),
+      permissionExtension({
+        cwd: ws.path,
+        // 每次工具调用即时读取：改档位/删规则立刻生效；workspace 被删时按最严的一档。
+        tier: () => workspaces.get(ws.id)?.tier ?? "rules",
+        rules: () => {
+          const all = rules.list(ws.id);
+          return {
+            path: all.flatMap((r) =>
+              r.kind === "path" && r.access
+                ? [{ access: r.access, value: r.value }]
+                : [],
+            ),
+            command: all
+              .filter((r) => r.kind === "command")
+              .map((r) => r.value),
+          };
+        },
+        addRule: (r) => rules.add(ws.id, r),
+        ask,
+        ...(reviewerFactory
+          ? {
+              review: (call) => {
+                const entry = this.entries.get(id);
+                let history: ChatEntry[] = [];
+                let toolOutputs: string[] = [];
+                try {
+                  const file = findSessionFile(this.deps.sessionDir, id);
+                  if (file) {
+                    history = readMessages(file, this.deps.sessionDir, id);
+                    toolOutputs = readToolOutputs(
+                      file,
+                      this.deps.sessionDir,
+                      id,
+                    );
+                  }
+                } catch {
+                  // 取不到证据就只带空证据，仍由审核方或降级兜底
+                }
+                return runReview(
+                  reviewerFactory,
+                  entry?.reviewPolicy ?? null,
+                  call,
+                  entry?.evidence(history, toolOutputs) ?? {
+                    trusted: [],
+                    untrusted: [],
+                  },
+                  this.deps.reviewTimeoutMs,
+                );
+              },
+            }
+          : {}),
+      }),
+    ];
+  }
+
+  private entryOptions(): Pick<EntryOptions, "onRunEnded" | "promptTimeoutMs"> {
+    return {
+      onRunEnded: (e) => this.persist(e),
+      ...(this.deps.promptTimeoutMs === undefined
+        ? {}
+        : { promptTimeoutMs: this.deps.promptTimeoutMs }),
+    };
   }
 
   // 会话一旦有了 JSONL 就进索引；之后每次运行结束更新 updated_at 与名称缓存。
@@ -431,23 +596,66 @@ export class SessionPool {
       name: e.name,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
+      workspaceId: e.workspaceId,
+      reviewPolicy: e.reviewPolicy,
     });
   }
 
-  async create(): Promise<SessionInfo> {
+  // 索引行的 workspace：空值读作默认（最早登记）的 workspace。
+  private rowWorkspaceId(workspaceId: string | null | undefined): string {
+    return workspaceId ?? this.deps.workspaces.getDefault()?.id ?? "";
+  }
+
+  // 登记路径此刻是否仍指向登记时的那个目录：消失、或被换成符号链接指向别处（realpath 与登记值不一致）都不能用。
+  private workspaceProblem(ws: Workspace): string | null {
+    const r = resolveDirectory(ws.path);
+    if (!r.ok) return "workspace 目录已不存在";
+    if (r.path !== ws.path)
+      return `workspace 路径已变化：登记为 ${ws.path}，现解析为 ${r.path}`;
+    return null;
+  }
+
+  async create(opts: { workspaceId?: string } = {}): Promise<SessionInfo> {
     if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
     const factory = this.deps.factory;
     if (!factory) throw new PoolError("load_failed", "没有会话后端");
+    const ws =
+      opts.workspaceId === undefined
+        ? this.deps.workspaces.getDefault()
+        : this.deps.workspaces.get(opts.workspaceId);
+    if (!ws) throw new PoolError("bad_request", "workspace 不存在");
+    const bad = this.workspaceProblem(ws);
+    if (bad) throw new PoolError("bad_request", bad);
     const id = uuidv7();
-    const session = await factory({
-      id,
-      sessionDir: this.deps.sessionDir,
-    });
+    const n = this.pending.get(ws.id) ?? 0;
+    this.pending.set(ws.id, n + 1);
+    let session: Awaited<ReturnType<typeof factory>>;
+    try {
+      session = await factory({
+        id,
+        sessionDir: this.deps.sessionDir,
+        cwd: ws.path,
+        extensions: this.extensions(id, ws),
+      });
+    } finally {
+      const n = this.pending.get(ws.id) ?? 0;
+      if (n > 1) this.pending.set(ws.id, n - 1);
+      else this.pending.delete(ws.id);
+    }
     if (this.disposed) {
       session.dispose();
       throw new PoolError("disposed", "会话池已关闭");
     }
-    const entry = new SessionEntry(session, { id, ...this.entryOptions() });
+    // 工厂完成后再次校验 workspace 仍存在（删除可能发生在工厂等待期间）。
+    if (!this.deps.workspaces.get(ws.id)) {
+      session.dispose();
+      throw new PoolError("bad_request", "workspace 已被删除");
+    }
+    const entry = new SessionEntry(session, {
+      id,
+      workspaceId: ws.id,
+      ...this.entryOptions(),
+    });
     this.entries.set(id, entry);
     return entry.info;
   }
@@ -472,7 +680,7 @@ export class SessionPool {
 
   private async load(id: string): Promise<SessionEntry | null> {
     if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
-    const { sessionDir, store, factory } = this.deps;
+    const { sessionDir, store, factory, workspaces } = this.deps;
     const file = findSessionFile(sessionDir, id);
     if (!file) return null;
     let seed: ChatMessage[];
@@ -491,9 +699,22 @@ export class SessionPool {
       throw new PoolError("load_failed", reason(err));
     }
     if (!factory) throw new PoolError("load_failed", "没有会话后端");
+    const row = store.get(id);
+    const ws =
+      (row?.workspaceId ? workspaces.get(row.workspaceId) : undefined) ??
+      workspaces.getDefault();
+    if (!ws) throw new PoolError("load_failed", "没有可用的 workspace");
+    const bad = this.workspaceProblem(ws);
+    if (bad) throw new PoolError("load_failed", bad);
     let session: AgentSession;
     try {
-      session = await factory({ id, sessionDir, file });
+      session = await factory({
+        id,
+        sessionDir,
+        file,
+        cwd: ws.path,
+        extensions: this.extensions(id, ws),
+      });
     } catch (err) {
       throw new PoolError("load_failed", reason(err));
     }
@@ -501,9 +722,10 @@ export class SessionPool {
       session.dispose();
       throw new PoolError("disposed", "会话池已关闭");
     }
-    const row = store.get(id);
     const entry = new SessionEntry(session, {
       id,
+      workspaceId: ws.id,
+      reviewPolicy: row?.reviewPolicy ?? null,
       createdAt: row?.createdAt ?? createdAt,
       updatedAt: row?.updatedAt,
       seed,
@@ -518,8 +740,7 @@ export class SessionPool {
   // 索引里的会话加上池内尚未持久化的会话；池内的状态（运行中、最新名称）优先。
   list(): SessionInfo[] {
     const out = new Map<string, SessionInfo>();
-    for (const r of this.deps.store.list())
-      out.set(r.id, { ...r, running: false });
+    for (const r of this.deps.store.list()) out.set(r.id, this.rowInfo(r));
     for (const e of this.entries.values()) out.set(e.id, e.info);
     return [...out.values()].sort(
       (a, b) =>
@@ -531,7 +752,27 @@ export class SessionPool {
     const e = this.entries.get(id);
     if (e) return e.info;
     const r = this.deps.store.get(id);
-    return r ? { ...r, running: false } : null;
+    return r ? this.rowInfo(r) : null;
+  }
+
+  private rowInfo(r: IndexRow): SessionInfo {
+    return {
+      id: r.id,
+      name: r.name,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      running: false,
+      workspaceId: this.rowWorkspaceId(r.workspaceId),
+      reviewPolicy: r.reviewPolicy ?? null,
+    };
+  }
+
+  // 是否有会话（池内或索引中）引用该 workspace；删除 workspace 前检查。
+  workspaceInUse(id: string): boolean {
+    for (const e of this.entries.values())
+      if (e.workspaceId === id) return true;
+    const created = this.pending.get(id) ?? 0;
+    return created > 0 || this.deps.workspaces.sessionCount(id) > 0;
   }
 
   // 改名：已加载的走池内会话；未加载的只追加 JSONL 并更新索引，不进池。
@@ -557,6 +798,28 @@ export class SessionPool {
     }
     if (!store.get(id)) this.indexFromFile(id, file, name);
     else store.rename(id, name);
+    return this.info(id);
+  }
+
+  // 设置会话级审核策略：去空白后 0–4000 字符，空串清除。
+  async setReviewPolicy(id: string, raw: string): Promise<SessionInfo | null> {
+    const policy = raw.trim();
+    if (policy.length > POLICY_MAX)
+      throw new PoolError(
+        "bad_request",
+        `reviewPolicy 最多 ${POLICY_MAX} 个字符`,
+      );
+    if (!UUID_RE.test(id)) return null;
+    const value = policy === "" ? null : policy;
+    const { store, sessionDir } = this.deps;
+    const resident = this.entries.get(id);
+    if (resident) resident.reviewPolicy = value;
+    if (!store.get(id)) {
+      const file = findSessionFile(sessionDir, id);
+      if (file) this.indexFromFile(id, file, readName(file));
+      else if (!resident) return null;
+    }
+    if (store.get(id)) store.setReviewPolicy(id, value);
     return this.info(id);
   }
 

@@ -96,11 +96,24 @@ export async function attach(
       }
     };
 
+    // /answer <编号或文本>：作答最早的待处理弹窗。
+    const answer = (arg: string) => {
+      const p = renderer.pendingPrompts[0];
+      if (!p) return void io.stderr.write("没有待回答的弹窗\n");
+      if (p.kind === "input")
+        return send("answer_prompt", { promptId: p.promptId, text: arg });
+      const opt = p.options[Number(arg) - 1];
+      if (!opt) return void io.stderr.write("编号无效\n");
+      send("answer_prompt", { promptId: p.promptId, optionId: opt.id });
+    };
+
     const onLine = (line: string) => {
       const cmd = line.trim();
       if (cmd === "") return;
       if (cmd === "/quit") return finish(EXIT_OK);
       if (cmd === "/stop") return send("stop");
+      if (cmd === "/answer" || cmd.startsWith("/answer "))
+        return answer(cmd.slice("/answer".length).trim());
       owed += 1;
       send("send_message", { text: line });
     };

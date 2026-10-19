@@ -18,9 +18,15 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { type SessionFactory, SessionPool } from "../../src/session/pool.js";
+import {
+  type PoolDeps,
+  type SessionFactory,
+  SessionPool,
+} from "../../src/session/pool.js";
 import { openDatabase } from "../../src/store/db.js";
+import { RuleStore } from "../../src/store/rules.js";
 import { SessionStore } from "../../src/store/sessions.js";
+import { WorkspaceStore } from "../../src/store/workspaces.js";
 
 export interface RecordedRequest {
   path: string;
@@ -36,9 +42,15 @@ export interface Stub {
   close(): Promise<void>;
 }
 
-// 最小的 OpenAI 兼容 stub：记录请求体，流式返回预设文本。
+// 回复可以是文本，也可以是一次工具调用（模型“决定”调用工具）。
+export type StubReply =
+  | string
+  | { tool: string; args: Record<string, unknown> };
+
+// 最小的 OpenAI 兼容 stub：记录请求体，流式返回预设文本或工具调用。
 export async function startStub(
-  reply: (n: number) => string = (n) => `stub-reply-${n}`,
+  reply: (n: number, body: Record<string, unknown>) => StubReply = (n) =>
+    `stub-reply-${n}`,
 ): Promise<Stub> {
   const requests: RecordedRequest[] = [];
   const mode = { delayMs: 0, status: 200, chunkBytes: 0 };
@@ -48,7 +60,9 @@ export async function startStub(
     req.on("end", () => {
       const body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
       requests.push({ path: req.url ?? "", headers: req.headers, body });
-      const text = reply(requests.length);
+      const out = reply(requests.length, body);
+      const call = typeof out === "string" ? null : out;
+      const text = typeof out === "string" ? out : "";
       if (mode.status !== 200) {
         res.writeHead(mode.status, { "content-type": "application/json" });
         res.end('{"error":{"message":"stub failure"}}');
@@ -74,6 +88,37 @@ export async function startStub(
       });
       // 首个 chunk 先发出，其余延迟：让测试能在"生成中途"观察会话。
       setTimeout(async () => {
+        if (call) {
+          send({
+            ...base,
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: `call_${requests.length}`,
+                      type: "function",
+                      function: {
+                        name: call.tool,
+                        arguments: JSON.stringify(call.args),
+                      },
+                    },
+                  ],
+                },
+                finish_reason: null,
+              },
+            ],
+          });
+          send({
+            ...base,
+            choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+          });
+          res.write("data: [DONE]\n\n");
+          res.end();
+          return;
+        }
         // chunkBytes>0 时把文本切成多个增量，模拟真实的流式输出。
         const size = mode.chunkBytes > 0 ? mode.chunkBytes : text.length || 1;
         for (let i = 0; i < Math.max(text.length, 1); i += size) {
@@ -163,6 +208,7 @@ export async function openSession(
     loader?: Partial<ConstructorParameters<typeof DefaultResourceLoader>[0]>;
     compaction?: { keepRecentTokens: number; reserveTokens: number };
     retry?: boolean;
+    // false：启用内置工具（read/bash/edit/write 等）；缺省只保留扩展工具。
     noTools?: false;
   } = {},
 ) {
@@ -192,7 +238,7 @@ export async function openSession(
     resourceLoader,
     settingsManager,
     sessionManager: opts.sessionManager ?? SessionManager.inMemory(env.cwd),
-    ...(opts.noTools === false ? {} : { noTools: "all" as const }),
+    ...(opts.noTools === false ? {} : { noTools: "builtin" as const }),
   });
   return { session, modelRuntime, resourceLoader };
 }
@@ -202,16 +248,20 @@ export async function openSession(
 export function stubSessionFactory(
   stub: { url: string },
   modelExtra: Record<string, unknown> = {},
+  builtinTools = false,
 ): SessionFactory {
-  return async ({ id, sessionDir, file }) => {
-    const env = makeEnv();
+  return async ({ id, sessionDir, file, cwd, extensions }) => {
+    // 工作目录以池给出的 workspace 路径为准；其余（agentDir 等）仍是隔离的临时目录。
+    const env = { ...makeEnv(), cwd };
     writeModels(env, stub.url, modelExtra);
     const manager = file
-      ? SessionManager.open(file, sessionDir)
-      : SessionManager.create(env.cwd, sessionDir, { id });
+      ? SessionManager.open(file, sessionDir, cwd)
+      : SessionManager.create(cwd, sessionDir, { id });
     const { session } = await openSession(env, {
       sessionManager: manager,
       retry: false,
+      loader: { extensionFactories: extensions },
+      ...(builtinTools ? { noTools: false as const } : {}),
     });
     return session;
   };
@@ -224,11 +274,17 @@ export function testData(existingDir?: string) {
   mkdirSync(sessionDir, { recursive: true });
   const db = openDatabase(dir);
   const store = new SessionStore(db);
+  const workspaces = new WorkspaceStore(db);
+  const rules = new RuleStore(db);
+  // 默认 workspace 指向数据目录本身（真实存在的目录）；已有 workspace 时不重复登记。
+  workspaces.ensureDefault(dir);
   return {
     dir,
     sessionDir,
     db,
     store,
+    workspaces,
+    rules,
     close(remove = true) {
       try {
         db.close();
@@ -243,12 +299,16 @@ export type TestData = ReturnType<typeof testData>;
 export function testPool(
   factory: SessionFactory,
   data: TestData = testData(),
+  extra: Partial<PoolDeps> = {},
 ): { pool: SessionPool; data: TestData } {
   return {
     pool: new SessionPool({
       factory,
       store: data.store,
+      workspaces: data.workspaces,
+      rules: data.rules,
       sessionDir: data.sessionDir,
+      ...extra,
     }),
     data,
   };
