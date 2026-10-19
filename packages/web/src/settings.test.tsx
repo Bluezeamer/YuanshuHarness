@@ -165,7 +165,9 @@ test("查看并删除已记住的规则", async () => {
 const openNew = async () => {
   render(<Shell sessions={[]} onUnauthorized={() => {}} />);
   // 顶栏按钮排在 DOM 最前；pane 会话列表里还有同名入口。
-  fireEvent.click(screen.getAllByRole("button", { name: "新建会话" })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "新建会话" })[0] as HTMLElement,
+  );
   await screen.findByRole("dialog", { name: "新建会话" });
   await screen.findByRole("list", { name: "子目录" });
 };
