@@ -35,7 +35,7 @@
 ## 里程碑
 
 - [x] M0 收尾：提交 7 个未提交文件；切 `feat/usable-v1`；提交本文件
-- [ ] M1 ssh 环境路由：工具走 ssh、多环境 workspace、list/switch_workspace 与尾部通知、sftp 传输、环境状态、权限按环境判定（第 6 条）
+- [ ] M1 ssh 环境路由（进行中，见「当前状态」）：工具走 ssh、多环境 workspace、list/switch_workspace 与尾部通知、sftp 传输、环境状态、权限按环境判定（第 6 条）
 - [ ] M2 WebUI 工作区：mock 布局模型（pane 内 tab、follow/钉住、预设、落区拖拽）、终端/文件管理/文件预览/PDF/网页预览/审计 pane、划选提问、跨主机拖拽传输、会话 rail 与总览、视觉 token 迁移
 - [ ] M3 agent 定义：提示词块拼接、能力勾选、build/plan 模式、模型向导补 compat/thinkingLevelMap（第 7 条）
 - [ ] M4 隐私变量与 sudo：@占位符审批后替换、输出回显遮罩、sudo 三类处理（第 8 条）
@@ -50,11 +50,19 @@
 
 ## 当前状态
 
-M0 完成，当前在 `feat/usable-v1`（从 `feat/permission-prompts` 切出，基线测试：server 822 通过、web 227 通过）。现状盘点：ROADMAP 第 1–5 条完成，第 6 条仅有密码库、环境登记、ssh 原语（`packages/server/src/ssh/connection.ts`），工具尚未路由到远程；pane 里只有 chat 是真的。
+M1 进行中，已提交三笔：a694538（权限判定改走环境原语、async）、6c77148（工具按 workspace 环境路由、list/switch_workspace、pool 接线）、27d38a5（ExecEnv 流式读写 + `env/transfer.ts`，含 local/ssh 契约测试与 transfer 测试）。最近一次 server 全量 vitest：854 通过；`tsc --noEmit` 干净。**`scripts/check.sh` 尚未跑过。**
+
+M1 还缺：环境状态与传输没有 REST 端点（`api/environments.ts` 里没有 status / transfer）；没有「ssh workspace 里真实走远程」的端到端测试，也没有真实模型冒烟；M1 末的 codex 评审未做。
+
+未跟踪文件 `packages/server/src/session/workspaces.ts` 与 `workspace-tools.ts` 注册了同名的两个工具，且无人 import。来源不明（会话中被标记为用户或 linter 改过，且是有意的）：不删、不提交，等用户确认去留。
 
 ## 下一步
 
-M1：先 spike pi SDK 的 read/edit/write/bash 能否注入自定义执行层（operations 或同类扩展点）；不行就自写四个工具。入口看 `packages/server/src/session/factory.ts`、`pool.ts`、`ssh/connection.ts`。
+M1 收尾，按顺序：
+1. `api/environments.ts` 加环境状态（`SshEnv.status()`）与传输端点，调用 `transfer()`，补 API 测试。
+2. 写 ssh workspace 的工具路由端到端测试（对 `tmp/sshd`）：read/ls/grep/bash 确认走远程，权限判定按远程路径解析。
+3. 跑 `scripts/check.sh`，全绿后再进 codex 评审（权限绕过、数据损坏、密钥泄露），结果写 `docs/reviews/m1.md`。
+4. 真实模型冒烟（`packages/server/test/live/`），再勾选 M1、更新 ROADMAP 第 6 条。
 
 ## 决策与偏差
 
@@ -68,7 +76,11 @@ M1：先 spike pi SDK 的 read/edit/write/bash 能否注入自定义执行层（
 
 ## Changelog
 
-### 2026-10-19
+### 2026-10-19（M1 中途）
+本轮完成：M1 的 env 层、工具路由、workspace 切换、transfer 原语（三笔提交，见「当前状态」）。M1 未完成，未勾选。
+主体更新：「当前状态」「下一步」改写，列出 M1 缺口。
+
+### 2026-10-19（M0 完成）
 本轮完成：创建本文件，对齐范围与固定决策。
 主体更新：全部区块初始化。
 下一步：M0，然后 M1 的 SDK 执行层 spike。
