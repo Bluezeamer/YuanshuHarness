@@ -1,4 +1,8 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { EnvHub } from "../env/hub.js";
+import { TransferError, transfer } from "../env/transfer.js";
+import type { ExecEnv } from "../env/types.js";
+import { pathOf } from "../permission/paths.js";
 import {
   type EnvironmentInput,
   type EnvironmentStore,
@@ -21,9 +25,9 @@ const str = (v: unknown, max: number): string | null =>
 // 密码库与 ssh 环境的登记接口。密码值只进不出：列表与返回体都不含 value。
 export async function environmentsApi(
   app: FastifyInstance,
-  opts: { environments: EnvironmentStore; secrets: SecretStore },
+  opts: { environments: EnvironmentStore; secrets: SecretStore; hub: EnvHub },
 ): Promise<void> {
-  const { environments, secrets } = opts;
+  const { environments, secrets, hub } = opts;
 
   app.get("/api/v1/secrets", async () => ({ secrets: secrets.list() }));
 
@@ -133,7 +137,60 @@ export async function environmentsApi(
       if (r === "not_found")
         return reply.code(404).send({ error: "not_found" });
       if (r === "in_use") return reply.code(409).send({ error: "in_use" });
+      hub.forget(req.params.id);
       return reply.code(204).send();
     },
   );
+
+  app.get("/api/v1/environments/status", async () => ({
+    statuses: environments
+      .list()
+      .map((e) => hub.status(e.id))
+      .filter((s) => s !== null),
+  }));
+
+  // 主动建立连接并返回结果；失败时状态里带原因，HTTP 仍是 200。
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/environments/:id/connect",
+    async (req, reply) => {
+      const env = hub.getSsh(req.params.id);
+      if (!env) return reply.code(404).send({ error: "not_found" });
+      await env.connect().catch(() => {});
+      return env.status();
+    },
+  );
+
+  // 用户在界面里拖拽触发的跨环境复制，不经 agent 权限判定；两端都必须是绝对路径。
+  app.post("/api/v1/transfers", async (req, reply) => {
+    const body = isObject(req.body) ? req.body : {};
+    const end = (v: unknown): { env: ExecEnv; path: string } | null => {
+      if (!isObject(v) || typeof v.env !== "string") return null;
+      const env = hub.get(v.env);
+      const p = v.path;
+      if (
+        !env ||
+        typeof p !== "string" ||
+        p.length > 4096 ||
+        p.includes("\0") ||
+        !pathOf(env).isAbsolute(p)
+      )
+        return null;
+      return { env, path: p };
+    };
+    const from = end(body.from);
+    const to = end(body.to);
+    if (!from || !to) return bad(reply, "invalid_endpoint");
+    try {
+      return await transfer(from, to, { overwrite: body.overwrite === true });
+    } catch (err) {
+      if (!(err instanceof TransferError)) throw err;
+      const status = {
+        src_missing: 404,
+        conflict: 409,
+        bad_request: 400,
+        copy_failed: 502,
+      }[err.code];
+      return reply.code(status).send({ error: err.code, message: err.message });
+    }
+  });
 }

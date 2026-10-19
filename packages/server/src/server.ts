@@ -249,7 +249,7 @@ export function createServer(
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
           scope.register(workspacesApi, { workspaces, rules, pool });
-          scope.register(environmentsApi, { environments, secrets });
+          scope.register(environmentsApi, { environments, secrets, hub });
           scope.register(modelsApi, { models, secrets, agentDir });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });

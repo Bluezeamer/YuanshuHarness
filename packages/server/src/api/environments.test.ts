@@ -1,8 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { EnvHub } from "../env/hub.js";
 import { type Db, openDatabase } from "../store/db.js";
 import { EnvironmentStore } from "../store/environments.js";
 import { KEY_FILE, loadMasterKey, SecretStore } from "../store/secrets.js";
@@ -13,20 +20,21 @@ let dir: string;
 let db: Db;
 let app: FastifyInstance;
 let secrets: SecretStore;
+let hub: EnvHub;
 
 beforeEach(async () => {
   dir = mkdtempSync(path.join(tmpdir(), "yuanshu-env-"));
   db = openDatabase(dir);
   secrets = new SecretStore(db, loadMasterKey(dir));
+  const environments = new EnvironmentStore(db);
+  hub = new EnvHub(environments, secrets);
   app = Fastify();
-  app.register(environmentsApi, {
-    environments: new EnvironmentStore(db),
-    secrets,
-  });
+  app.register(environmentsApi, { environments, secrets, hub });
   await app.ready();
 });
 afterEach(async () => {
   await app.close();
+  hub.close();
   db.close();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -193,5 +201,77 @@ describe("环境", () => {
     expect((await del()).statusCode).toBe(409);
     new WorkspaceStore(db).remove("w");
     expect((await del()).statusCode).toBe(204);
+  });
+});
+
+describe("环境状态与连接", () => {
+  test("状态列表含本机；连不上的环境报 error 并带原因，本机不可 connect", async () => {
+    const env = await post("/api/v1/environments", {
+      name: "dead",
+      host: "127.0.0.1",
+      port: 1,
+      username: "u",
+    });
+    const id = env.json().id;
+    const before = (
+      await app.inject({ method: "GET", url: "/api/v1/environments/status" })
+    ).json().statuses;
+    expect(before).toContainEqual({ id: "local", state: "local" });
+    expect(before).toContainEqual({ id, state: "disconnected" });
+
+    const conn = await post(`/api/v1/environments/${id}/connect`, {});
+    expect(conn.statusCode).toBe(200);
+    expect(conn.json().state).toBe("error");
+    expect(conn.json().error).toBeTruthy();
+
+    expect(
+      (await post("/api/v1/environments/local/connect", {})).statusCode,
+    ).toBe(404);
+    expect(
+      (await post("/api/v1/environments/nope/connect", {})).statusCode,
+    ).toBe(404);
+  });
+});
+
+describe("跨环境传输", () => {
+  const tr = (from: string, to: string, overwrite?: boolean) =>
+    post("/api/v1/transfers", {
+      from: { env: "local", path: from },
+      to: { env: "local", path: to },
+      ...(overwrite === undefined ? {} : { overwrite }),
+    });
+
+  test("复制文件；目标已存在 409，overwrite 后成功；源不存在 404", async () => {
+    const src = path.join(dir, "a.txt");
+    const dst = path.join(dir, "b.txt");
+    writeFileSync(src, "one");
+    const ok = await tr(src, dst);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ files: 1, bytes: 3, skippedLinks: 0 });
+    expect(readFileSync(dst, "utf8")).toBe("one");
+
+    writeFileSync(src, "two!");
+    expect((await tr(src, dst)).statusCode).toBe(409);
+    expect(readFileSync(dst, "utf8")).toBe("one");
+    expect((await tr(src, dst, true)).statusCode).toBe(200);
+    expect(readFileSync(dst, "utf8")).toBe("two!");
+
+    expect((await tr(path.join(dir, "nope"), dst)).statusCode).toBe(404);
+  });
+
+  test("端点必须是已登记环境上的绝对路径", async () => {
+    const bad = (body: unknown) => post("/api/v1/transfers", body);
+    const abs = path.join(dir, "x");
+    expect((await tr("rel/a", abs)).statusCode).toBe(400);
+    expect((await tr(abs, `${abs}\0y`)).statusCode).toBe(400);
+    expect(
+      (
+        await bad({
+          from: { env: "ghost", path: abs },
+          to: { env: "local", path: abs },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect((await bad({})).statusCode).toBe(400);
   });
 });
