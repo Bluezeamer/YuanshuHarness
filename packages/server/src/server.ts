@@ -12,6 +12,7 @@ import Fastify, {
 } from "fastify";
 import { environmentsApi } from "./api/environments.js";
 import { fsApi } from "./api/fs.js";
+import { modelsApi } from "./api/models.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { workbenchApi } from "./api/workbench.js";
 import { workspacesApi } from "./api/workspaces.js";
@@ -22,6 +23,7 @@ import type { ReviewerFactory } from "./permission/review.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
 import { type Db, openDatabase } from "./store/db.js";
 import { EnvironmentStore } from "./store/environments.js";
+import { ModelStore } from "./store/models.js";
 import { RuleStore } from "./store/rules.js";
 import { loadMasterKey, SecretStore } from "./store/secrets.js";
 import { SessionStore } from "./store/sessions.js";
@@ -36,6 +38,12 @@ export interface ServerOptions {
   logStream?: { write(msg: string): void };
   // 未提供时会话创建返回 501（真实模型接入在后续能力里）。
   sessionFactory?: SessionFactory;
+  // 需要服务内依赖（模型登记、密码库）时用它构造工厂；与 sessionFactory 二选一。
+  makeSessionFactory?: (deps: {
+    models: ModelStore;
+    secrets: SecretStore;
+    agentDir: string;
+  }) => SessionFactory;
   // 注入的审核会话工厂（ADR-0031）；未提供时 auto 档同 rules。
   reviewerFactory?: ReviewerFactory;
   // 仅供测试缩短审核超时。
@@ -202,8 +210,14 @@ export function createServer(
         );
         if (created)
           app.log.info({ path: created.path }, "已登记默认 workspace");
+        const secrets = new SecretStore(db as Db, loadMasterKey(config.dataDir));
+        const models = new ModelStore(config.dataDir);
+        const agentDir = path.join(config.dataDir, "agent");
         const pool = new SessionPool({
-          factory: options.sessionFactory ?? null,
+          factory:
+            options.sessionFactory ??
+            options.makeSessionFactory?.({ models, secrets, agentDir }) ??
+            null,
           ...(options.reviewerFactory
             ? { reviewerFactory: options.reviewerFactory }
             : {}),
@@ -227,8 +241,9 @@ export function createServer(
           scope.register(workspacesApi, { workspaces, rules, pool });
           scope.register(environmentsApi, {
             environments: new EnvironmentStore(db as Db),
-            secrets: new SecretStore(db as Db, loadMasterKey(config.dataDir)),
+            secrets,
           });
+          scope.register(modelsApi, { models, secrets, agentDir });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });

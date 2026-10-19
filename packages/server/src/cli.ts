@@ -62,7 +62,7 @@ export async function execute(argv: string[], deps: Deps): Promise<number> {
   const server = createServer(parsed.config, {
     webRoot: deps.webRoot,
     startDir: defaultDir,
-    sessionFactory: createSessionFactory(),
+    makeSessionFactory: createSessionFactory,
     logStream: deps.logStream,
   });
   try {

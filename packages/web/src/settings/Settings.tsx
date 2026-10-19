@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { ModelsPanel } from "./ModelsPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { WorkspacesPanel } from "./WorkspacesPanel";
 
 const TABS = [
   { id: "ws", label: "工作区" },
+  { id: "models", label: "模型" },
   { id: "review", label: "审核策略" },
 ] as const;
 
@@ -49,6 +51,8 @@ export function Settings({
         </div>
         {tab === "ws" ? (
           <WorkspacesPanel onUnauthorized={onUnauthorized} />
+        ) : tab === "models" ? (
+          <ModelsPanel onUnauthorized={onUnauthorized} />
         ) : (
           <ReviewPanel onUnauthorized={onUnauthorized} />
         )}
