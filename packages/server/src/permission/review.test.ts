@@ -39,6 +39,33 @@ describe("buildUserText", () => {
     expect(got).toContain("## 不可信上下文");
     expect(got).toContain("助手说");
   });
+  test("write/edit 只送路径与内容长度，不送内容", () => {
+    const ev = { trusted: [], untrusted: [] };
+    const w = buildUserText(
+      {
+        tool: "write",
+        summary: "/w/a.env",
+        input: { path: "/w/a.env", content: "SECRET=hunter2" },
+      },
+      ev,
+    );
+    expect(w).not.toContain("hunter2");
+    expect(w).toContain("/w/a.env");
+    expect(w).toContain("<14 字符>");
+    const e = buildUserText(
+      {
+        tool: "edit",
+        summary: "/w/a",
+        input: {
+          path: "/w/a",
+          edits: [{ oldText: "OLD-SECRET", newText: "NEW-SECRET" }],
+        },
+      },
+      ev,
+    );
+    expect(e).not.toContain("OLD-SECRET");
+    expect(e).not.toContain("NEW-SECRET");
+  });
   test("超长文本截断并留标记", () => {
     const got = buildUserText(
       { tool: "x", summary: "y", input: {} },

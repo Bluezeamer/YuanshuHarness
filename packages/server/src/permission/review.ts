@@ -60,13 +60,31 @@ export interface Evidence {
 /** 单行 JSON 字符串：换行与引号都被转义，内容不可能自成段落或标题。 */
 const enc = (s: string) => JSON.stringify(s);
 
+const PATH_KEYS = new Set(["path", "file_path", "filePath"]);
+
+/** write/edit 只保留路径，其余字符串字段换成长度（ADR-0031：审核方不见内容）。 */
+function redact(v: unknown, key = ""): unknown {
+  if (typeof v === "string")
+    return PATH_KEYS.has(key) ? v : `<${v.length} 字符>`;
+  if (Array.isArray(v)) return v.map((x) => redact(x, key));
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.entries(v).map(([k, x]) => [k, redact(x, k)]),
+    );
+  return v;
+}
+
 export function buildUserText(
   call: { tool: string; summary: string; input: Record<string, unknown> },
   ev: Evidence,
 ): string {
   let args = "";
   try {
-    args = clipItem(JSON.stringify(call.input), INPUT_MAX);
+    const input =
+      call.tool === "write" || call.tool === "edit"
+        ? (redact(call.input) as Record<string, unknown>)
+        : call.input;
+    args = clipItem(JSON.stringify(input), INPUT_MAX);
   } catch {
     args = "(无法序列化)";
   }
