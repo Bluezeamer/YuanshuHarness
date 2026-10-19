@@ -10,6 +10,7 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { environmentsApi } from "./api/environments.js";
 import { fsApi } from "./api/fs.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { workbenchApi } from "./api/workbench.js";
@@ -20,7 +21,9 @@ import { prepareDataDir } from "./data-dir.js";
 import type { ReviewerFactory } from "./permission/review.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
 import { type Db, openDatabase } from "./store/db.js";
+import { EnvironmentStore } from "./store/environments.js";
 import { RuleStore } from "./store/rules.js";
+import { loadMasterKey, SecretStore } from "./store/secrets.js";
 import { SessionStore } from "./store/sessions.js";
 import { WorkbenchStore } from "./store/workbench.js";
 import { WorkspaceStore } from "./store/workspaces.js";
@@ -222,6 +225,10 @@ export function createServer(
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
           scope.register(workspacesApi, { workspaces, rules, pool });
+          scope.register(environmentsApi, {
+            environments: new EnvironmentStore(db as Db),
+            secrets: new SecretStore(db as Db, loadMasterKey(config.dataDir)),
+          });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });

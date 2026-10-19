@@ -61,6 +61,27 @@ export const MIGRATIONS: Migration[] = [
     ),
   // 会话级审核策略覆盖（ADR-0031），可空。
   (db) => db.exec("ALTER TABLE sessions ADD COLUMN review_policy TEXT"),
+  // 密码库与 ssh 环境（ADR-0033）。secrets 被环境引用时外键拒绝删除。
+  (db) =>
+    db.exec(
+      `CREATE TABLE secrets (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL UNIQUE,
+         kind TEXT NOT NULL,
+         ciphertext BLOB NOT NULL,
+         created_at TEXT NOT NULL
+       );
+       CREATE TABLE environments (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL UNIQUE,
+         host TEXT NOT NULL,
+         port INTEGER NOT NULL DEFAULT 22,
+         username TEXT NOT NULL,
+         os TEXT NOT NULL DEFAULT 'posix',
+         secret_id TEXT REFERENCES secrets(id),
+         created_at TEXT NOT NULL
+       )`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

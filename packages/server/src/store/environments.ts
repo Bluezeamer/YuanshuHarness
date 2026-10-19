@@ -1,0 +1,153 @@
+import { uuidv7 } from "../id.js";
+import type { Db } from "./db.js";
+
+export const LOCAL_ENV_ID = "local";
+export const OS_TYPES = ["posix", "windows"] as const;
+export type OsType = (typeof OS_TYPES)[number];
+export const isOsType = (v: unknown): v is OsType =>
+  typeof v === "string" && (OS_TYPES as readonly string[]).includes(v);
+
+export interface Environment {
+  id: string;
+  name: string;
+  kind: "local" | "ssh";
+  host: string | null;
+  port: number | null;
+  username: string | null;
+  os: OsType;
+  secretId: string | null;
+  createdAt: string;
+}
+
+export interface EnvironmentInput {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  os: OsType;
+  secretId: string | null;
+}
+
+type Row = {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  os: string;
+  secret_id: string | null;
+  created_at: string;
+};
+const toEnv = (r: Row): Environment => ({
+  id: r.id,
+  name: r.name,
+  kind: "ssh",
+  host: r.host,
+  port: r.port,
+  username: r.username,
+  os: r.os as OsType,
+  secretId: r.secret_id,
+  createdAt: r.created_at,
+});
+
+const LOCAL: Environment = {
+  id: LOCAL_ENV_ID,
+  name: "本机",
+  kind: "local",
+  host: null,
+  port: null,
+  username: null,
+  os: process.platform === "win32" ? "windows" : "posix",
+  secretId: null,
+  createdAt: "",
+};
+
+const isUnique = (err: unknown) =>
+  (err as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE";
+
+// 环境登记：本机环境是隐含的（id=local，不入表），其余均为 ssh 环境。
+export class EnvironmentStore {
+  constructor(private readonly db: Db) {}
+
+  list(): Environment[] {
+    const rows = this.db
+      .prepare("SELECT * FROM environments ORDER BY created_at")
+      .all() as Row[];
+    return [LOCAL, ...rows.map(toEnv)];
+  }
+
+  get(id: string): Environment | null {
+    if (id === LOCAL_ENV_ID) return LOCAL;
+    const r = this.db
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(id) as Row | undefined;
+    return r ? toEnv(r) : null;
+  }
+
+  // 名称重复返回 null；secretId 不存在由外键抛出（调用方先校验）。
+  create(input: EnvironmentInput): Environment | null {
+    const id = uuidv7();
+    const createdAt = new Date().toISOString();
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO environments (id, name, host, port, username, os, secret_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          input.name,
+          input.host,
+          input.port,
+          input.username,
+          input.os,
+          input.secretId,
+          createdAt,
+        );
+    } catch (err) {
+      if (isUnique(err)) return null;
+      throw err;
+    }
+    return this.get(id);
+  }
+
+  // 返回 undefined=不存在，null=名称重复。
+  update(
+    id: string,
+    patch: Partial<EnvironmentInput>,
+  ): Environment | null | undefined {
+    const cur = this.get(id);
+    if (!cur || cur.kind === "local") return undefined;
+    const next = { ...cur, ...patch };
+    try {
+      this.db
+        .prepare(
+          `UPDATE environments SET name=?, host=?, port=?, username=?, os=?, secret_id=? WHERE id=?`,
+        )
+        .run(
+          next.name,
+          next.host,
+          next.port,
+          next.username,
+          next.os,
+          next.secretId,
+          id,
+        );
+    } catch (err) {
+      if (isUnique(err)) return null;
+      throw err;
+    }
+    return this.get(id);
+  }
+
+  // 有 workspace 引用时返回 "in_use"。
+  remove(id: string): "ok" | "not_found" | "in_use" {
+    if (id === LOCAL_ENV_ID) return "in_use";
+    const used = this.db
+      .prepare("SELECT count(*) AS n FROM workspaces WHERE environment_id = ?")
+      .get(id) as { n: number };
+    if (used.n > 0) return "in_use";
+    const r = this.db.prepare("DELETE FROM environments WHERE id = ?").run(id);
+    return r.changes > 0 ? "ok" : "not_found";
+  }
+}
