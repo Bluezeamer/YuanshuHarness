@@ -70,6 +70,9 @@
 - 会话池独立于 Web 框架，由注入的会话工厂创建会话（`src/session/`）；路由层只做协议编解码（`src/api/`）。快照由池从同一条事件流累积，保证快照与序号一致。模型不支持图片时拒绝带图消息，因为 SDK 会悄悄丢图。（[ADR-0020](adr/0020-transport-websocket.md)、[ADR-0021](adr/0021-session-wire-protocol.md)）
 - 会话按需从 JSONL 加载进池，索引（SQLite）与文件不一致时以文件为准并在启动时对账；运行中的会话不可删除；被打断留下的悬挂工具调用，在下一轮以尾部通知告知模型。（[ADR-0004](adr/0004-state-storage-recovery.md)、[ADR-0024](adr/0024-session-rest-and-history.md)、[ADR-0025](adr/0025-data-dir-layout-and-versioning-revised.md)）
 - 认证：`/api/v1` 路由挂在带 hook 的封装作用域里，按来源网段、限流、令牌的顺序检查（`src/auth.ts`）；限流状态只在内存、无定时器；`/healthz` 与静态页不检查；认证不进会话池。（[ADR-0026](adr/0026-access-token-and-source-network.md)）
+- 弹窗（审批与 agent 提问）走会话事件流的 `prompt.*` 事件与 `answer_prompt` 命令，先答先赢，30 分钟超时，只存内存。（[ADR-0028](adr/0028-prompt-wire-protocol.md)）
+- workspace 本期仅本机：登记目录、档位与规则挂其上，会话绑定一个 workspace，其路径即 cwd。（[ADR-0029](adr/0029-minimal-workspace.md)）
+- 权限层挂在 pi 的 `tool_call` 扩展点：cwd 内放行、规则外弹审批、敏感路径不可记住、bash 无法确定即不放行；二档的审核方为注入式，拿不准一律交人。（[ADR-0030](adr/0030-permission-rules.md)、[ADR-0031](adr/0031-auto-review.md)）
 - 超时、出错、拿不准一律不默认放行；敏感路径不吃 cwd 放行；子进程不继承 Server 的环境。（[ADR-0006](adr/0006-permission-tiers.md)）
 - 凭据真值只在启动进程时出现，不经环境变量；sudo 开 shell 类动作始终人工审批。（[ADR-0007](adr/0007-private-variables.md)）
 - 输出脱敏不在基建内，只预留变换槽位。（[ADR-0006](adr/0006-permission-tiers.md)）
@@ -93,3 +96,4 @@
 - 2026-10-17：ADR-0026 定访问令牌、来源网段、携带方式与启动检查，接替 ADR-0018 的非回环警告。
 - 2026-10-17：访问认证落地，边界与约定补认证位置与检查顺序。
 - 2026-10-18：ADR-0027 定 WebUI 多 pane 布局的保活机制、布局文档、存储与 pane 类型注册。
+- 2026-10-18：ADR-0028 至 ADR-0031 定弹窗协议、最小 workspace、权限规则判定与自动模式审核方（ROADMAP 第 5 条）。

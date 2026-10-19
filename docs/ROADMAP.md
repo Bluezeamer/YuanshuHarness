@@ -16,8 +16,8 @@
    - `sudo -n -l` 的缓存与跨系统输出差异（[ADR-0007](genesis/adr/0007-private-variables.md)）
 3. 主干：会话池、带序号的事件流与排队、持久化、认证、最小命令行客户端，仅本机环境（[ADR-0004](genesis/adr/0004-state-storage-recovery.md)、[ADR-0005](genesis/adr/0005-client-protocol.md)、[ADR-0011](genesis/adr/0011-auth-and-im-routing.md)、[ADR-0020](genesis/adr/0020-transport-websocket.md)、[ADR-0021](genesis/adr/0021-session-wire-protocol.md)、[ADR-0022](genesis/adr/0022-sqlite-driver.md)、[ADR-0025](genesis/adr/0025-data-dir-layout-and-versioning-revised.md)、[ADR-0024](genesis/adr/0024-session-rest-and-history.md)）
 4. WebUI 基础：对话、停止、断线重连；多 window / pane 布局与会话镜像、输入导航（[ADR-0027](genesis/adr/0027-webui-pane-layout.md)）
-5. 权限：三档、规则、自动审批与审核模型、只读命令白名单；统一弹窗（审批与 agent 提问，`prompt.*` 帧契约随本条定）（[ADR-0005](genesis/adr/0005-client-protocol.md)、[ADR-0006](genesis/adr/0006-permission-tiers.md)、[ADR-0021](genesis/adr/0021-session-wire-protocol.md)）
-6. 环境：ssh 环境（含 Windows）、workspace、环境切换、文件传输、状态通知、存 ssh 凭据的基础密码库（[ADR-0002](genesis/adr/0002-thin-environment-ssh.md)、[ADR-0003](genesis/adr/0003-concept-model.md)、[ADR-0007](genesis/adr/0007-private-variables.md)）
+5. 权限：最小 workspace（仅本机，挂靠档位与规则）、三档、规则、自动审批与审核模型、只读命令白名单；统一弹窗（审批与 agent 提问，`prompt.*` 帧契约随本条定）（[ADR-0005](genesis/adr/0005-client-protocol.md)、[ADR-0006](genesis/adr/0006-permission-tiers.md)、[ADR-0021](genesis/adr/0021-session-wire-protocol.md)、[ADR-0028](genesis/adr/0028-prompt-wire-protocol.md)、[ADR-0029](genesis/adr/0029-minimal-workspace.md)、[ADR-0030](genesis/adr/0030-permission-rules.md)、[ADR-0031](genesis/adr/0031-auto-review.md)）
+6. 环境：ssh 环境（含 Windows）、workspace 扩展到多环境（最小本机 workspace 已在第 5 条）、环境切换、文件传输、状态通知、存 ssh 凭据的基础密码库（[ADR-0002](genesis/adr/0002-thin-environment-ssh.md)、[ADR-0003](genesis/adr/0003-concept-model.md)、[ADR-0007](genesis/adr/0007-private-variables.md)）
 7. agent 定义：提示词分组拼接、能力勾选、模式、模型接入向导（[ADR-0003](genesis/adr/0003-concept-model.md)、[ADR-0009](genesis/adr/0009-prompt-assembly-injection.md)、[ADR-0015](genesis/adr/0015-model-management.md)）
 8. skill 与 MCP 集中管理与同步；密码绑定命令注入与 sudo（[ADR-0007](genesis/adr/0007-private-variables.md)、[ADR-0008](genesis/adr/0008-capability-sets.md)）
 9. subagent 与调用拓扑图（[ADR-0010](genesis/adr/0010-subagent.md)）
@@ -33,6 +33,7 @@
 13. 首次发布（npm 包与镜像）：用户确认有可用版本后（条件式）
 
 ## 调整记录
+- 2026-10-18 第 5、6 条：最小 workspace（仅本机登记、档位字段、会话绑定）从第 6 条提前到第 5 条，第 6 条改为在其上扩展多环境。依据：档位与规则挂在 workspace 上，先挂会话再迁移更贵（bluezeamer 批准）。
 - 2026-10-18 第 4、12 条：第 4 条并入多 window / pane 布局（含会话镜像与输入导航），第 4 条内的次序为 skeleton、conversation、reconnect、pane 布局，统一弹窗已在第 5 条；第 12 条移除"对话导航与输入区布局"，已由第 4 条覆盖。依据 ADR-0027：现成布局库跨 window 移动会重挂载 pane，保活是硬需求，须自建（bluezeamer 批准）。
 - 2026-10-18 第 4、5 条：统一弹窗从第 4 条移到第 5 条。服务端没有弹窗帧（ADR-0021 将 `prompt.*` 留作预留），弹窗的触发方是权限审批与 agent 提问，放在第 4 条只能对着假帧做，无法端到端验证（bluezeamer 批准）。
 - 2026-10-17 第 2 条：契约测试第一批只覆盖 openai-completions，anthropic-messages 的工具类标志延期到接入该协议时（bluezeamer 批准）。
