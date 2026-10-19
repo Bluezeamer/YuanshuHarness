@@ -34,6 +34,7 @@ import {
   type WorkspaceStore,
 } from "../store/workspaces.js";
 import {
+  type Block,
   type ChatMessage,
   cut,
   EVENT_STRING_MAX,
@@ -281,7 +282,13 @@ export class SessionEntry {
           (data.role === "user" || data.role === "assistant") &&
           typeof data.text === "string"
         ) {
-          this.recent.push({ role: data.role, text: data.text });
+          this.recent.push({
+            role: data.role,
+            text: data.text,
+            ...(Array.isArray(data.blocks)
+              ? { blocks: data.blocks as Block[] }
+              : {}),
+          });
           this.total += 1;
           if (this.recent.length > WINDOW) this.recent.shift();
         }
@@ -350,6 +357,21 @@ export class SessionEntry {
       const trim = (m: ChatMessage) => ({
         role: m.role,
         text: cut(m.text, limit),
+        ...(m.blocks
+          ? {
+              blocks: m.blocks.map((b) =>
+                b.type === "tool"
+                  ? {
+                      ...b,
+                      args: cut(b.args, limit),
+                      ...(b.result === undefined
+                        ? {}
+                        : { result: cut(b.result, limit) }),
+                    }
+                  : { ...b, text: cut(b.text, limit) },
+              ),
+            }
+          : {}),
       });
       const messages = limit === 0 ? [] : this.recent.map(trim);
       const partial = this.partial
@@ -693,7 +715,7 @@ export class SessionPool {
       createdAt = header.createdAt;
       const all = readMessages(file, sessionDir, id);
       seedTotal = all.length;
-      seed = all.slice(-WINDOW).map(({ role, text }) => ({ role, text }));
+      seed = all.slice(-WINDOW).map(({ index: _i, ...m }) => m);
       interrupted = hasDanglingToolCall(file, sessionDir, id);
     } catch (err) {
       throw new PoolError("load_failed", reason(err));

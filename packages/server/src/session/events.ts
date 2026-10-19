@@ -7,10 +7,28 @@ export interface ServerEvent {
 
 export type ChatRole = "user" | "assistant";
 
+// 助手消息里按出现顺序排列的内容块；工具块的 result/isError 来自后续的 toolResult。
+export type Block =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      args: string;
+      result?: string;
+      isError?: boolean;
+    };
+
 export interface ChatMessage {
   role: ChatRole;
   text: string;
+  // 仅当含思考或工具调用时才有，纯文本消息不带。
+  blocks?: Block[];
 }
+
+export const TOOL_ARGS_MAX = 2000;
+export const TOOL_RESULT_MAX = 4000;
 
 // 只有这两种角色属于对话；system、toolResult 等由别的事件或不下发。
 const isChatRole = (role: unknown): role is ChatRole =>
@@ -29,13 +47,47 @@ export function messageText(content: unknown): string {
     .join("");
 }
 
+export function blocksOf(content: unknown): Block[] | undefined {
+  if (!Array.isArray(content)) return undefined;
+  const out: Block[] = [];
+  let rich = false;
+  for (const b of content) {
+    if (!b || typeof b !== "object") continue;
+    const x = b as Record<string, unknown>;
+    if (x.type === "text") out.push({ type: "text", text: String(x.text ?? "") });
+    else if (x.type === "thinking") {
+      rich = true;
+      out.push({ type: "thinking", text: String(x.thinking ?? "") });
+    } else if (x.type === "toolCall") {
+      rich = true;
+      let args = "";
+      try {
+        args = JSON.stringify(x.arguments ?? {}, null, 2) ?? "";
+      } catch {
+        // 参数不可序列化时留空
+      }
+      out.push({
+        type: "tool",
+        id: String(x.id ?? ""),
+        name: String(x.name ?? ""),
+        args: cut(args, TOOL_ARGS_MAX),
+      });
+    }
+  }
+  return rich ? out : undefined;
+}
+
 export function toChatMessage(message: {
   role: string;
   content?: unknown;
 }): ChatMessage | null {
-  return isChatRole(message.role)
-    ? { role: message.role, text: messageText(message.content) }
-    : null;
+  if (!isChatRole(message.role)) return null;
+  const blocks = message.role === "assistant" ? blocksOf(message.content) : undefined;
+  return {
+    role: message.role,
+    text: messageText(message.content),
+    ...(blocks ? { blocks } : {}),
+  };
 }
 
 // 纯映射。表外的事件返回 null，不下发。

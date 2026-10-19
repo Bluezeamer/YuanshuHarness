@@ -1,11 +1,19 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { type ChatRole, messageText } from "../session/events.js";
+import {
+  type Block,
+  blocksOf,
+  type ChatRole,
+  cut,
+  messageText,
+  TOOL_RESULT_MAX,
+} from "../session/events.js";
 import { readHeader } from "./sessions.js";
 
 export interface ChatEntry {
   index: number;
   role: ChatRole;
   text: string;
+  blocks?: Block[];
 }
 
 export const DEFAULT_LIMIT = 50;
@@ -26,11 +34,27 @@ export function readMessages(
   id: string,
 ): ChatEntry[] {
   const out: ChatEntry[] = [];
+  const tools = new Map<string, Extract<Block, { type: "tool" }>>();
   for (const e of openBranch(file, dir, id)) {
     const m = e.message;
     if (e.type !== "message" || !m) continue;
+    if (m.role === "toolResult" && typeof m.toolCallId === "string") {
+      const t = tools.get(m.toolCallId);
+      if (t) {
+        t.result = cut(messageText(m.content), TOOL_RESULT_MAX);
+        t.isError = m.isError === true;
+      }
+      continue;
+    }
     if (m.role !== "user" && m.role !== "assistant") continue;
-    out.push({ index: out.length, role: m.role, text: messageText(m.content) });
+    const blocks = m.role === "assistant" ? blocksOf(m.content) : undefined;
+    for (const b of blocks ?? []) if (b.type === "tool") tools.set(b.id, b);
+    out.push({
+      index: out.length,
+      role: m.role,
+      text: messageText(m.content),
+      ...(blocks ? { blocks } : {}),
+    });
   }
   return out;
 }
