@@ -56,8 +56,8 @@ describe("npm 包结构（R10）", () => {
     expect(server.license).toBe("MIT");
   });
 
-  test("files 白名单只含构建产物与 web 静态目录", () => {
-    expect(server.files).toEqual(["dist", "web"]);
+  test("files 白名单只含构建产物、web 静态目录与 Apache-2.0 署名文件", () => {
+    expect(server.files).toEqual(["dist", "web", "NOTICE", "licenses"]);
   });
 
   test("入口源文件带 shebang", () => {

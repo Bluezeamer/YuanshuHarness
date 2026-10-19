@@ -27,3 +27,6 @@ coverage/
 
 # server 包里的 web 产物：构建时从 packages/web/dist 复制而来
 packages/server/web/
+# 同上：打包时从仓库根复制进来的 NOTICE 与 licenses
+packages/server/NOTICE
+packages/server/licenses/

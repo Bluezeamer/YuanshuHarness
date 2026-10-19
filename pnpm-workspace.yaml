@@ -3,3 +3,4 @@ packages:
 allowBuilds:
   '@google/genai': false
   protobufjs: false
+  tree-sitter-bash@0.25.1: true

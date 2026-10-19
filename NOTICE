@@ -1,0 +1,31 @@
+Yuanshu Harness
+Copyright (c) bluezeamer. 本项目以 MIT 许可发布，见 LICENSE。
+
+本项目包含改写自下列第三方软件的代码：
+
+openai/codex  https://github.com/openai/codex
+Copyright 2025 OpenAI
+许可证：Apache License 2.0（全文副本见 licenses/Apache-2.0.txt）
+
+改写所用提交：1b450c79126cc56df29b833110a8c702f82de882
+改写所涉原文件（均位于 codex-rs/shell-command/src/）：
+  - command_safety/is_safe_command.rs  只读命令白名单与参数拒绝规则
+                                        （is_known_safe_command / is_safe_to_call_with_exec / is_safe_git_command）
+  - command_safety/is_dangerous_command.rs  仅参考 find_git_subcommand 的 git 全局选项处理
+  - bash.rs                            纯词命令序列的 shell 解析
+                                        （try_parse_word_only_commands_sequence / is_literal_word_or_number 等）
+
+改写后的文件（已修改，非原文）：
+  - packages/server/src/permission/bash.ts
+
+本项目所做修改概述：
+  - 由 Rust 翻译为 TypeScript，shell 解析改用 web-tree-sitter 与 tree-sitter-bash 的 wasm。
+  - 去掉 `bash -lc "..."` 包装识别以及 Windows/PowerShell 相关逻辑。
+  - 可执行文件名按字面精确匹配，不做路径取末段。
+  - git：保留该提交时的只读子命令与参数拒绝规则（status/log/diff/show/branch），
+    另放行 blame/ls-files/rev-parse，并对以 `-` 开头的全局选项一律拒绝。
+  - 额外放行 date/df/du/file/sort/basename/dirname/realpath/readlink/printenv，
+    并拒绝 sort --output/--compress-program 与 date --set。
+  - rg 的拒绝规则更严（前缀匹配，并拒绝含 z 的短选项合并）。
+  - 只读判定对词的字面性要求与 Codex 一致（拒绝 glob、花括号、~ 等），
+    命令规则与记住功能使用的非只读解析则放宽此项。

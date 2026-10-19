@@ -37,6 +37,8 @@ echo "== 核对 tarball 清单"
 tar -tzf "$TARBALL" > "$WORK/list.txt"
 grep -qx 'package/web/index.html' "$WORK/list.txt" || die "tarball 里没有 web/index.html"
 grep -qx 'package/dist/bin.js' "$WORK/list.txt" || die "tarball 里没有 dist/bin.js"
+grep -qx 'package/NOTICE' "$WORK/list.txt" || die "tarball 里没有 NOTICE"
+grep -qx 'package/licenses/Apache-2.0.txt' "$WORK/list.txt" || die "tarball 里没有 licenses/Apache-2.0.txt"
 if bad="$(grep -E '^package/(src/|tsconfig)|\.test\.' "$WORK/list.txt")"; then
   die "tarball 里不应出现源码、测试或 tsconfig：$bad"
 fi

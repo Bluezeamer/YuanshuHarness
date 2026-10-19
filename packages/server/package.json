@@ -9,7 +9,9 @@
   },
   "files": [
     "dist",
-    "web"
+    "web",
+    "NOTICE",
+    "licenses"
   ],
   "engines": {
     "node": ">=22.19.0"
@@ -32,6 +34,8 @@
     "@fastify/static": "10.1.6",
     "@fastify/websocket": "11.3.4",
     "better-sqlite3": "13.0.3",
-    "fastify": "5.12.7"
+    "fastify": "5.12.7",
+    "tree-sitter-bash": "0.25.1",
+    "web-tree-sitter": "0.27.1"
   }
 }

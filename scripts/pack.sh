@@ -11,10 +11,13 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
 cd "$REPO"
-rm -rf packages/web/dist packages/server/dist packages/server/web
+rm -rf packages/web/dist packages/server/dist packages/server/web packages/server/NOTICE packages/server/licenses
 pnpm --filter yuanshu-harness-web build
 pnpm --filter yuanshu-harness-server build
 cp -R packages/web/dist packages/server/web
+# Apache-2.0 要求随分发件附许可证副本与 NOTICE（bash.ts 改写自 openai/codex）。
+cp NOTICE packages/server/NOTICE
+cp -R licenses packages/server/licenses
 
 rm -f "$OUT"/*.tgz
 (cd packages/server && pnpm pack --pack-destination "$OUT")
