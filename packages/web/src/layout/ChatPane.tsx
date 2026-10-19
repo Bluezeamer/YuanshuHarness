@@ -146,7 +146,22 @@ export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
         )}
         <div className="min-h-0 min-w-0 flex-1">
           {!config.sessionId ? (
-            <p className="p-7 text-mute">选择会话</p>
+            <div className="flex items-center gap-3 p-7 text-mute">
+              选择会话
+              {env.newSession && (
+                <button
+                  type="button"
+                  className={btn}
+                  onClick={() =>
+                    env.newSession?.((sessionId) =>
+                      onUpdateConfig({ sessionId }),
+                    )
+                  }
+                >
+                  在此新建会话
+                </button>
+              )}
+            </div>
           ) : !session ? (
             <p className="p-7 text-mute">会话不存在</p>
           ) : (

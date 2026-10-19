@@ -19,7 +19,7 @@ export function NewSession({
   onCancel,
   onUnauthorized,
 }: {
-  onCreated(): void;
+  onCreated(sessionId: string): void;
   onCancel(): void;
   onUnauthorized(): void;
 }) {
@@ -112,7 +112,7 @@ export function NewSession({
     const r = await createSession(token, { workspaceId: ws.id });
     setBusy(false);
     if (r.ok) {
-      onCreated();
+      onCreated(r.data.id);
       return;
     }
     fail(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listSessions, loadToken, type SessionInfo } from "./api";
 import { Workbench } from "./layout/Workbench";
 import { SessionHub } from "./sessions/hub";
@@ -25,6 +25,12 @@ export function Shell({
     const r = await listSessions(loadToken());
     if (r.ok) setSessions(r.data);
   };
+  // 创建成功后的去向：顶栏入口无回调；pane 内入口把新会话绑到发起的 pane。
+  const [onDone, setOnDone] = useState<((id: string) => void) | null>(null);
+  const newSession = useCallback((done: (id: string) => void) => {
+    setOnDone(() => done);
+    setPanel("new");
+  }, []);
   const btn =
     "self-center border border-ink px-3 py-1 text-xs font-semibold hover:bg-ink hover:text-bg";
 
@@ -37,7 +43,14 @@ export function Shell({
         </div>
         <div ref={setTabsHost} className="flex items-stretch" />
         <div className="ml-auto flex items-center gap-3 font-medium">
-          <button type="button" className={btn} onClick={() => setPanel("new")}>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => {
+              setOnDone(null);
+              setPanel("new");
+            }}
+          >
             新建会话
           </button>
           <button
@@ -57,6 +70,7 @@ export function Shell({
           sessions={sessions}
           onUnauthorized={onUnauthorized}
           tabsHost={tabsHost}
+          newSession={newSession}
         />
         {panel === "settings" && (
           <Settings
@@ -68,9 +82,11 @@ export function Shell({
           <NewSession
             onUnauthorized={onUnauthorized}
             onCancel={() => setPanel(null)}
-            onCreated={() => {
+            onCreated={(id) => {
               setPanel(null);
-              void refresh();
+              const done = onDone;
+              setOnDone(null);
+              void refresh().then(() => done?.(id));
             }}
           />
         )}

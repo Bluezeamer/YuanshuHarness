@@ -47,12 +47,14 @@ export function Workbench({
   sessions,
   onUnauthorized,
   tabsHost,
+  newSession,
 }: {
   hub: SessionHub;
   sessions: SessionInfo[];
   onUnauthorized: () => void;
   // 顶栏里放 window 标签的位置；没有时标签行留在工作台内。
   tabsHost?: HTMLElement | null;
+  newSession?: (done: (sessionId: string) => void) => void;
 }) {
   const registry = useMemo(defaultRegistry, []);
   const wb = useWorkbench(registry, onUnauthorized);
@@ -75,7 +77,10 @@ export function Workbench({
       el?.querySelector<HTMLElement>("textarea,input:not([type=hidden])") ?? el
     )?.focus();
   }, [focusReq]);
-  const env = useMemo(() => ({ hub, sessions }), [hub, sessions]);
+  const env = useMemo(
+    () => ({ hub, sessions, newSession }),
+    [hub, sessions, newSession],
+  );
 
   const active = doc.windows.find((w) => w.id === doc.activeWindowId);
   const inActive = visibleIds(active?.tree ?? null);
@@ -219,8 +224,16 @@ export function Workbench({
     style: { cursor: "grab", touchAction: "none" },
   });
 
-  const newChat = (windowId: string, at?: Parameters<typeof addPane>[4]) => {
-    const entry = registry.newEntry("chat");
+  const addChat = (windowId: string, at?: Parameters<typeof addPane>[4]) => {
+    const id = newPane("chat", windowId, at);
+    if (id) goto(id);
+  };
+  const newPane = (
+    type: string,
+    windowId: string,
+    at?: Parameters<typeof addPane>[4],
+  ) => {
+    const entry = registry.newEntry(type);
     if (!entry) return null;
     warnIfCrowded();
     const id = newId("p");
@@ -231,8 +244,7 @@ export function Workbench({
   const split = (paneId: string, dir: "h" | "v") => {
     const w = windowOf(doc, paneId);
     if (!w) return;
-    const id = newChat(w.id, { target: paneId, dir });
-    if (id) goto(id);
+    addChat(w.id, { target: paneId, dir });
   };
 
   const menu = (paneId: string) => (
@@ -390,7 +402,7 @@ export function Workbench({
             <button
               type="button"
               className={btn}
-              onClick={() => newChat(active.id)}
+              onClick={() => addChat(active.id)}
             >
               新建 pane
             </button>
