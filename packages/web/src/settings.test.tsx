@@ -1,0 +1,174 @@
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { saveToken } from "./api";
+import { FakeWS, installAdmin, installApi } from "./fakes";
+import { Shell } from "./Shell";
+
+const ws1 = (over: object = {}) => ({
+  id: "w1",
+  name: "项目甲",
+  path: "/work/a",
+  environmentId: "local",
+  tier: "rules",
+  createdAt: "t",
+  ...over,
+});
+
+let admin: ReturnType<typeof installAdmin>;
+beforeEach(() => {
+  FakeWS.all = [];
+  sessionStorage.clear();
+  saveToken("tok");
+  vi.stubGlobal("WebSocket", FakeWS);
+  installApi([]);
+  admin = installAdmin();
+  admin.workspaces = [
+    ws1(),
+    ws1({ id: "w2", name: "项目乙", path: "/work/b" }),
+  ];
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+const openSettings = async () => {
+  render(<Shell sessions={[]} onUnauthorized={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  await screen.findByLabelText("名称");
+};
+const patches = () => admin.calls.filter((c) => c.method === "PATCH");
+
+test("改名与改档位只发改动的字段", async () => {
+  await openSettings();
+  fireEvent.change(screen.getByLabelText("名称"), {
+    target: { value: "新名" },
+  });
+  fireEvent.click(screen.getByRole("radio", { name: /自动模式/ }));
+  expect(screen.getByText(/拿不准会交给你决定/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(patches()).toHaveLength(1));
+  expect(patches()[0]?.body).toEqual({ name: "新名", tier: "auto" });
+  await screen.findByText("已保存");
+});
+
+test("设为完全允许要二次确认，取消则不发请求", async () => {
+  await openSettings();
+  fireEvent.click(screen.getByRole("radio", { name: /完全允许/ }));
+  expect(screen.getByRole("note").textContent).toContain("风险");
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  expect(screen.getByRole("alertdialog")).toBeTruthy();
+  expect(patches()).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
+  expect(patches()).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  fireEvent.click(screen.getByRole("button", { name: "确认设为完全允许" }));
+  await waitFor(() => expect(patches()[0]?.body).toEqual({ tier: "full" }));
+});
+
+test("新增：无效路径与重复路径给出不同提示", async () => {
+  await openSettings();
+  fireEvent.click(screen.getByRole("button", { name: "新增工作区" }));
+  fireEvent.change(screen.getByLabelText(/目录路径/), {
+    target: { value: "/x" },
+  });
+  admin.fail["POST /api/v1/workspaces"] = 400;
+  fireEvent.click(screen.getByRole("button", { name: "添加" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("路径无效");
+  admin.fail["POST /api/v1/workspaces"] = 409;
+  fireEvent.click(screen.getByRole("button", { name: "添加" }));
+  await waitFor(() =>
+    expect(screen.getByRole("alert").textContent).toContain("已登记"),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "添加" }));
+  await screen.findByRole("button", { name: /x/ });
+  expect(admin.workspaces).toHaveLength(3);
+});
+
+test("删除需确认；409 提示仍有会话引用并保留条目", async () => {
+  await openSettings();
+  fireEvent.click(screen.getByRole("button", { name: "删除工作区" }));
+  admin.fail["DELETE /api/v1/workspaces/w1"] = 409;
+  fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+  await waitFor(() =>
+    expect(screen.getByRole("alert").textContent).toContain("仍有会话"),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "删除工作区" }));
+  fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+  await waitFor(() => expect(admin.workspaces).toHaveLength(1));
+  await waitFor(() =>
+    expect(screen.getByLabelText("名称")).toHaveProperty("value", "项目乙"),
+  );
+});
+
+test("查看并删除已记住的规则", async () => {
+  admin.rules.w1 = [
+    {
+      id: "r1",
+      kind: "command",
+      access: null,
+      value: "git status",
+      createdAt: "t",
+    },
+    {
+      id: "r2",
+      kind: "path",
+      access: "write",
+      value: "/work/a/dist",
+      createdAt: "t",
+    },
+  ];
+  await openSettings();
+  await screen.findByText("git status");
+  expect(screen.getByText(/路径 · 读写/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "删除规则 git status" }));
+  await waitFor(() => expect(screen.queryByText("git status")).toBeNull());
+  expect(screen.getByText("/work/a/dist")).toBeTruthy();
+});
+
+test("新建会话带所选 workspaceId", async () => {
+  render(<Shell sessions={[]} onUnauthorized={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "新建会话" }));
+  const sel = (await screen.findByLabelText("工作区")) as HTMLSelectElement;
+  fireEvent.change(sel, { target: { value: "w2" } });
+  fireEvent.click(screen.getByRole("button", { name: "创建" }));
+  await waitFor(() =>
+    expect(admin.calls.find((c) => c.method === "POST")?.body).toEqual({
+      workspaceId: "w2",
+    }),
+  );
+});
+
+test("会话审核策略：保存、清除（空串）", async () => {
+  const api = installApi([]);
+  api.list = [
+    {
+      id: "s1",
+      name: "甲",
+      createdAt: "t",
+      updatedAt: "t",
+      running: false,
+      reviewPolicy: null,
+    },
+  ];
+  admin = installAdmin();
+  render(<Shell sessions={[]} onUnauthorized={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("tab", { name: "审核策略" }));
+  const box = await screen.findByLabelText("审核策略");
+  expect(screen.getByText(/拿不准时会交给你决定/)).toBeTruthy();
+  fireEvent.change(box, { target: { value: " 不要碰生产 " } });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() =>
+    expect(patches()[0]?.body).toEqual({ reviewPolicy: "不要碰生产" }),
+  );
+  await screen.findByText("已保存");
+  fireEvent.click(screen.getByRole("button", { name: "清除策略" }));
+  await waitFor(() => expect(patches()[1]?.body).toEqual({ reviewPolicy: "" }));
+});

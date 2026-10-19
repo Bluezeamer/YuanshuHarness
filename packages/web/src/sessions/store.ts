@@ -25,6 +25,9 @@ export interface SessionSnapshot {
   earlierFailed: boolean;
   notice: string | null;
   stopPending: boolean;
+  // 正在等回执的弹窗答复，及最近一次失败的提示（按弹窗）。
+  answering: string | null;
+  promptError: { promptId: string; message: string } | null;
 }
 
 export const initialSnapshot: SessionSnapshot = {
@@ -37,6 +40,14 @@ export const initialSnapshot: SessionSnapshot = {
   earlierFailed: false,
   notice: null,
   stopPending: false,
+  answering: null,
+  promptError: null,
+};
+
+const PROMPT_ERRORS: Record<string, string> = {
+  prompt_resolved: "已被其他端答复、超时或撤销",
+  prompt_unknown: "这个提问已不存在",
+  bad_request: "答复无效，请检查后重试",
 };
 
 // 这两种探测结果说明继续握手没有意义，要停下来等人处理。
@@ -59,7 +70,8 @@ export class SessionStore {
   private snap: SessionSnapshot = initialSnapshot;
   private listeners = new Set<() => void>();
   private stream: Stream | null = null;
-  private pending = new Map<string, "send" | "stop">();
+  private pending = new Map<string, "send" | "stop" | "answer">();
+  private answers = new Map<string, string>();
   private lastSent = new Map<string, string>();
   private alive = false;
   private failures = 0;
@@ -112,7 +124,9 @@ export class SessionStore {
     if (unsent.length) this.host.restoreDraft(this.id, unsent.join("\n"));
     this.pending.clear();
     this.lastSent.clear();
-    if (this.snap.stopPending) this.set({ stopPending: false });
+    this.answers.clear();
+    if (this.snap.stopPending || this.snap.answering)
+      this.set({ stopPending: false, answering: null });
   }
 
   private sync(startIndex: number) {
@@ -188,9 +202,22 @@ export class SessionStore {
         if (!this.alive || !ack.id) return;
         const kind = this.pending.get(ack.id);
         const text = this.lastSent.get(ack.id);
+        const promptId = this.answers.get(ack.id);
         this.pending.delete(ack.id);
         this.lastSent.delete(ack.id);
+        this.answers.delete(ack.id);
         if (kind === "stop") this.set({ stopPending: false });
+        if (kind === "answer") {
+          this.set({ answering: null });
+          if (!ack.ok && promptId) {
+            const message =
+              PROMPT_ERRORS[ack.error?.code ?? ""] ??
+              ack.error?.message ??
+              "答复失败";
+            this.set({ promptError: { promptId, message } });
+          }
+          return;
+        }
         if (ack.ok) return;
         this.set({ notice: ack.error?.message ?? "命令失败" });
         if (kind === "send" && text !== undefined)
@@ -228,6 +255,20 @@ export class SessionStore {
     if (!id) return;
     this.pending.set(id, "stop");
     this.set({ stopPending: true, notice: null });
+  };
+
+  // choice 传 optionId，input 传 text。成功与否以 prompt.resolved 为准，这里只管发出与失败提示。
+  answerPrompt = (
+    promptId: string,
+    answer: { optionId: string } | { text: string },
+  ): boolean => {
+    if (this.snap.answering) return false;
+    const id = this.stream?.command("answer_prompt", { promptId, ...answer });
+    if (!id) return false;
+    this.pending.set(id, "answer");
+    this.answers.set(id, promptId);
+    this.set({ answering: promptId, promptError: null });
+    return true;
   };
 
   reconnect = () => {

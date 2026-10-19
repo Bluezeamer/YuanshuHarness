@@ -1,20 +1,32 @@
 import { useEffect, useState } from "react";
-import type { SessionInfo } from "./api";
+import { listSessions, loadToken, type SessionInfo } from "./api";
 import { Workbench } from "./layout/Workbench";
 import { SessionHub } from "./sessions/hub";
+import { NewSession } from "./settings/NewSession";
+import { Settings } from "./settings/Settings";
 
 export function Shell({
-  sessions,
+  sessions: initialSessions,
   onUnauthorized,
 }: {
   sessions: SessionInfo[];
   onUnauthorized: () => void;
 }) {
+  const [sessions, setSessions] = useState(initialSessions);
+  const [panel, setPanel] = useState<"settings" | "new" | null>(null);
   const [tabsHost, setTabsHost] = useState<HTMLDivElement | null>(null);
   const [hub] = useState(() => new SessionHub());
   useEffect(() => {
     hub.onUnauthorized = onUnauthorized;
   }, [hub, onUnauthorized]);
+
+  // 新建会话后重新拉列表；失败时保持原列表。
+  const refresh = async () => {
+    const r = await listSessions(loadToken());
+    if (r.ok) setSessions(r.data);
+  };
+  const btn =
+    "self-center border border-ink px-3 py-1 text-xs font-semibold hover:bg-ink hover:text-bg";
 
   return (
     <div className="grid h-full grid-rows-[auto_1fr]">
@@ -24,17 +36,45 @@ export function Shell({
           元枢
         </div>
         <div ref={setTabsHost} className="flex items-stretch" />
-        <div className="ml-auto flex items-center gap-2 font-medium">
+        <div className="ml-auto flex items-center gap-3 font-medium">
+          <button type="button" className={btn} onClick={() => setPanel("new")}>
+            新建会话
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setPanel("settings")}
+          >
+            设置
+          </button>
           <i className="size-2 rounded-full bg-ok" />
           Server 在线
         </div>
       </header>
-      <Workbench
-        hub={hub}
-        sessions={sessions}
-        onUnauthorized={onUnauthorized}
-        tabsHost={tabsHost}
-      />
+      <div className="relative min-h-0">
+        <Workbench
+          hub={hub}
+          sessions={sessions}
+          onUnauthorized={onUnauthorized}
+          tabsHost={tabsHost}
+        />
+        {panel === "settings" && (
+          <Settings
+            onClose={() => setPanel(null)}
+            onUnauthorized={onUnauthorized}
+          />
+        )}
+        {panel === "new" && (
+          <NewSession
+            onUnauthorized={onUnauthorized}
+            onCancel={() => setPanel(null)}
+            onCreated={() => {
+              setPanel(null);
+              void refresh();
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
