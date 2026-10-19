@@ -10,6 +10,8 @@ export type Block =
       args: string;
       result?: string;
       isError?: boolean;
+      // 运行中的实时输出，仅来自 tool.updated，不属于历史。
+      live?: string;
     };
 
 export interface Known {

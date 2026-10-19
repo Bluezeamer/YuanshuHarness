@@ -131,6 +131,14 @@ function ToolBlock({
             </pre>
           </div>
         )}
+        {t.result === undefined && t.live && (
+          <div>
+            <div className="mb-1 font-semibold text-mute">实时输出</div>
+            <pre className="max-h-60 overflow-auto bg-panel p-2 font-mono text-xs">
+              {t.live}
+            </pre>
+          </div>
+        )}
         {t.result !== undefined && (
           <div>
             <div className="mb-1 font-semibold text-mute">
@@ -215,10 +223,12 @@ function Message({
                   name: t.name,
                   args: "",
                   ...(t.status === "ok"
-                    ? { result: "", isError: false }
+                    ? { result: t.output ?? "", isError: false }
                     : t.status === "error"
-                      ? { result: "", isError: true }
-                      : {}),
+                      ? { result: t.output ?? "", isError: true }
+                      : t.output
+                        ? { live: t.output }
+                        : {}),
                 }}
                 open
               />

@@ -30,6 +30,16 @@ export interface ChatMessage {
 export const TOOL_ARGS_MAX = 2000;
 export const TOOL_RESULT_MAX = 4000;
 
+// 工具结果形如 { content: [{type:"text", text}] }；只取文本。
+const toolOutput = (r: unknown): string =>
+  r && typeof r === "object"
+    ? messageText((r as { content?: unknown }).content)
+    : "";
+
+// 实时输出保留末尾，最新的内容最有用。
+const tailText = (t: string, max: number): string =>
+  t.length <= max ? t : `…${t.slice(t.length - max)}`;
+
 // 只有这两种角色属于对话；system、toolResult 等由别的事件或不下发。
 const isChatRole = (role: unknown): role is ChatRole =>
   role === "user" || role === "assistant";
@@ -133,7 +143,7 @@ export function mapEvent(e: AgentSessionEvent): ServerEvent | null {
         data: {
           toolCallId: e.toolCallId,
           toolName: e.toolName,
-          partialResult: e.partialResult,
+          output: tailText(toolOutput(e.partialResult), TOOL_RESULT_MAX),
         },
       };
     case "tool_execution_end":
@@ -142,7 +152,7 @@ export function mapEvent(e: AgentSessionEvent): ServerEvent | null {
         data: {
           toolCallId: e.toolCallId,
           toolName: e.toolName,
-          result: e.result,
+          output: tailText(toolOutput(e.result), TOOL_RESULT_MAX),
           isError: e.isError,
           ...(e.durationMs === undefined ? {} : { durationMs: e.durationMs }),
         },

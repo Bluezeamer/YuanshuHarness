@@ -71,13 +71,13 @@ describe("mapEvent", () => {
           type: "tool_execution_end",
           toolCallId: "c",
           toolName: "t",
-          result: 1,
+          result: { content: [{ type: "text", text: "done" }] },
           isError: false,
         }),
       ),
     ).toEqual({
       type: "tool.ended",
-      data: { toolCallId: "c", toolName: "t", result: 1, isError: false },
+      data: { toolCallId: "c", toolName: "t", output: "done", isError: false },
     });
   });
 

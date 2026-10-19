@@ -11,6 +11,7 @@ export interface Tool {
   id: string;
   name: string;
   status: "running" | "ok" | "error";
+  output?: string;
 }
 
 export interface PromptOption {
@@ -148,12 +149,23 @@ export function reduce(s: ConvState, f: Frame): ConvState {
           { id: str(d.toolCallId), name: str(d.toolName), status: "running" },
         ],
       };
+    case "tool.updated":
+      return {
+        ...s,
+        tools: s.tools.map((t) =>
+          t.id === str(d.toolCallId) ? { ...t, output: str(d.output) } : t,
+        ),
+      };
     case "tool.ended":
       return {
         ...s,
         tools: s.tools.map((t) =>
           t.id === str(d.toolCallId)
-            ? { ...t, status: d.isError === true ? "error" : "ok" }
+            ? {
+                ...t,
+                status: d.isError === true ? "error" : "ok",
+                output: str(d.output),
+              }
             : t,
         ),
       };

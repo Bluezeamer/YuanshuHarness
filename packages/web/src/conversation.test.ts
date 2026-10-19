@@ -51,9 +51,26 @@ test("R5 工具起止与失败", () => {
     f("tool.ended", { toolCallId: "b", isError: true }),
   ]);
   expect(s.tools).toEqual([
-    { id: "a", name: "bash", status: "ok" },
-    { id: "b", name: "read", status: "error" },
+    { id: "a", name: "bash", status: "ok", output: "" },
+    { id: "b", name: "read", status: "error", output: "" },
   ]);
+});
+
+test("工具实时输出随 tool.updated 更新，结束时落定", () => {
+  const s = run([
+    f("tool.started", { toolCallId: "a", toolName: "bash" }),
+    f("tool.updated", { toolCallId: "a", output: "line1" }),
+    f("tool.updated", { toolCallId: "a", output: "line1\nline2" }),
+  ]);
+  expect(s.tools[0]).toMatchObject({
+    status: "running",
+    output: "line1\nline2",
+  });
+  const e = reduce(
+    s,
+    f("tool.ended", { toolCallId: "a", output: "done", isError: false }),
+  );
+  expect(e.tools[0]).toMatchObject({ status: "ok", output: "done" });
 });
 
 test("R5 快照恢复进行中的工具与半截消息", () => {
