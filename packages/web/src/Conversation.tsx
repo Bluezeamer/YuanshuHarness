@@ -9,8 +9,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatEntry } from "./api";
-import type { Block } from "./history";
 import type { Prompt, Tool } from "./conversation";
+import type { Block } from "./history";
 import { MermaidBlock } from "./MermaidBlock";
 import { PromptDialog } from "./PromptDialog";
 import type { Conn } from "./useConversation";
@@ -102,11 +102,7 @@ function ToolBlock({
 }) {
   const [expanded, setExpanded] = useState(open);
   const done = t.result !== undefined;
-  const cls = done
-    ? t.isError
-      ? "text-acc"
-      : "text-ok"
-    : "text-live";
+  const cls = done ? (t.isError ? "text-acc" : "text-ok") : "text-live";
   const status = done ? (t.isError ? "失败" : "完成") : "运行中";
   return (
     <details

@@ -54,7 +54,8 @@ export function blocksOf(content: unknown): Block[] | undefined {
   for (const b of content) {
     if (!b || typeof b !== "object") continue;
     const x = b as Record<string, unknown>;
-    if (x.type === "text") out.push({ type: "text", text: String(x.text ?? "") });
+    if (x.type === "text")
+      out.push({ type: "text", text: String(x.text ?? "") });
     else if (x.type === "thinking") {
       rich = true;
       out.push({ type: "thinking", text: String(x.thinking ?? "") });
@@ -82,7 +83,8 @@ export function toChatMessage(message: {
   content?: unknown;
 }): ChatMessage | null {
   if (!isChatRole(message.role)) return null;
-  const blocks = message.role === "assistant" ? blocksOf(message.content) : undefined;
+  const blocks =
+    message.role === "assistant" ? blocksOf(message.content) : undefined;
   return {
     role: message.role,
     text: messageText(message.content),
