@@ -347,7 +347,7 @@ export function Workbench({
   );
 
   return (
-    <div className="enter relative flex min-h-0 flex-col">
+    <div className="enter relative flex h-full min-h-0 flex-col">
       {tabsHost ? (
         createPortal(tablist, tabsHost)
       ) : (
