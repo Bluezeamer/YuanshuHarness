@@ -5,6 +5,10 @@ import {
   type ExtensionFactory,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import type { EnvHub } from "../env/hub.js";
+import { LocalEnv } from "../env/local.js";
+import { routedToolsExtension } from "../env/tools.js";
+import type { ExecEnv } from "../env/types.js";
 import { uuidv7 } from "../id.js";
 import { permissionExtension } from "../permission/extension.js";
 import {
@@ -13,6 +17,7 @@ import {
   type ReviewerFactory,
   runReview,
 } from "../permission/review.js";
+import { type EnvironmentStore, LOCAL_ENV_ID } from "../store/environments.js";
 import {
   type ChatEntry,
   hasDanglingToolCall,
@@ -47,6 +52,11 @@ import {
 } from "./events.js";
 import { type PromptResult, type PromptSpec, PromptTable } from "./prompts.js";
 import { askUserExtension } from "./tools.js";
+import {
+  switchNotice,
+  type WorkspaceView,
+  workspaceExtension,
+} from "./workspace-tools.js";
 
 export interface FactoryOptions {
   id: string;
@@ -126,7 +136,9 @@ const INTERRUPTED_NOTICE =
 export class SessionEntry {
   readonly id: string;
   readonly createdAt: string;
-  readonly workspaceId: string;
+  workspaceId: string;
+  // 切换 workspace 后待在下一轮末尾追加的通知。
+  workspaceNotice: string | null = null;
   reviewPolicy: string | null;
   updatedAt: string;
   running = false;
@@ -519,6 +531,9 @@ export interface PoolDeps {
   reviewerFactory?: ReviewerFactory;
   // 审核超时（毫秒），缺省 60 秒；测试用。
   reviewTimeoutMs?: number;
+  // 环境服务与登记；缺省时所有 workspace 按本机处理（只用于没有远程环境的测试）。
+  envHub?: EnvHub;
+  environments?: EnvironmentStore;
 }
 
 const NAME_MAX = 200;
@@ -534,6 +549,68 @@ export class SessionPool {
 
   constructor(private readonly deps: PoolDeps) {}
 
+  private localEnv = new LocalEnv();
+
+  private envOf(ws: Workspace): ExecEnv | null {
+    const hub = this.deps.envHub;
+    if (hub) return hub.get(ws.environmentId);
+    return ws.environmentId === LOCAL_ENV_ID ? this.localEnv : null;
+  }
+
+  private viewOf(w: Workspace, currentId: string): WorkspaceView {
+    const { envHub, environments } = this.deps;
+    const local = w.environmentId === LOCAL_ENV_ID;
+    const s = envHub?.status(w.environmentId);
+    let state = "本机";
+    if (!local) {
+      if (!s) state = "环境已删除";
+      else if (s.state === "connected") state = "已连接";
+      else if (s.state === "error") state = `连接失败：${s.error ?? ""}`;
+      else state = "未连接";
+    }
+    return {
+      id: w.id,
+      name: w.name,
+      path: w.path,
+      environment: local
+        ? "本机"
+        : (environments?.get(w.environmentId)?.name ?? w.environmentId),
+      state,
+      current: w.id === currentId,
+    };
+  }
+
+  private workspaceViews(currentId: string): WorkspaceView[] {
+    return this.deps.workspaces.list().map((w) => this.viewOf(w, currentId));
+  }
+
+  // 供 switch_workspace 工具调用，失败抛 Error（信息直接给模型看）。
+  private switchWorkspace(sessionId: string, target: string): WorkspaceView {
+    const entry = this.entries.get(sessionId);
+    if (!entry) throw new Error("会话已关闭");
+    const all = this.deps.workspaces.list();
+    const byId = all.find((w) => w.id === target);
+    const byName = all.filter((w) => w.name === target);
+    if (!byId && byName.length > 1)
+      throw new Error(
+        `名称「${target}」对应多个 workspace，请改用 id：${byName.map((w) => w.id).join("、")}`,
+      );
+    const hit = byId ?? byName[0];
+    if (!hit)
+      throw new Error(
+        `workspace 不存在：${target}。已登记的：${all.map((w) => w.name).join("、")}`,
+      );
+    const bad = this.workspaceProblem(hit);
+    if (bad) throw new Error(bad);
+    if (!this.envOf(hit)) throw new Error(`环境不可用：${hit.environmentId}`);
+    const view = this.viewOf(hit, hit.id);
+    entry.workspaceId = hit.id;
+    entry.workspaceNotice = switchNotice(view);
+    // 运行结束时索引会按条目上的 id 写入；这里同步一次，避免中途崩溃后回到旧 workspace。
+    this.deps.store.updateWorkspaceId(sessionId, hit.id);
+    return view;
+  }
+
   get canCreate(): boolean {
     return this.deps.factory !== null;
   }
@@ -544,14 +621,34 @@ export class SessionPool {
       this.entries.get(id)?.ask(spec) ??
       Promise.resolve<PromptResult>({ outcome: "cancelled" });
     const { workspaces, rules, reviewerFactory } = this.deps;
+    // 会话当前所在的 workspace：切换会改条目上的 id，创建期间条目还没有就用起始值。
+    const current = (): Workspace =>
+      workspaces.get(this.entries.get(id)?.workspaceId ?? ws.id) ?? ws;
+    const where = () => {
+      const w = current();
+      const env = this.envOf(w);
+      if (!env) throw new Error(`环境不可用：${w.environmentId}`);
+      return { env, cwd: w.path };
+    };
     return [
       askUserExtension(ask),
+      routedToolsExtension(where),
+      workspaceExtension({
+        list: () => this.workspaceViews(current().id),
+        switchTo: (target) => this.switchWorkspace(id, target),
+        takeNotice: () => {
+          const entry = this.entries.get(id);
+          const n = entry?.workspaceNotice ?? null;
+          if (entry) entry.workspaceNotice = null;
+          return n;
+        },
+      }),
       permissionExtension({
-        cwd: ws.path,
+        where,
         // 每次工具调用即时读取：改档位/删规则立刻生效；workspace 被删时按最严的一档。
-        tier: () => workspaces.get(ws.id)?.tier ?? "rules",
+        tier: () => workspaces.get(current().id)?.tier ?? "rules",
         rules: () => {
-          const all = rules.list(ws.id);
+          const all = rules.list(current().id);
           return {
             path: all.flatMap((r) =>
               r.kind === "path" && r.access
@@ -563,7 +660,7 @@ export class SessionPool {
               .map((r) => r.value),
           };
         },
-        addRule: (r) => rules.add(ws.id, r),
+        addRule: (r) => rules.add(current().id, r),
         ask,
         ...(reviewerFactory
           ? {
@@ -630,6 +727,8 @@ export class SessionPool {
 
   // 登记路径此刻是否仍指向登记时的那个目录：消失、或被换成符号链接指向别处（realpath 与登记值不一致）都不能用。
   private workspaceProblem(ws: Workspace): string | null {
+    // 远程目录不在本机，预检无从谈起；不存在会在工具调用时如实报错。
+    if (ws.environmentId !== LOCAL_ENV_ID) return null;
     const r = resolveDirectory(ws.path);
     if (!r.ok) return "workspace 目录已不存在";
     if (r.path !== ws.path)

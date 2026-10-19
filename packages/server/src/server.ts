@@ -19,6 +19,7 @@ import { workspacesApi } from "./api/workspaces.js";
 import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
+import { EnvHub } from "./env/hub.js";
 import type { ReviewerFactory } from "./permission/review.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
 import { type Db, openDatabase } from "./store/db.js";
@@ -155,6 +156,7 @@ export function createServer(
   app.setErrorHandler(hideServerErrorDetails);
 
   let db: Db | null = null;
+  let envHub: EnvHub | null = null;
   app.register(fastifyWebsocket, {
     options: {
       maxPayload: DEFAULTS.maxPayloadBytes,
@@ -216,7 +218,12 @@ export function createServer(
         );
         const models = new ModelStore(config.dataDir);
         const agentDir = path.join(config.dataDir, "agent");
+        const environments = new EnvironmentStore(db as Db);
+        const hub = new EnvHub(environments, secrets);
+        envHub = hub;
         const pool = new SessionPool({
+          envHub: hub,
+          environments,
           factory:
             options.sessionFactory ??
             options.makeSessionFactory?.({ models, secrets, agentDir }) ??
@@ -242,15 +249,14 @@ export function createServer(
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
           scope.register(workspacesApi, { workspaces, rules, pool });
-          scope.register(environmentsApi, {
-            environments: new EnvironmentStore(db as Db),
-            secrets,
-          });
+          scope.register(environmentsApi, { environments, secrets });
           scope.register(modelsApi, { models, secrets, agentDir });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {
+        envHub?.close();
+        envHub = null;
         db.close();
         db = null;
         throw err;
@@ -265,6 +271,8 @@ export function createServer(
       try {
         await app.listen({ host: config.host, port: config.port });
       } catch (err) {
+        envHub?.close();
+        envHub = null;
         db.close();
         db = null;
         throw new Error(
@@ -276,6 +284,8 @@ export function createServer(
     },
     async stop() {
       await app.close();
+      envHub?.close();
+      envHub = null;
       db?.close();
       db = null;
     },

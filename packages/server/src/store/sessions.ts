@@ -132,6 +132,12 @@ export class SessionStore {
       .run(policy, id);
   }
 
+  updateWorkspaceId(id: string, workspaceId: string): void {
+    this.db
+      .prepare("UPDATE sessions SET workspace_id = ? WHERE id = ?")
+      .run(workspaceId, id);
+  }
+
   remove(id: string): boolean {
     return (
       this.db.prepare("DELETE FROM sessions WHERE id = ?").run(id).changes > 0
