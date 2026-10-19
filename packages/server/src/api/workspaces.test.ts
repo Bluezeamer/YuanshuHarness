@@ -12,12 +12,14 @@ import Database from "better-sqlite3";
 import {
   afterAll,
   afterEach,
+  beforeAll,
   beforeEach,
   describe,
   expect,
   test,
 } from "vitest";
 import { waitFor } from "../../test/support/frames.js";
+import { hasSshd, startSshd, type TestSshd } from "../../test/support/sshd.js";
 import { startStub, stubSessionFactory } from "../../test/support/stub.js";
 import { TestClient } from "../../test/support/ws-client.js";
 import { createServer, type YuanshuServer } from "../server.js";
@@ -500,5 +502,87 @@ describe("auto-review R1 reviewPolicy REST", () => {
       ).reviewPolicy,
     ).toBeNull();
     await b.stop();
+  });
+});
+
+describe("R4 在 ssh 环境登记 workspace", () => {
+  const post = async (call: Call, url: string, body: unknown) =>
+    (await call("POST", url, body)).json() as Promise<{ id: string }>;
+
+  test("未知或非字符串的 environmentId 为 400；连不上的环境为 502", async () => {
+    const { call } = await launch();
+    const dir = mkdirp("somewhere");
+    for (const environmentId of ["nope", 5, null]) {
+      const r = await add(call, { path: dir, environmentId });
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { error: string }).error).toBe(
+        "invalid_environment",
+      );
+    }
+    const dead = await post(call, "/api/v1/environments", {
+      name: "dead",
+      host: "127.0.0.1",
+      port: 1,
+      username: "u",
+    });
+    const r = await add(call, { path: dir, environmentId: dead.id });
+    expect(r.status).toBe(502);
+    expect(((await r.json()) as { error: string }).error).toBe(
+      "env_unreachable",
+    );
+  });
+
+  describe.skipIf(!hasSshd)("真实 sshd", () => {
+    let sshd: TestSshd;
+    beforeAll(async () => {
+      sshd = await startSshd();
+    });
+    afterAll(() => sshd.close());
+
+    async function remoteEnv(call: Call): Promise<string> {
+      const key = await post(call, "/api/v1/secrets", {
+        name: "k",
+        kind: "ssh_key",
+        value: sshd.privateKey,
+      });
+      const env = await post(call, "/api/v1/environments", {
+        name: "box",
+        host: "127.0.0.1",
+        port: sshd.port,
+        username: sshd.user,
+        secretId: key.id,
+      });
+      return env.id;
+    }
+
+    test("远程目录按真实路径登记；相对路径、文件、不存在为 400", async () => {
+      const { call } = await launch();
+      const environmentId = await remoteEnv(call);
+      const real = mkdirp("remote-real");
+      const link = path.join(base, "remote-link");
+      symlinkSync(real, link);
+      const file = path.join(base, "remote.txt");
+      writeFileSync(file, "x");
+      for (const p of ["rel/dir", file, path.join(base, "nope"), undefined]) {
+        expect((await add(call, { path: p, environmentId })).status).toBe(400);
+      }
+      const ok = await add(call, { path: link, environmentId });
+      expect(ok.status).toBe(201);
+      expect(await ok.json()).toMatchObject({
+        environmentId,
+        path: real,
+        name: "remote-real",
+      });
+    });
+
+    test("唯一性按 (环境, 路径)：同路径本机与远程可并存，同环境重复为 409", async () => {
+      const { call } = await launch();
+      const environmentId = await remoteEnv(call);
+      const dir = mkdirp("both");
+      expect((await add(call, { path: dir })).status).toBe(201);
+      expect((await add(call, { path: dir, environmentId })).status).toBe(201);
+      expect((await add(call, { path: dir, environmentId })).status).toBe(409);
+      expect((await list(call)).filter((w) => w.path === dir)).toHaveLength(2);
+    });
   });
 });

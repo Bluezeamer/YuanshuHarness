@@ -2,6 +2,7 @@ import { realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { uuidv7 } from "../id.js";
 import type { Db } from "./db.js";
+import { LOCAL_ENV_ID } from "./environments.js";
 
 export const TIERS = ["rules", "auto", "full"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -85,21 +86,26 @@ export class WorkspaceStore {
     return r && toWorkspace(r);
   }
 
-  getByPath(p: string): Workspace | undefined {
+  getByPath(p: string, environmentId = LOCAL_ENV_ID): Workspace | undefined {
     const r = this.db
-      .prepare("SELECT * FROM workspaces WHERE path = ?")
-      .get(p) as Row | undefined;
+      .prepare("SELECT * FROM workspaces WHERE path = ? AND environment_id = ?")
+      .get(p, environmentId) as Row | undefined;
     return r && toWorkspace(r);
   }
 
-  // path 须已解析；重复路径返回 null。
-  create(name: string, p: string, now = new Date()): Workspace | null {
-    if (this.getByPath(p)) return null;
+  // path 须已解析；同一环境内重复路径返回 null。
+  create(
+    name: string,
+    p: string,
+    now = new Date(),
+    environmentId = LOCAL_ENV_ID,
+  ): Workspace | null {
+    if (this.getByPath(p, environmentId)) return null;
     const ws: Workspace = {
       id: uuidv7(),
       name,
       path: p,
-      environmentId: "local",
+      environmentId,
       tier: "rules",
       createdAt: now.toISOString(),
     };

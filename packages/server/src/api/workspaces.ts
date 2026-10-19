@@ -1,6 +1,8 @@
 import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { EnvHub } from "../env/hub.js";
 import type { SessionPool } from "../session/pool.js";
+import { LOCAL_ENV_ID } from "../store/environments.js";
 import type { RuleStore } from "../store/rules.js";
 import {
   cleanName,
@@ -21,24 +23,58 @@ export async function workspacesApi(
     workspaces: WorkspaceStore;
     rules: RuleStore;
     pool: SessionPool | null;
+    hub: EnvHub;
   },
 ): Promise<void> {
-  const { workspaces, rules, pool } = opts;
+  const { workspaces, rules, pool, hub } = opts;
 
   app.get("/api/v1/workspaces", async () => ({
     workspaces: workspaces.list(),
   }));
 
+  // 远程目录经环境原语解析：必须是 POSIX 绝对路径、真实存在且是目录。
+  async function resolveRemote(
+    environmentId: string,
+    raw: unknown,
+  ): Promise<string | null> {
+    const env = hub.getSsh(environmentId);
+    if (!env || typeof raw !== "string" || !path.posix.isAbsolute(raw))
+      return null;
+    const real = await env.realpath(raw);
+    if (real === null) return null;
+    return (await env.stat(real))?.isDirectory ? real : null;
+  }
+
   app.post("/api/v1/workspaces", async (req, reply) => {
     const body = isObject(req.body) ? req.body : {};
-    const dir = resolveDirectory(body.path);
-    if (!dir.ok) return bad(reply, "invalid_path");
+    const environmentId =
+      body.environmentId === undefined ? LOCAL_ENV_ID : body.environmentId;
+    if (typeof environmentId !== "string")
+      return bad(reply, "invalid_environment");
+    const remote = environmentId !== LOCAL_ENV_ID;
+    let dirPath: string;
+    if (!remote) {
+      const dir = resolveDirectory(body.path);
+      if (!dir.ok) return bad(reply, "invalid_path");
+      dirPath = dir.path;
+    } else {
+      if (!hub.getSsh(environmentId)) return bad(reply, "invalid_environment");
+      let real: string | null;
+      try {
+        real = await resolveRemote(environmentId, body.path);
+      } catch {
+        return reply.code(502).send({ error: "env_unreachable" });
+      }
+      if (real === null) return bad(reply, "invalid_path");
+      dirPath = real;
+    }
+    const base = remote ? path.posix : path;
     const name =
       body.name === undefined
-        ? cleanName(path.basename(dir.path) || dir.path)
+        ? cleanName(base.basename(dirPath) || dirPath)
         : cleanName(body.name);
     if (name === null) return bad(reply, "invalid_name");
-    const ws = workspaces.create(name, dir.path);
+    const ws = workspaces.create(name, dirPath, new Date(), environmentId);
     if (!ws) return reply.code(409).send({ error: "path_exists" });
     return reply.code(201).send(ws);
   });

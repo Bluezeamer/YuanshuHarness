@@ -248,7 +248,7 @@ export function createServer(
         app.register(async (scope) => {
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
-          scope.register(workspacesApi, { workspaces, rules, pool });
+          scope.register(workspacesApi, { workspaces, rules, pool, hub });
           scope.register(environmentsApi, { environments, secrets, hub });
           scope.register(modelsApi, { models, secrets, agentDir });
           scope.register(fsApi);
