@@ -419,6 +419,9 @@ export async function operandsInside(
   if (!segs) return false;
   return segs.every(([, ...args]) =>
     args.every((a) => {
+      // 递归并跟随符号链接的选项会越出 cwd
+      if (/^-[^-]*R/.test(a) || a === "--dereference-recursive") return false;
+      if (a === "-L" || a === "-follow" || a === "--dereference") return false;
       if (a.startsWith("-")) return !a.includes("/");
       const p = resolveTarget(a, cwd);
       return p !== null && isInside(cwd, p);

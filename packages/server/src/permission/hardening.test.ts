@@ -5,6 +5,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -173,6 +174,38 @@ describe("7. 不可记住与 sudo 按首词 basename 归一化", () => {
     });
     await h.call("bash", { command: "/usr/bin/sudo rm -rf x" });
     expect(reviewed).toBe(0);
+    expect(h.asked).toHaveLength(1);
+  });
+});
+
+describe("第三轮：无 glob 的 grep/find 与跟随链接的递归选项", () => {
+  test("目录树里有 .env 时，不带 glob 的 grep/find 要审批", async () => {
+    const dir = path.join(root, "withenv");
+    mkdirSync(path.join(dir, "sub"), { recursive: true });
+    writeFileSync(path.join(dir, "sub", ".env"), "SECRET=1");
+    const h = harness({ cwd: dir });
+    await h.call("grep", { pattern: "SECRET", path: dir });
+    await h.call("find", { path: dir });
+    expect(h.ids()).toEqual([
+      ["allow", "deny"],
+      ["allow", "deny"],
+    ]);
+  });
+
+  test("没有敏感文件时不误拦", async () => {
+    const h = harness();
+    expect(await h.call("grep", { pattern: "x", path: cwd })).toBeUndefined();
+    expect(h.asked).toHaveLength(0);
+  });
+
+  test.each([
+    "grep -R x .",
+    "grep -rR x .",
+    "grep --dereference-recursive x .",
+    "find . -L -name x",
+  ])("%s：不自动放行", async (command) => {
+    const h = harness();
+    await h.call("bash", { command });
     expect(h.asked).toHaveLength(1);
   });
 });

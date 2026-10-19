@@ -1,5 +1,5 @@
 // 路径解析与敏感路径判定（ADR-0030）。
-import { lstatSync, realpathSync } from "node:fs";
+import { type Dirent, lstatSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -174,4 +174,30 @@ export function selectorEscapes(sel: string): boolean {
     sel.startsWith("~") ||
     sel.split(/[\\/]/).includes("..")
   );
+}
+
+const SKIP_DIRS = new Set(["node_modules", ".git"]);
+
+/**
+ * 在目录树内找首个敏感名条目（不跟随符号链接，最多看 limit 个条目）；
+ * grep/find 不带选择器时会连隐藏文件一起读，用它判断是否会扫到敏感文件。超限视为有。
+ */
+export function findSensitiveBelow(dir: string, limit = 5000): string | null {
+  const queue = [dir];
+  let seen = 0;
+  for (let d = queue.shift(); d !== undefined; d = queue.shift()) {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (++seen > limit) return ".env";
+      if (segmentSensitive(e.name)) return e.name;
+      if (e.isDirectory() && !SKIP_DIRS.has(e.name))
+        queue.push(path.join(d, e.name));
+    }
+  }
+  return null;
 }

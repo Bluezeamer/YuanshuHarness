@@ -19,7 +19,7 @@ import {
   decide,
   type RememberRule,
 } from "./decide.js";
-import { resolveTarget } from "./paths.js";
+import { findSensitiveBelow, resolveTarget } from "./paths.js";
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["edit", "write"]);
@@ -96,16 +96,31 @@ async function classify(
   // 决定实际读哪些文件的选择器：grep 的 glob、find 的 pattern（grep 的 pattern 是内容正则，不是路径）
   const sel =
     tool === "grep" ? input.glob : tool === "find" ? input.pattern : null;
+  const selectors =
+    typeof sel === "string" && sel !== ""
+      ? [sel]
+      : // 无选择器的 grep/find 会连隐藏文件一起读：目录树里有敏感文件就按敏感处理
+        (tool === "grep" || tool === "find") && isDirectory(p)
+        ? [findSensitiveBelow(p)].filter((x): x is string => x !== null)
+        : [];
   return {
     summary: clip(p),
     action: {
       kind: "path",
       access,
       targets: [{ path: p, dir: dirOf(p) }],
-      ...(typeof sel === "string" && sel !== "" ? { selectors: [sel] } : {}),
+      ...(selectors.length ? { selectors } : {}),
     },
   };
 }
+
+const isDirectory = (p: string): boolean => {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
 
 const sizeOf = (v: unknown): number =>
   typeof v === "string"
