@@ -31,6 +31,7 @@ export interface ChatEntry {
   index: number;
   role: "user" | "assistant";
   text: string;
+  blocks?: import("./history").Block[];
 }
 
 export interface Page {

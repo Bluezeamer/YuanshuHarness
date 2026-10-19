@@ -1,4 +1,4 @@
-import type { Known } from "./history";
+import type { Block, Known } from "./history";
 
 export interface Frame {
   session: string;
@@ -87,6 +87,9 @@ function parsePrompt(v: unknown): Prompt | null {
 }
 
 // 快照整体替换状态；其余帧按增量套用。未识别的帧原样忽略，协议新增帧不会让界面崩。
+const blocksOf = (v: unknown): { blocks?: Block[] } =>
+  Array.isArray(v) ? { blocks: v as Block[] } : {};
+
 export function reduce(s: ConvState, f: Frame): ConvState {
   const d = f.data;
   switch (f.type) {
@@ -95,10 +98,14 @@ export function reduce(s: ConvState, f: Frame): ConvState {
       const active = Array.isArray(d.activeTools) ? d.activeTools : [];
       const p = d.partial as { text?: unknown } | null | undefined;
       return {
-        messages: msgs.flatMap((m: { role?: unknown; text?: unknown }) => {
-          const r = role(m?.role);
-          return r ? [{ role: r, text: str(m.text) }] : [];
-        }),
+        messages: msgs.flatMap(
+          (m: { role?: unknown; text?: unknown; blocks?: unknown }) => {
+            const r = role(m?.role);
+            return r
+              ? [{ role: r, text: str(m.text), ...blocksOf(m.blocks) }]
+              : [];
+          },
+        ),
         partial: p && typeof p === "object" ? str(p.text) : null,
         tools: active.map(
           (t: { toolCallId?: unknown; toolName?: unknown }) => ({
@@ -127,7 +134,10 @@ export function reduce(s: ConvState, f: Frame): ConvState {
       return {
         ...s,
         partial: r === "assistant" ? null : s.partial,
-        messages: [...s.messages, { role: r, text: str(d.text) }],
+        messages: [
+          ...s.messages,
+          { role: r, text: str(d.text), ...blocksOf(d.blocks) },
+        ],
       };
     }
     case "tool.started":

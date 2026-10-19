@@ -4,9 +4,14 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ChatEntry } from "./api";
+import type { Block } from "./history";
 import type { Prompt, Tool } from "./conversation";
+import { MermaidBlock } from "./MermaidBlock";
 import { PromptDialog } from "./PromptDialog";
 import type { Conn } from "./useConversation";
 
@@ -40,34 +45,115 @@ function TickBar({
   );
 }
 
-function ToolCard({ t }: { t: Tool }) {
-  const cls =
-    t.status === "running"
-      ? "text-live"
-      : t.status === "error"
-        ? "text-acc"
-        : "text-ok";
+function RichText({ text }: { text: string }) {
   return (
-    <div
-      className={`relative overflow-hidden border border-line bg-panel ${t.status === "running" ? "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:w-[30%] after:animate-[slide_1.4s_var(--ease)_infinite] after:bg-live" : ""}`}
-    >
-      <div className="flex items-center justify-between border-b border-line bg-ink/[0.04] px-3 py-1.5 text-xs">
-        <code className="font-mono font-semibold">{t.name}</code>
-        <span className={`font-semibold ${cls}`}>
-          {t.status === "running"
-            ? "运行中"
-            : t.status === "error"
-              ? "失败"
-              : "完成"}
-        </span>
-      </div>
+    <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className, children, ...props }) {
+            const lang = /language-(\w+)/.exec(className || "")?.[1];
+            const code = String(children).replace(/\n$/, "");
+            if (lang === "mermaid") return <MermaidBlock code={code} />;
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     </div>
+  );
+}
+
+function ThinkingBlock({ text, open }: { text: string; open: boolean }) {
+  const [expanded, setExpanded] = useState(open);
+  return (
+    <details
+      open={expanded}
+      onToggle={(e) => setExpanded(e.currentTarget.open)}
+      className="group overflow-hidden border border-line bg-panel/60"
+    >
+      <summary className="flex cursor-pointer items-center gap-2 border-b border-line bg-ink/[0.03] px-3 py-1.5 text-xs font-semibold text-mute transition-colors group-open:bg-ink/[0.06] hover:bg-ink/[0.08]">
+        <span
+          className="inline-block transition-transform group-open:rotate-90"
+          aria-hidden
+        >
+          ▸
+        </span>
+        思考
+      </summary>
+      <div className="px-3 py-2 text-sm text-mute">
+        <RichText text={text} />
+      </div>
+    </details>
+  );
+}
+
+function ToolBlock({
+  t,
+  open,
+}: {
+  t: Extract<Block, { type: "tool" }>;
+  open: boolean;
+}) {
+  const [expanded, setExpanded] = useState(open);
+  const done = t.result !== undefined;
+  const cls = done
+    ? t.isError
+      ? "text-acc"
+      : "text-ok"
+    : "text-live";
+  const status = done ? (t.isError ? "失败" : "完成") : "运行中";
+  return (
+    <details
+      open={expanded}
+      onToggle={(e) => setExpanded(e.currentTarget.open)}
+      className={`group relative overflow-hidden border border-line bg-panel ${!done ? "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:w-[30%] after:animate-[slide_1.4s_var(--ease)_infinite] after:bg-live" : ""}`}
+    >
+      <summary className="flex cursor-pointer items-center justify-between border-b border-line bg-ink/[0.04] px-3 py-1.5 text-xs transition-colors group-open:bg-ink/[0.06] hover:bg-ink/[0.08]">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block transition-transform group-open:rotate-90"
+            aria-hidden
+          >
+            ▸
+          </span>
+          <code className="font-mono font-semibold">{t.name}</code>
+        </div>
+        <span className={`font-semibold ${cls}`}>{status}</span>
+      </summary>
+      <div className="space-y-2 px-3 py-2 text-xs">
+        {t.args && (
+          <div>
+            <div className="mb-1 font-semibold text-mute">参数</div>
+            <pre className="overflow-auto bg-panel p-2 font-mono text-xs">
+              {t.args}
+            </pre>
+          </div>
+        )}
+        {t.result !== undefined && (
+          <div>
+            <div className="mb-1 font-semibold text-mute">
+              {t.isError ? "错误" : "结果"}
+            </div>
+            <pre className="overflow-auto bg-panel p-2 font-mono text-xs">
+              {t.result}
+            </pre>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
 function Message({
   who,
   text,
+  blocks,
   tools,
   partial,
   anchor,
@@ -75,48 +161,80 @@ function Message({
   anchor?: string;
   who: "user" | "agent" | "queued";
   text?: string;
+  blocks?: Block[];
   tools?: Tool[];
   partial?: boolean;
 }) {
-  const label = who === "user" ? "用户" : who === "agent" ? "恒侍" : "排队中";
-  const labelCls =
-    who === "user" ? "text-mute" : who === "agent" ? "text-ink" : "text-live";
+  const isUser = who === "user";
+  const isQueued = who === "queued";
   return (
     <div
       data-anchor={anchor}
-      className="grid grid-cols-[72px_minmax(0,72ch)] gap-x-3 gap-y-2.5 animate-[in_0.6s_var(--ease)_backwards]"
+      className={`flex animate-[in_0.6s_var(--ease)_backwards] gap-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
-      <span
-        className={`col-start-1 row-start-1 pt-[3px] text-xs font-semibold ${labelCls}`}
+      <div
+        className={`max-w-[min(720px,85%)] space-y-2 ${isUser ? "order-1 rounded-lg border border-line bg-panel px-4 py-3" : ""}`}
       >
-        {label}
-      </span>
-      {text !== undefined && (
-        <p
-          className={`col-start-2 m-0 whitespace-pre-wrap ${who === "user" ? "text-[16px] font-semibold leading-snug" : who === "queued" ? "text-mute" : ""}`}
-        >
-          {text}
-          {partial && (
-            <span
-              className="caret inline-block ml-[3px] h-[1.05em] w-[7px] align-text-bottom bg-live animate-[blink_1s_steps(2)_infinite]"
-              role="img"
-              aria-label="正在输入"
-            />
-          )}
-        </p>
-      )}
-      {tools && tools.length > 0 && (
-        <div className="col-start-2 flex flex-col gap-2">
-          {tools.map((t) => (
-            <ToolCard key={t.id} t={t} />
-          ))}
-        </div>
-      )}
-      {who === "queued" && (
-        <small className="col-start-2 text-xs font-semibold text-live animate-[blink_1.4s_steps(2)_infinite]">
-          当前步骤结束后送达
-        </small>
-      )}
+        {text !== undefined && (
+          <div className={isQueued ? "text-mute" : ""}>
+            <RichText text={text} />
+            {partial && (
+              <span
+                className="caret ml-1 inline-block h-[1.05em] w-[7px] align-text-bottom bg-live animate-[blink_1s_steps(2)_infinite]"
+                role="img"
+                aria-label="正在输入"
+              />
+            )}
+          </div>
+        )}
+        {blocks && blocks.length > 0 && (
+          <div className="space-y-2">
+            {blocks.map((b, i) =>
+              b.type === "text" ? null : b.type === "thinking" ? (
+                <ThinkingBlock
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 块按顺序渲染
+                  key={i}
+                  text={b.text}
+                  open
+                />
+              ) : (
+                <ToolBlock
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 块按顺序渲染
+                  key={i}
+                  t={b}
+                  open
+                />
+              ),
+            )}
+          </div>
+        )}
+        {tools && tools.length > 0 && (
+          <div className="space-y-2">
+            {tools.map((t) => (
+              <ToolBlock
+                key={t.id}
+                t={{
+                  type: "tool",
+                  id: t.id,
+                  name: t.name,
+                  args: "",
+                  ...(t.status === "ok"
+                    ? { result: "", isError: false }
+                    : t.status === "error"
+                      ? { result: "", isError: true }
+                      : {}),
+                }}
+                open
+              />
+            ))}
+          </div>
+        )}
+        {isQueued && (
+          <small className="text-xs font-semibold text-live animate-[blink_1.4s_steps(2)_infinite]">
+            当前步骤结束后送达
+          </small>
+        )}
+      </div>
     </div>
   );
 }
@@ -173,7 +291,7 @@ export function Conversation({
   name: string | null;
   draft: string;
   onDraft(text: string): void;
-  messages: { role: string; text: string }[];
+  messages: { role: string; text: string; blocks?: Block[] }[];
   older: ChatEntry[];
   hasEarlier: boolean;
   loadingEarlier: boolean;
@@ -338,6 +456,7 @@ export function Conversation({
               anchor={`h-${m.index}`}
               who={whoOf(m.role)}
               text={m.text}
+              blocks={m.blocks}
             />
           ))}
           {messages.map((m, i) => (
@@ -347,6 +466,7 @@ export function Conversation({
               anchor={`w-${i}`}
               who={whoOf(m.role)}
               text={m.text}
+              blocks={m.blocks}
             />
           ))}
           {partial !== null && <Message who="agent" text={partial} partial />}

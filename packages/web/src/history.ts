@@ -1,8 +1,21 @@
 import type { ChatEntry, Page, Result } from "./api";
 
+export type Block =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      args: string;
+      result?: string;
+      isError?: boolean;
+    };
+
 export interface Known {
   role: string;
   text: string;
+  blocks?: Block[];
 }
 
 // 已加载的更早历史：index 连续递增；nextBefore 是继续往前翻的游标，null 表示已到最早。
