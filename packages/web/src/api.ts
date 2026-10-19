@@ -4,6 +4,27 @@ export interface SessionInfo {
   createdAt: string;
   updatedAt: string;
   running: boolean;
+  workspaceId?: string | null;
+  reviewPolicy?: string | null;
+}
+
+export type Tier = "rules" | "auto" | "full";
+
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  path: string;
+  environmentId: string;
+  tier: Tier;
+  createdAt: string;
+}
+
+export interface RuleInfo {
+  id: string;
+  kind: "path" | "command";
+  access: "read" | "write" | null;
+  value: string;
+  createdAt: string;
 }
 
 export interface ChatEntry {
@@ -215,3 +236,114 @@ export async function deleteSavedLayout(
   if (res.status === 404) return { ok: false, kind: "not_found" };
   return { ok: false, ...failure(res) };
 }
+
+export type CallFailure =
+  | Failure
+  | { kind: "bad_request" }
+  | { kind: "not_found" }
+  | { kind: "conflict" };
+
+export type CallResult<T> =
+  | { ok: true; data: T }
+  | ({ ok: false } & CallFailure);
+
+// 带请求体或非 GET 的调用。204 视为成功且无数据。
+async function call<T>(
+  method: string,
+  path: string,
+  token: string | null,
+  body: unknown,
+  pick: (b: never) => T,
+): Promise<CallResult<T>> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method,
+      headers: {
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, kind: "network" };
+  }
+  if (res.status === 400) return { ok: false, kind: "bad_request" };
+  if (res.status === 404) return { ok: false, kind: "not_found" };
+  if (res.status === 409) return { ok: false, kind: "conflict" };
+  if (!res.ok) return { ok: false, ...failure(res) };
+  if (res.status === 204) return { ok: true, data: undefined as T };
+  try {
+    return { ok: true, data: pick((await res.json()) as never) };
+  } catch {
+    return { ok: false, kind: "server" };
+  }
+}
+
+const enc = encodeURIComponent;
+
+export const listWorkspaces = (token: string | null) =>
+  get("/api/v1/workspaces", token, (b: { workspaces: WorkspaceInfo[] }) => {
+    if (!Array.isArray(b.workspaces)) throw new Error("shape");
+    return b.workspaces;
+  });
+
+export const createWorkspace = (
+  token: string | null,
+  body: { path: string; name?: string },
+) => call("POST", "/api/v1/workspaces", token, body, (b: WorkspaceInfo) => b);
+
+export const patchWorkspace = (
+  token: string | null,
+  id: string,
+  body: { name?: string; tier?: Tier },
+) =>
+  call(
+    "PATCH",
+    `/api/v1/workspaces/${enc(id)}`,
+    token,
+    body,
+    (b: WorkspaceInfo) => b,
+  );
+
+export const deleteWorkspace = (token: string | null, id: string) =>
+  call("DELETE", `/api/v1/workspaces/${enc(id)}`, token, undefined, () => {});
+
+export const listRules = (token: string | null, workspaceId: string) =>
+  get(
+    `/api/v1/workspaces/${enc(workspaceId)}/rules`,
+    token,
+    (b: { rules: RuleInfo[] }) => {
+      if (!Array.isArray(b.rules)) throw new Error("shape");
+      return b.rules;
+    },
+  );
+
+export const deleteRule = (
+  token: string | null,
+  workspaceId: string,
+  ruleId: string,
+) =>
+  call(
+    "DELETE",
+    `/api/v1/workspaces/${enc(workspaceId)}/rules/${enc(ruleId)}`,
+    token,
+    undefined,
+    () => {},
+  );
+
+export const createSession = (
+  token: string | null,
+  body: { workspaceId?: string },
+) =>
+  call("POST", "/api/v1/sessions", token, body, (b: { id: string }) => {
+    if (typeof b.id !== "string") throw new Error("shape");
+    return b;
+  });
+
+// reviewPolicy 空串表示清除。
+export const patchSession = (
+  token: string | null,
+  id: string,
+  body: { reviewPolicy: string },
+) => call("PATCH", `/api/v1/sessions/${enc(id)}`, token, body, () => {});

@@ -59,6 +59,10 @@ export function ConversationView({
       onSend={c.send}
       onStop={c.stop}
       onReconnect={c.reconnect}
+      prompts={c.state.prompts}
+      answering={c.answering}
+      promptError={c.promptError}
+      onAnswer={c.answerPrompt}
     />
   );
 }

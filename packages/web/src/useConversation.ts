@@ -21,6 +21,12 @@ export interface Conversation {
   historyFailed: boolean;
   notice: string | null;
   stopPending: boolean;
+  answering: string | null;
+  promptError: { promptId: string; message: string } | null;
+  answerPrompt(
+    promptId: string,
+    answer: { optionId: string } | { text: string },
+  ): boolean;
   send(text: string): boolean;
   stop(): void;
   reconnect(): void;
@@ -52,6 +58,11 @@ export function useConversation(
 
   const send = useCallback((t: string) => store?.send(t) ?? false, [store]);
   const stop = useCallback(() => store?.stop(), [store]);
+  const answerPrompt = useCallback(
+    (id: string, a: { optionId: string } | { text: string }) =>
+      store?.answerPrompt(id, a) ?? false,
+    [store],
+  );
   const reconnect = useCallback(() => store?.reconnect(), [store]);
   const loadEarlier = useCallback(() => store?.loadEarlier(), [store]);
 
@@ -66,6 +77,9 @@ export function useConversation(
     historyFailed: snap.historyFailed,
     notice: snap.notice,
     stopPending: snap.stopPending,
+    answering: snap.answering,
+    promptError: snap.promptError,
+    answerPrompt,
     send,
     stop,
     reconnect,

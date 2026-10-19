@@ -193,3 +193,81 @@ export function installApi(history: ChatEntry[] = []): Api {
   });
   return api;
 }
+
+export interface Admin {
+  workspaces: {
+    id: string;
+    name: string;
+    path: string;
+    environmentId: string;
+    tier: string;
+    createdAt: string;
+  }[];
+  rules: Record<string, object[]>;
+  // 下一次对应请求返回的状态码（一次性）。
+  fail: Record<string, number>;
+  calls: { method: string; path: string; body: unknown }[];
+}
+
+// 在 installApi 之上叠加 workspace / 规则 / 会话写入的假实现。
+export function installAdmin(): Admin {
+  const base = globalThis.fetch;
+  const admin: Admin = { workspaces: [], rules: {}, fail: {}, calls: [] };
+  vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    const isAdmin =
+      input.startsWith("/api/v1/workspaces") ||
+      (input === "/api/v1/sessions" && method === "POST") ||
+      (input.startsWith("/api/v1/sessions/") && method === "PATCH");
+    if (!isAdmin) return base(input, init);
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    admin.calls.push({ method, path: input, body });
+    const key = `${method} ${input}`;
+    const forced = admin.fail[key];
+    if (forced) {
+      delete admin.fail[key];
+      return new Response("{}", { status: forced });
+    }
+    const json = (s: number, b: object) =>
+      new Response(JSON.stringify(b), { status: s });
+    if (input === "/api/v1/workspaces") {
+      if (method === "GET") return json(200, { workspaces: admin.workspaces });
+      const w = {
+        id: `w${admin.workspaces.length + 1}`,
+        name: body.name ?? body.path.split("/").pop(),
+        path: body.path,
+        environmentId: "local",
+        tier: "rules",
+        createdAt: "t",
+      };
+      admin.workspaces.push(w);
+      return json(201, w);
+    }
+    const m = /^\/api\/v1\/workspaces\/([^/]+)(?:\/rules(?:\/([^/]+))?)?$/.exec(
+      input,
+    );
+    if (m) {
+      const [, id, ruleId] = m as unknown as [string, string, string?];
+      const w = admin.workspaces.find((x) => x.id === id);
+      if (!w) return json(404, {});
+      if (input.includes("/rules")) {
+        if (ruleId) {
+          admin.rules[id] = (admin.rules[id] ?? []).filter(
+            (r) => (r as { id: string }).id !== ruleId,
+          );
+          return new Response(null, { status: 204 });
+        }
+        return json(200, { rules: admin.rules[id] ?? [] });
+      }
+      if (method === "PATCH") {
+        Object.assign(w, body);
+        return json(200, w);
+      }
+      admin.workspaces = admin.workspaces.filter((x) => x.id !== id);
+      return new Response(null, { status: 204 });
+    }
+    if (method === "POST") return json(201, { id: "new1" });
+    return json(200, {});
+  });
+  return admin;
+}

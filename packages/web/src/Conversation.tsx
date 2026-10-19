@@ -6,7 +6,8 @@ import {
   useRef,
 } from "react";
 import type { ChatEntry } from "./api";
-import type { Tool } from "./conversation";
+import type { Prompt, Tool } from "./conversation";
+import { PromptDialog } from "./PromptDialog";
 import type { Conn } from "./useConversation";
 
 function TickBar({
@@ -157,7 +158,18 @@ export function Conversation({
   onSend,
   onStop,
   onReconnect,
+  prompts = [],
+  answering = null,
+  promptError = null,
+  onAnswer,
 }: {
+  prompts?: Prompt[];
+  answering?: string | null;
+  promptError?: { promptId: string; message: string } | null;
+  onAnswer?(
+    promptId: string,
+    answer: { optionId: string } | { text: string },
+  ): void;
   name: string | null;
   draft: string;
   onDraft(text: string): void;
@@ -268,113 +280,137 @@ export function Conversation({
     tools.length === 0 &&
     queue.length === 0;
 
+  const prompt = prompts[0];
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_auto_1fr_auto]">
-      {conn === "reconnecting" || gap ? <SyncBar closed={gap} /> : <div />}
-      <div className="flex items-baseline justify-between border-b border-line px-7 pb-3 pt-4">
-        <h1 className="text-[22px] font-bold leading-tight tracking-tight">
-          {name ?? "未命名会话"}
-        </h1>
-        {gap && (
-          <button
-            type="button"
-            onClick={onReconnect}
-            className="text-xs font-semibold text-live hover:underline"
-          >
-            重新连接
-          </button>
-        )}
-      </div>
-      <TickBar running={running} seqs={seqs.length ? seqs : [0]} gap={gap} />
+    <div className="relative h-full min-h-0">
+      {/* 弹窗打开时其余内容 inert：不可点击、不可聚焦（只能明确答复） */}
       <div
-        ref={feedRef}
-        role="log"
-        aria-label="对话记录"
-        className="flex min-h-0 flex-col gap-6 overflow-auto px-7 py-6"
-        style={{ overflowAnchor: "none" }}
+        inert={prompt !== undefined}
+        className="grid h-full min-h-0 grid-rows-[auto_auto_auto_1fr_auto]"
       >
-        {historyFailed && (
-          <p className="text-sm text-acc">历史加载失败，只显示当前窗口</p>
-        )}
-        {hasEarlier && (
-          <div className="flex items-baseline gap-3">
+        {conn === "reconnecting" || gap ? <SyncBar closed={gap} /> : <div />}
+        <div className="flex items-baseline justify-between border-b border-line px-7 pb-3 pt-4">
+          <h1 className="text-[22px] font-bold leading-tight tracking-tight">
+            {name ?? "未命名会话"}
+          </h1>
+          {gap && (
             <button
               type="button"
-              onClick={loadEarlier}
-              disabled={loadingEarlier}
-              className="border border-ink px-3 py-1 text-xs font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-wait disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-ink"
+              onClick={onReconnect}
+              className="text-xs font-semibold text-live hover:underline"
             >
-              {loadingEarlier ? "加载中…" : "加载更早"}
+              重新连接
             </button>
-            {earlierFailed && (
-              <span className="text-xs text-acc">
-                更早的消息加载失败，请重试
-              </span>
-            )}
-          </div>
-        )}
-        {empty && <p className="text-mute">还没有消息</p>}
-        {older.map((m) => (
-          <Message
-            key={`h-${m.index}`}
-            anchor={`h-${m.index}`}
-            who={whoOf(m.role)}
-            text={m.text}
-          />
-        ))}
-        {messages.map((m, i) => (
-          <Message
-            // biome-ignore lint/suspicious/noArrayIndexKey: 窗口消息没有序位，只追加不重排
-            key={`w-${i}`}
-            anchor={`w-${i}`}
-            who={whoOf(m.role)}
-            text={m.text}
-          />
-        ))}
-        {partial !== null && <Message who="agent" text={partial} partial />}
-        {tools.length > 0 && <Message who="agent" tools={tools} />}
-        {queue.length > 0 && (
-          <p className="text-xs font-semibold text-live">排队 {queue.length}</p>
-        )}
-        {queue.map((q, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: 排队文本可重复，没有稳定 id
-          <Message key={`q-${i}`} who="queued" text={q} />
-        ))}
-        {error && <p className="text-sm text-acc">{error}</p>}
-        {notice && <p className="text-sm text-acc">{notice}</p>}
-      </div>
-      <form
-        onSubmit={handleSend}
-        className="grid grid-cols-[1fr_auto_auto] border-t border-ink bg-panel"
-      >
-        <textarea
-          value={draft}
-          onChange={(e) => onDraft(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="输入消息"
-          aria-label="输入消息"
-          disabled={!effective}
-          className="h-[68px] resize-none border-0 bg-transparent px-7 py-3.5 font-[inherit] text-ink placeholder:text-mute disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={!effective || !draft.trim()}
-          className="flex items-center gap-2 border-l border-line px-7 font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink"
+          )}
+        </div>
+        <TickBar running={running} seqs={seqs.length ? seqs : [0]} gap={gap} />
+        <div
+          ref={feedRef}
+          role="log"
+          aria-label="对话记录"
+          className="flex min-h-0 flex-col gap-6 overflow-auto px-7 py-6"
+          style={{ overflowAnchor: "none" }}
         >
-          发送
-        </button>
-        {running && (
+          {historyFailed && (
+            <p className="text-sm text-acc">历史加载失败，只显示当前窗口</p>
+          )}
+          {hasEarlier && (
+            <div className="flex items-baseline gap-3">
+              <button
+                type="button"
+                onClick={loadEarlier}
+                disabled={loadingEarlier}
+                className="border border-ink px-3 py-1 text-xs font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-wait disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-ink"
+              >
+                {loadingEarlier ? "加载中…" : "加载更早"}
+              </button>
+              {earlierFailed && (
+                <span className="text-xs text-acc">
+                  更早的消息加载失败，请重试
+                </span>
+              )}
+            </div>
+          )}
+          {empty && <p className="text-mute">还没有消息</p>}
+          {older.map((m) => (
+            <Message
+              key={`h-${m.index}`}
+              anchor={`h-${m.index}`}
+              who={whoOf(m.role)}
+              text={m.text}
+            />
+          ))}
+          {messages.map((m, i) => (
+            <Message
+              // biome-ignore lint/suspicious/noArrayIndexKey: 窗口消息没有序位，只追加不重排
+              key={`w-${i}`}
+              anchor={`w-${i}`}
+              who={whoOf(m.role)}
+              text={m.text}
+            />
+          ))}
+          {partial !== null && <Message who="agent" text={partial} partial />}
+          {tools.length > 0 && <Message who="agent" tools={tools} />}
+          {queue.length > 0 && (
+            <p className="text-xs font-semibold text-live">
+              排队 {queue.length}
+            </p>
+          )}
+          {queue.map((q, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 排队文本可重复，没有稳定 id
+            <Message key={`q-${i}`} who="queued" text={q} />
+          ))}
+          {error && <p className="text-sm text-acc">{error}</p>}
+          {notice && <p className="text-sm text-acc">{notice}</p>}
+        </div>
+        <form
+          onSubmit={handleSend}
+          className="grid grid-cols-[1fr_auto_auto] border-t border-ink bg-panel"
+        >
+          <textarea
+            value={draft}
+            onChange={(e) => onDraft(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="输入消息"
+            aria-label="输入消息"
+            disabled={!effective}
+            className="h-[68px] resize-none border-0 bg-transparent px-7 py-3.5 font-[inherit] text-ink placeholder:text-mute disabled:opacity-50"
+          />
           <button
-            type="button"
-            onClick={onStop}
-            disabled={stopPending || !effective}
-            aria-label="停止运行"
-            className="flex items-center gap-2 animate-[wipe_0.5s_var(--ease)] border-l border-line bg-acc px-7 font-semibold text-bg transition-colors hover:bg-acc-press disabled:cursor-not-allowed disabled:opacity-70"
+            type="submit"
+            disabled={!effective || !draft.trim()}
+            className="flex items-center gap-2 border-l border-line px-7 font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink"
           >
-            停止
+            发送
           </button>
-        )}
-      </form>
+          {running && (
+            <button
+              type="button"
+              onClick={onStop}
+              disabled={stopPending || !effective}
+              aria-label="停止运行"
+              className="flex items-center gap-2 animate-[wipe_0.5s_var(--ease)] border-l border-line bg-acc px-7 font-semibold text-bg transition-colors hover:bg-acc-press disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              停止
+            </button>
+          )}
+        </form>
+      </div>
+      {prompt && (
+        <PromptDialog
+          key={prompt.promptId}
+          prompt={prompt}
+          more={prompts.length - 1}
+          sessionName={name}
+          busy={answering === prompt.promptId}
+          error={
+            promptError?.promptId === prompt.promptId
+              ? promptError.message
+              : null
+          }
+          onAnswer={(a) => onAnswer?.(prompt.promptId, a)}
+        />
+      )}
     </div>
   );
 }
