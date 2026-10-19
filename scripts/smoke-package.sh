@@ -45,13 +45,13 @@ fi
 VERSION="$(tar -xzOf "$TARBALL" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')"
 
 echo "== 装到干净目录（$WORK/app）"
-mkdir -p "$WORK/app"
+mkdir -p "$WORK/app" "$WORK/home"
 (cd "$WORK/app" && npm init -y >/dev/null && npm install --no-audit --no-fund --loglevel=error "$TARBALL")
 
 echo "== 启动 yuanshu serve"
 PORT="$(free_port)"
 BASE="http://127.0.0.1:$PORT"
-"$WORK/app/node_modules/.bin/yuanshu" serve --port "$PORT" --data-dir "$WORK/data" > "$SMOKE_LOG" 2>&1 &
+HOME="$WORK/home" "$WORK/app/node_modules/.bin/yuanshu" serve --port "$PORT" --data-dir "$WORK/data" > "$SMOKE_LOG" 2>&1 &
 SERVER_PID=$!
 wait_http "$BASE/healthz" 15 || die "15 秒内 /healthz 没有返回 200"
 
@@ -73,6 +73,6 @@ SERVER_PID=""
 ((code == 0)) || die "SIGTERM 后退出码应为 0，实际 $code"
 
 [[ -d "$WORK/data" ]] || die "数据目录没有被创建"
-[[ "$(ls -A "$WORK/data" | sort | tr "\n" " ")" == "sessions yuanshu.db " ]] || die "数据目录内容不符（应只有 sessions 与 yuanshu.db）：$(ls -A "$WORK/data")"
+[[ "$(ls -A "$WORK/data" | sort | tr "\n" " ")" == "models secret.key sessions yuanshu.db " ]] || die "数据目录内容不符（应为 models、secret.key、sessions、yuanshu.db）：$(ls -A "$WORK/data")"
 
 echo "装包冒烟通过（版本 $VERSION）"

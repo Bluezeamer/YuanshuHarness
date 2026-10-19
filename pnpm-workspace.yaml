@@ -3,4 +3,6 @@ packages:
 allowBuilds:
   '@google/genai': false
   protobufjs: false
+  cpu-features: false
+  ssh2: false
   tree-sitter-bash@0.25.1: true
