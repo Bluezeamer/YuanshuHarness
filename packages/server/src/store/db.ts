@@ -31,6 +31,36 @@ export const MIGRATIONS: Migration[] = [
          created_at TEXT NOT NULL
        )`,
     ),
+  // 最小 workspace（仅本机）；会话的 workspace_id 可空，空值读作默认 workspace。
+  // meta 存持久化标记（如默认 workspace 已登记过），避免删空后重启又补登记。
+  (db) =>
+    db.exec(
+      `CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+       CREATE TABLE workspaces (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL,
+         path TEXT NOT NULL UNIQUE,
+         environment_id TEXT NOT NULL DEFAULT 'local',
+         tier TEXT NOT NULL DEFAULT 'rules',
+         created_at TEXT NOT NULL
+       );
+       ALTER TABLE sessions ADD COLUMN workspace_id TEXT`,
+    ),
+  // 已记住的权限规则；随 workspace 级联删除（需 foreign_keys 开启）。
+  (db) =>
+    db.exec(
+      `CREATE TABLE permission_rules (
+         id TEXT PRIMARY KEY,
+         workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+         kind TEXT NOT NULL,
+         access TEXT,
+         value TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         UNIQUE(workspace_id, kind, access, value)
+       )`,
+    ),
+  // 会话级审核策略覆盖（ADR-0031），可空。
+  (db) => db.exec("ALTER TABLE sessions ADD COLUMN review_policy TEXT"),
 ];
 
 export const DB_FILE = "yuanshu.db";
@@ -57,6 +87,7 @@ export function openDatabase(
     // 独占锁在第一次读写时才真正获取；超时调短，让第二个实例立刻失败而不是干等。
     db = new Database(file, { timeout: 200 });
     db.pragma("locking_mode = EXCLUSIVE");
+    db.pragma("foreign_keys = ON");
     db.exec("BEGIN EXCLUSIVE; COMMIT");
   } catch (err) {
     throw new Error(

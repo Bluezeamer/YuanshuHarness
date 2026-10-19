@@ -14,6 +14,9 @@ export interface IndexRow {
   name: string | null;
   createdAt: string;
   updatedAt: string;
+  // 空表示迁移前或对账补建的会话，读作默认 workspace。
+  workspaceId?: string | null;
+  reviewPolicy?: string | null;
 }
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -81,12 +84,16 @@ type Row = {
   name: string | null;
   created_at: string;
   updated_at: string;
+  workspace_id: string | null;
+  review_policy: string | null;
 };
 const toRow = (r: Row): IndexRow => ({
   id: r.id,
   name: r.name,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  workspaceId: r.workspace_id,
+  reviewPolicy: r.review_policy,
 });
 
 export class SessionStore {
@@ -95,10 +102,17 @@ export class SessionStore {
   upsert(row: IndexRow): void {
     this.db
       .prepare(
-        `INSERT INTO sessions (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO sessions (id, name, created_at, updated_at, workspace_id, review_policy) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
       )
-      .run(row.id, row.name, row.createdAt, row.updatedAt);
+      .run(
+        row.id,
+        row.name,
+        row.createdAt,
+        row.updatedAt,
+        row.workspaceId ?? null,
+        row.reviewPolicy ?? null,
+      );
   }
 
   touch(id: string, updatedAt: string): void {
@@ -110,6 +124,12 @@ export class SessionStore {
   // 改名不算活动，不改 updated_at。
   rename(id: string, name: string): void {
     this.db.prepare("UPDATE sessions SET name = ? WHERE id = ?").run(name, id);
+  }
+
+  setReviewPolicy(id: string, policy: string | null): void {
+    this.db
+      .prepare("UPDATE sessions SET review_policy = ? WHERE id = ?")
+      .run(policy, id);
   }
 
   remove(id: string): boolean {

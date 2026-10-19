@@ -39,7 +39,9 @@ describe("R1 迁移与备份", () => {
 
   test("重新打开已是当前版本：不备份、数据保留", () => {
     const a = openDatabase(dir);
-    a.prepare("INSERT INTO sessions VALUES ('x', NULL, 'a', 'b')").run();
+    a.prepare(
+      "INSERT INTO sessions (id, name, created_at, updated_at) VALUES ('x', NULL, 'a', 'b')",
+    ).run();
     a.close();
     const b = track(openDatabase(dir));
     expect(b.prepare("SELECT id FROM sessions").all()).toEqual([{ id: "x" }]);

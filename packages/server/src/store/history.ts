@@ -35,6 +35,23 @@ export function readMessages(
   return out;
 }
 
+// 当前分支上的工具输出摘要（每条截断到 max 字符），供自动审核当不可信上下文；不进历史接口。
+export function readToolOutputs(
+  file: string,
+  dir: string,
+  id: string,
+  max = 200,
+): string[] {
+  const out: string[] = [];
+  for (const e of openBranch(file, dir, id)) {
+    const m = e.message;
+    if (e.type !== "message" || m?.role !== "toolResult") continue;
+    const t = messageText(m.content).replace(/\s+/g, " ").trim();
+    out.push(`工具输出：${t.length > max ? `${t.slice(0, max)}…` : t}`);
+  }
+  return out;
+}
+
 // 末尾最后一条带工具调用的助手消息，其调用是否有没拿到结果的。
 export function hasDanglingToolCall(
   file: string,
