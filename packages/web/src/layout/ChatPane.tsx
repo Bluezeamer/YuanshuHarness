@@ -104,7 +104,23 @@ export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
               left.open ? "absolute inset-y-0 left-0 z-20" : ""
             }`}
           >
-            <div className="flex justify-end border-b border-line2 p-1">
+            <div className="flex items-center justify-between gap-2 border-b border-line2 p-1">
+              {env.newSession ? (
+                <button
+                  type="button"
+                  className={btn}
+                  onClick={() =>
+                    env.newSession?.((sessionId) => {
+                      left.close();
+                      onUpdateConfig({ sessionId });
+                    })
+                  }
+                >
+                  新建会话
+                </button>
+              ) : (
+                <span />
+              )}
               {left.open ? (
                 <button type="button" className={btn} onClick={left.pin}>
                   固定会话列表
