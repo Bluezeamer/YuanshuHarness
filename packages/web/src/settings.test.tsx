@@ -4,10 +4,11 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "./api";
-import { FakeWS, installAdmin, installApi } from "./fakes";
+import { FakeWS, installAdmin, installApi, installFs } from "./fakes";
 import { Shell } from "./Shell";
 
 const ws1 = (over: object = {}) => ({
@@ -28,6 +29,7 @@ beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWS);
   installApi([]);
   admin = installAdmin();
+  installFs();
   admin.workspaces = [
     ws1(),
     ws1({ id: "w2", name: "项目乙", path: "/work/b" }),
@@ -72,12 +74,28 @@ test("设为完全允许要二次确认，取消则不发请求", async () => {
   await waitFor(() => expect(patches()[0]?.body).toEqual({ tier: "full" }));
 });
 
-test("新增：无效路径与重复路径给出不同提示", async () => {
+// 从根目录起逐级进入。
+const goto = async (...names: string[]) => {
+  fireEvent.click(
+    within(await screen.findByRole("navigation", { name: "路径" })).getByRole(
+      "button",
+      { name: "根目录" },
+    ),
+  );
+  for (const n of names) {
+    const l = await screen.findByRole("list", { name: "子目录" });
+    fireEvent.click(within(l).getByRole("button", { name: n }));
+  }
+  await screen.findByRole("status");
+};
+const posts = (path: string) =>
+  admin.calls.filter((c) => c.method === "POST" && c.path === path);
+
+test("新增：用选择器选目录，无效与重复路径给出不同提示", async () => {
   await openSettings();
   fireEvent.click(screen.getByRole("button", { name: "新增工作区" }));
-  fireEvent.change(screen.getByLabelText(/目录路径/), {
-    target: { value: "/x" },
-  });
+  expect(screen.queryByLabelText(/目录路径/)).toBeNull();
+  await goto("work", "c");
   admin.fail["POST /api/v1/workspaces"] = 400;
   fireEvent.click(screen.getByRole("button", { name: "添加" }));
   expect((await screen.findByRole("alert")).textContent).toContain("路径无效");
@@ -87,8 +105,20 @@ test("新增：无效路径与重复路径给出不同提示", async () => {
     expect(screen.getByRole("alert").textContent).toContain("已登记"),
   );
   fireEvent.click(screen.getByRole("button", { name: "添加" }));
-  await screen.findByRole("button", { name: /x/ });
+  await screen.findByRole("button", { name: /\/work\/c/ });
   expect(admin.workspaces).toHaveLength(3);
+  expect(posts("/api/v1/workspaces")[2]?.body).toEqual({ path: "/work/c" });
+});
+
+test("新增：目录不可读写时禁用并写明原因", async () => {
+  await openSettings();
+  fireEvent.click(screen.getByRole("button", { name: "新增工作区" }));
+  await goto("home", "u", "proj", "locked");
+  expect(screen.getByRole("button", { name: "添加" })).toHaveProperty(
+    "disabled",
+    true,
+  );
+  expect(screen.getByText(/不能用作工作区/)).toBeTruthy();
 });
 
 test("删除需确认；409 提示仍有会话引用并保留条目", async () => {
@@ -132,17 +162,87 @@ test("查看并删除已记住的规则", async () => {
   expect(screen.getByText("/work/a/dist")).toBeTruthy();
 });
 
-test("新建会话带所选 workspaceId", async () => {
+const openNew = async () => {
   render(<Shell sessions={[]} onUnauthorized={() => {}} />);
   fireEvent.click(screen.getByRole("button", { name: "新建会话" }));
-  const sel = (await screen.findByLabelText("工作区")) as HTMLSelectElement;
-  fireEvent.change(sel, { target: { value: "w2" } });
-  fireEvent.click(screen.getByRole("button", { name: "创建" }));
-  await waitFor(() =>
-    expect(admin.calls.find((c) => c.method === "POST")?.body).toEqual({
-      workspaceId: "w2",
-    }),
+  await screen.findByRole("dialog", { name: "新建会话" });
+  await screen.findByRole("list", { name: "子目录" });
+};
+const createBtn = () => screen.getByRole("button", { name: "创建" });
+
+test("新建会话：点已登记入口跳转，沿用其档位，不再登记", async () => {
+  admin.workspaces[1] = ws1({
+    id: "w2",
+    name: "项目乙",
+    path: "/work/b",
+    tier: "auto",
+  });
+  await openNew();
+  fireEvent.click(await screen.findByRole("button", { name: /项目乙/ }));
+  await waitFor(() => expect(screen.getByText(/已登记/)).toBeTruthy());
+  expect(screen.queryByRole("radio")).toBeNull();
+  expect(screen.getByText(/自动模式/)).toBeTruthy();
+  await waitFor(() => expect(createBtn()).toHaveProperty("disabled", false));
+  fireEvent.click(createBtn());
+  await waitFor(() => expect(posts("/api/v1/sessions")).toHaveLength(1));
+  expect(posts("/api/v1/sessions")[0]?.body).toEqual({ workspaceId: "w2" });
+  expect(posts("/api/v1/workspaces")).toHaveLength(0);
+});
+
+test("新建会话：未登记目录先登记、按所选档位设置，再建会话", async () => {
+  await openNew();
+  await goto("work", "c");
+  expect(screen.getByRole("radio", { name: /规则审批/ })).toHaveProperty(
+    "checked",
+    true,
   );
+  fireEvent.click(screen.getByRole("radio", { name: /自动模式/ }));
+  fireEvent.click(createBtn());
+  await waitFor(() => expect(posts("/api/v1/sessions")).toHaveLength(1));
+  expect(posts("/api/v1/workspaces")[0]?.body).toEqual({ path: "/work/c" });
+  expect(admin.calls.find((c) => c.method === "PATCH")?.body).toEqual({
+    tier: "auto",
+  });
+  expect(posts("/api/v1/sessions")[0]?.body).toEqual({ workspaceId: "w3" });
+});
+
+test("新建会话：登记返回 409 时按路径复用已有工作区", async () => {
+  await openNew();
+  await goto("work", "c");
+  // 界面加载后才被别处登记，造成 409。
+  admin.workspaces.push(ws1({ id: "w9", name: "别处", path: "/work/c" }));
+  fireEvent.click(createBtn());
+  await waitFor(() => expect(posts("/api/v1/sessions")).toHaveLength(1));
+  expect(posts("/api/v1/sessions")[0]?.body).toEqual({ workspaceId: "w9" });
+  expect(admin.workspaces).toHaveLength(3);
+  expect(admin.calls.some((c) => c.method === "PATCH")).toBe(false);
+});
+
+test("新建会话：目录不可读写时创建禁用并写明原因", async () => {
+  await openNew();
+  await goto("home", "u", "proj", "locked");
+  expect(createBtn()).toHaveProperty("disabled", true);
+  expect(screen.getByText(/不可读写，不能创建会话/)).toBeTruthy();
+  cleanup();
+  await openNew();
+  await goto("home", "u", "proj", "ro");
+  expect(createBtn()).toHaveProperty("disabled", true);
+});
+
+test("新建会话失败：给出提示，说明目录已登记，且不吞错", async () => {
+  await openNew();
+  await goto("work", "c");
+  admin.fail["POST /api/v1/sessions"] = 500;
+  fireEvent.click(createBtn());
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("目录已登记");
+  expect(alert.textContent).toContain("Server");
+  expect(admin.workspaces).toHaveLength(3);
+  // 重试直接走已登记路径，不再重复登记。
+  fireEvent.click(createBtn());
+  await waitFor(() => expect(posts("/api/v1/sessions")).toHaveLength(2));
+  expect(posts("/api/v1/workspaces")).toHaveLength(1);
+  expect(posts("/api/v1/sessions")[1]?.body).toEqual({ workspaceId: "w3" });
 });
 
 test("会话审核策略：保存、清除（空串）", async () => {

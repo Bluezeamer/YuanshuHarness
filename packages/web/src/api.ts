@@ -347,3 +347,26 @@ export const patchSession = (
   id: string,
   body: { reviewPolicy: string },
 ) => call("PATCH", `/api/v1/sessions/${enc(id)}`, token, body, () => {});
+
+export interface DirListing {
+  path: string;
+  parent: string | null;
+  dirs: string[];
+  readable: boolean;
+  writable: boolean;
+  truncated: boolean;
+}
+
+// path 缺省为服务端用户 home；400 表示路径不存在或不是目录。
+export const listDirs = (token: string | null, path?: string, hidden = false) =>
+  call(
+    "GET",
+    `/api/v1/fs/dirs?${path === undefined ? "" : `path=${enc(path)}&`}hidden=${hidden ? 1 : 0}`,
+    token,
+    undefined,
+    (b: DirListing) => {
+      if (typeof b.path !== "string" || !Array.isArray(b.dirs))
+        throw new Error("shape");
+      return b;
+    },
+  );

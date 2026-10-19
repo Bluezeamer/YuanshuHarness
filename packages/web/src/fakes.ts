@@ -232,6 +232,8 @@ export function installAdmin(): Admin {
       new Response(JSON.stringify(b), { status: s });
     if (input === "/api/v1/workspaces") {
       if (method === "GET") return json(200, { workspaces: admin.workspaces });
+      if (admin.workspaces.some((x) => x.path === body.path))
+        return json(409, {});
       const w = {
         id: `w${admin.workspaces.length + 1}`,
         name: body.name ?? body.path.split("/").pop(),
@@ -270,4 +272,76 @@ export function installAdmin(): Admin {
     return json(200, {});
   });
   return admin;
+}
+
+export interface FsNode {
+  dirs?: string[];
+  readable?: boolean;
+  writable?: boolean;
+  truncated?: boolean;
+}
+
+export interface Fs {
+  tree: Record<string, FsNode>;
+  home: string;
+  calls: string[];
+  // 下一次目录请求返回的状态码（一次性）。
+  failNext: number | null;
+}
+
+// 内存目录树，语义对齐 ADR-0032：点目录按 hidden 过滤，不可读时 dirs 为空。
+export const sampleTree = (): Record<string, FsNode> => ({
+  "/": { dirs: ["big", "home", "work"] },
+  "/big": { dirs: ["d1", "d2"], truncated: true },
+  "/home": { dirs: ["u"] },
+  "/home/u": { dirs: ["proj", ".cache", "empty"] },
+  "/home/u/empty": {},
+  "/home/u/.cache": {},
+  "/home/u/proj": { dirs: ["locked", "ro"] },
+  "/home/u/proj/locked": { dirs: ["x"], readable: false, writable: false },
+  "/home/u/proj/ro": { writable: false },
+  "/work": { dirs: ["a", "b", "c"] },
+  "/work/a": {},
+  "/work/b": {},
+  "/work/c": {},
+});
+
+// 在已有 fetch 之上叠加 /api/v1/fs/dirs。
+export function installFs(
+  tree: Record<string, FsNode> = sampleTree(),
+  home = "/home/u",
+): Fs {
+  const base = globalThis.fetch;
+  const fs: Fs = { tree, home, calls: [], failNext: null };
+  vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
+    if (!input.startsWith("/api/v1/fs/dirs")) return base(input, init);
+    fs.calls.push(input);
+    const json = (s: number, b: object) =>
+      new Response(JSON.stringify(b), { status: s });
+    if (fs.failNext) {
+      const s = fs.failNext;
+      fs.failNext = null;
+      return json(s, {});
+    }
+    const q = new URLSearchParams(input.split("?")[1]);
+    const path = q.get("path") ?? fs.home;
+    const node = fs.tree[path];
+    if (!node) return json(400, { error: "invalid_path" });
+    const readable = node.readable ?? true;
+    const hidden = q.get("hidden") === "1";
+    const dirs = readable
+      ? [...(node.dirs ?? [])]
+          .filter((d) => hidden || !d.startsWith("."))
+          .sort()
+      : [];
+    return json(200, {
+      path,
+      parent: path === "/" ? null : path.slice(0, path.lastIndexOf("/")) || "/",
+      dirs,
+      readable,
+      writable: node.writable ?? true,
+      truncated: node.truncated ?? false,
+    });
+  });
+  return fs;
 }

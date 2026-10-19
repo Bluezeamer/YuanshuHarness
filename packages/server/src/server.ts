@@ -10,6 +10,7 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { fsApi } from "./api/fs.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { workbenchApi } from "./api/workbench.js";
 import { workspacesApi } from "./api/workspaces.js";
@@ -221,6 +222,7 @@ export function createServer(
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
           scope.register(workspacesApi, { workspaces, rules, pool });
+          scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {

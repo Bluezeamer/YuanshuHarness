@@ -11,6 +11,7 @@ import {
   type Tier,
   type WorkspaceInfo,
 } from "../api";
+import { type DirChoice, DirPicker } from "./DirPicker";
 import {
   actionBtn,
   dangerBtn,
@@ -296,17 +297,18 @@ function AddForm({
   onCreated(w: WorkspaceInfo): void;
   onUnauthorized: Unauth;
 }) {
-  const [path, setPath] = useState("");
+  const [picked, setPicked] = useState<DirChoice | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!picked) return;
     setBusy(true);
     setError(null);
     const r = await createWorkspace(loadToken(), {
-      path: path.trim(),
+      path: picked.path,
       ...(name.trim() ? { name: name.trim() } : {}),
     });
     setBusy(false);
@@ -327,17 +329,7 @@ function AddForm({
       <p className="m-0 text-mute">
         登记目录等于授予 agent 在该目录下的默认读写范围。
       </p>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="ws-path" className="text-xs font-semibold">
-          目录路径（本机绝对路径）
-        </label>
-        <input
-          id="ws-path"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          className={`${field} font-mono`}
-        />
-      </div>
+      <DirPicker onChange={setPicked} onUnauthorized={onUnauthorized} />
       <div className="flex flex-col gap-1">
         <label htmlFor="ws-new-name" className="text-xs font-semibold">
           名称（可选，默认取目录名）
@@ -357,7 +349,7 @@ function AddForm({
       <div>
         <button
           type="submit"
-          disabled={busy || !path.trim()}
+          disabled={busy || !picked?.usable}
           className={actionBtn}
         >
           添加
