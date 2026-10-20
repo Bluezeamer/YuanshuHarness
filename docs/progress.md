@@ -35,7 +35,7 @@
 ## 里程碑
 
 - [x] M0 收尾：提交 7 个未提交文件；切 `feat/usable-v1`；提交本文件
-- [ ] M1 ssh 环境路由（进行中，见「当前状态」）：工具走 ssh、多环境 workspace、list/switch_workspace 与尾部通知、sftp 传输、环境状态、权限按环境判定（第 6 条）
+- [x] M1 ssh 环境路由：工具走 ssh、多环境 workspace、list/switch_workspace 与尾部通知、sftp 传输、环境状态、权限按环境判定（第 6 条）
 - [ ] M2 WebUI 工作区：mock 布局模型（pane 内 tab、follow/钉住、预设、落区拖拽）、终端/文件管理/文件预览/PDF/网页预览/审计 pane、划选提问、跨主机拖拽传输、会话 rail 与总览、视觉 token 迁移
 - [ ] M3 agent 定义：提示词块拼接、能力勾选、build/plan 模式、模型向导补 compat/thinkingLevelMap（第 7 条）
 - [ ] M4 隐私变量与 sudo：@占位符审批后替换、输出回显遮罩、sudo 三类处理（第 8 条）
@@ -50,7 +50,7 @@
 
 ## 当前状态
 
-M0 完成。M1 代码、测试、真实模型冒烟完成，codex 评审已落 `docs/reviews/m1.md`，其中 7 条已采纳/部分采纳，**修复待做**（等 task/* 合并后做，避免与改 env/、ssh/ 的分支冲突），修完才勾 M1。
+M0、M1 完成。M1 评审（`docs/reviews/m1.md`）采纳的 7 条已由 `task/m1-fixes` 修复并合并，处理列已标「已修」；合并后 server typecheck 通过，全量测试 1269 通过、1 跳过。
 
 上一会话被中断后，5 个半成品分支（基线 731f9da）各留了已提交的第一块和一批**未提交**改动；本会话已重新派 5 个后台 subagent 在原 worktree 里续做，各自收尾后自行提交：
 - `task/term-files`（.worktrees/term-files）：M2 服务端——终端(pty/ssh shell)、审计、文件管理 API、传输入口、预览支撑（ADR 0035–0039）
@@ -64,12 +64,11 @@ M0 完成。M1 代码、测试、真实模型冒烟完成，codex 评审已落 `
 ## 下一步
 
 1. 等 5 个 subagent 回报；逐个核对（看 diff、跑测试）再 squash 合并到 feat/usable-v1，解冲突，每次合并后跑相关测试，全合完跑 `scripts/check.sh`。
-2. 修 M1 评审 7 条（见 `docs/reviews/m1.md`），提交后把处理列改为「已修（提交号）」，勾 M1。
-3. 合并后接线（subagent 刻意留给主 agent）：topnav 挂 `CapabilitiesPage`（含 AgentsPanel/PromptBlocksPanel/SkillsPanel/McpPanel）、agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计真实组件、审计钩子、VariablesPanel 已挂设置页则核对。
-4. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 agent 定义与 M4 interactive 判定）；M7 设置页逐 tab 对齐。
-5. 波次 3：M8、M9、M10、M11；M12 收口。
-6. 评审节点：M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
-7. 调研素材（pi 检索，`tmp/pi/`）：browser-embed（M8）、lsp-dap（M11）、rg-fd（M11）、hooks（M9）。
+2. 合并后接线（subagent 刻意留给主 agent）：`CapabilitiesPage` 已挂四个面板（Agent/提示词块/Skill/MCP）；全局约定文件 `GET|PUT /api/v1/prompt/conventions` 仍无 UI；agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计真实组件、审计钩子、VariablesPanel 已挂设置页则核对。
+3. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 agent 定义与 M4 interactive 判定）；M7 设置页逐 tab 对齐。
+4. 波次 3：M8、M9、M10、M11；M12 收口。
+5. 评审节点：M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
+6. 调研素材（pi 检索，`tmp/pi/`）：browser-embed（M8）、lsp-dap（M11）、rg-fd（M11）、hooks（M9）。
 
 ## 决策与偏差
 
