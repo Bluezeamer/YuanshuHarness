@@ -122,6 +122,16 @@ describe("browser_open 审批", () => {
     expect(toolResults()).toContain("用户拒绝了该操作");
   });
 
+  test("完全允许档：不弹审批，直接打开", async () => {
+    const x = await setup();
+    x.data.workspaces.update(x.entry.workspaceId, { tier: "full" });
+    CALLS.push({ tool: "browser_open", args: { url: "http://example.test/" } });
+    x.entry.send("go");
+    await waitFor(ended(x.c), "run.ended", 8000);
+    expect(prompts(x.c)).toHaveLength(0);
+    expect(x.visited).toEqual(["http://example.test/"]);
+  });
+
   test("非 http(s) 地址不弹窗，直接拒绝", async () => {
     const x = await setup();
     CALLS.push({ tool: "browser_open", args: { url: "file:///etc/passwd" } });
