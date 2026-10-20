@@ -19,7 +19,11 @@ import {
 import { hasSshd, startSshd, type TestSshd } from "../../test/support/sshd.js";
 import { type Db, openDatabase } from "../store/db.js";
 import { loadMasterKey, SecretStore } from "../store/secrets.js";
-import { SshConnection } from "./connection.js";
+import {
+  type HostKeyStore,
+  hostKeyFingerprint,
+  SshConnection,
+} from "./connection.js";
 
 describe.skipIf(!hasSshd)("SshConnection（真实 sshd）", () => {
   let sshd: TestSshd;
@@ -147,5 +151,117 @@ describe.skipIf(!hasSshd)("SshConnection（真实 sshd）", () => {
       secrets,
     );
     await expect(bad.connect()).rejects.toThrow();
+  });
+});
+
+// 评审 M1#3：accept-new 主机密钥校验。每个 startSshd 都生成独立的主机密钥，拿第二个实例模拟换密钥。
+describe.skipIf(!hasSshd)("SshConnection 主机密钥（真实 sshd）", () => {
+  let a: TestSshd;
+  let b: TestSshd;
+  let dir: string;
+  let db: Db;
+  let secrets: SecretStore;
+
+  beforeAll(async () => {
+    a = await startSshd();
+    b = await startSshd();
+  });
+  afterAll(async () => {
+    await a.close();
+    await b.close();
+  });
+  beforeEach(() => {
+    dir = mkdtempSync(path.join(tmpdir(), "yuanshu-ssh-hk-"));
+    db = openDatabase(dir);
+    secrets = new SecretStore(db, loadMasterKey(dir));
+  });
+  afterEach(() => {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const store = (initial: string | null = null) => {
+    const saved: string[] = [];
+    let fp = initial;
+    const hostKeys: HostKeyStore = {
+      get: () => fp,
+      save: (v) => {
+        saved.push(v);
+        fp = v;
+      },
+    };
+    return { hostKeys, saved, current: () => fp };
+  };
+  const open = (sshd: TestSshd, hostKeys?: HostKeyStore) => {
+    const key = secrets.create(`k${Math.random()}`, "ssh_key", sshd.privateKey);
+    return new SshConnection(
+      {
+        host: "127.0.0.1",
+        port: sshd.port,
+        username: sshd.user,
+        secretId: key?.id ?? null,
+      },
+      secrets,
+      hostKeys,
+    );
+  };
+
+  test("首次连接记录指纹，再次连接同一服务器通过", async () => {
+    const hk = store();
+    const first = open(a, hk.hostKeys);
+    await first.connect();
+    first.close();
+    expect(hk.saved).toHaveLength(1);
+    expect(hk.current()).toMatch(/^ssh-ed25519:[0-9a-f]{64}$/);
+
+    const second = open(a, hk.hostKeys);
+    await second.connect();
+    second.close();
+    expect(hk.saved).toHaveLength(1); // 已有记录不再写
+  });
+
+  test("服务器换了密钥：拒绝连接，错误里有记录与实际两个指纹，且不覆盖记录", async () => {
+    const hk = store();
+    const first = open(a, hk.hostKeys);
+    await first.connect();
+    first.close();
+    const recorded = hk.current();
+
+    const imposter = open(b, hk.hostKeys);
+    await expect(imposter.connect()).rejects.toThrow(/主机密钥与记录不符/);
+    await expect(open(b, hk.hostKeys).connect()).rejects.toThrow(
+      new RegExp(`记录 ${recorded}`),
+    );
+    expect(hk.current()).toBe(recorded);
+    expect(hk.saved).toHaveLength(1);
+  });
+
+  test("清除记录后重新学习新指纹", async () => {
+    const hk = store();
+    const first = open(a, hk.hostKeys);
+    await first.connect();
+    first.close();
+
+    const cleared = store();
+    const again = open(b, cleared.hostKeys);
+    await again.connect();
+    again.close();
+    expect(cleared.current()).not.toBe(hk.current());
+  });
+
+  test("没有传入存取器时也按连接对象记忆，同一对象不会换密钥", async () => {
+    const conn = open(a);
+    await conn.connect();
+    conn.close();
+    await conn.connect(); // 同一服务器仍能重连
+    conn.close();
+  });
+
+  test("hostKeyFingerprint 取线格式里的算法名与整段公钥的 sha256", () => {
+    const algo = Buffer.from("ssh-ed25519");
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(algo.length);
+    const wire = Buffer.concat([len, algo, Buffer.alloc(36, 7)]);
+    expect(hostKeyFingerprint(wire)).toMatch(/^ssh-ed25519:[0-9a-f]{64}$/);
   });
 });

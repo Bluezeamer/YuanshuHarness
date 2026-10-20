@@ -38,6 +38,19 @@ describe("resolveTarget：无法可靠解析一律返回 null（不放行）", (
       path.join(realpathSync(cwd), "x/y/z.txt"),
     );
   });
+
+  // 评审 M1#2：SDK 会把 file:// 转成绝对路径、把 Unicode 空格改写成 U+0020，
+  // 权限层若按字面当作 cwd 内的相对路径就与 SDK 不一致。
+  test.each([
+    ["file:// 前缀", "file:///tmp/outside"],
+    ["@ 后接 file://", "@file:///tmp/outside"],
+    ["U+00A0", "a\u00A0b"],
+    ["U+2003", "a\u2003b/x"],
+    ["U+202F", "a\u202Fb"],
+    ["U+3000", "\u3000x"],
+  ])("SDK 会改写的写法返回 null：%s", async (_n, p) => {
+    expect(await resolveTarget(p, cwd, env)).toBeNull();
+  });
 });
 
 describe("评审 R2：花括号展开限额", () => {

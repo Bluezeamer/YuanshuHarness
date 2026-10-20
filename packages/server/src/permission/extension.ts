@@ -93,18 +93,18 @@ async function classify(
     const line = typeof input.command === "string" ? input.command : "";
     const { words, opaque } = await analyzeCommand(line);
     const segs = await parseCommand(line);
+    const operands = await operandsInside(line, cwd, env);
     return {
       summary: clip(line),
       action: {
         kind: "command",
         line,
         words,
+        resolved: operands.resolved,
         opaque,
         // 只读白名单还要求路径操作数都在 cwd 内；出界的转规则外审批（可按原规则记住）
         readOnly:
-          !extra.usesVars &&
-          (await isReadOnlyCommand(line)) &&
-          (await operandsInside(line, cwd, env)),
+          !extra.usesVars && operands.inside && (await isReadOnlyCommand(line)),
         normalized: await normalizeCommand(line),
         rememberable: await rememberable(line),
         sudo: segs

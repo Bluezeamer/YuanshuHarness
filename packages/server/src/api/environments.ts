@@ -7,6 +7,7 @@ import { pathOf } from "../permission/paths.js";
 import { type AuditLog, auditSession } from "../store/audit.js";
 import {
   type EnvironmentInput,
+  type EnvironmentPatch,
   type EnvironmentStore,
   isOsType,
 } from "../store/environments.js";
@@ -76,10 +77,8 @@ export async function environmentsApi(
   function parse(
     body: Record<string, unknown>,
     partial: boolean,
-  ):
-    | { ok: true; value: Partial<EnvironmentInput> }
-    | { ok: false; error: string } {
-    const v: Partial<EnvironmentInput> = {};
+  ): { ok: true; value: EnvironmentPatch } | { ok: false; error: string } {
+    const v: EnvironmentPatch = {};
     if (!partial || body.name !== undefined) {
       const n = cleanName(body.name);
       if (n === null) return { ok: false, error: "invalid_name" };
@@ -113,6 +112,12 @@ export async function environmentsApi(
       }
       v.secretId = body.secretId as string | null;
     } else if (!partial) v.secretId = null;
+    // 主机密钥只能清除（PATCH 置 null 后下次连接重新记录），不接受外部写入
+    if (partial && body.hostKey !== undefined) {
+      if (body.hostKey !== null)
+        return { ok: false, error: "invalid_host_key" };
+      v.hostKey = null;
+    }
     return { ok: true, value: v };
   }
 
@@ -165,7 +170,7 @@ export async function environmentsApi(
       if (!env) return reply.code(404).send({ error: "not_found" });
       const t0 = Date.now();
       await env.connect().catch(() => {});
-      const status = env.status();
+      const status = hub.status(req.params.id) ?? env.status();
       audit?.record({
         actor: "user",
         kind: "env",

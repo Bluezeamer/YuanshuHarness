@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { hasSshd, startSshd } from "../../test/support/sshd.js";
 import { EnvHub } from "../env/hub.js";
 import { AuditLog } from "../store/audit.js";
 import { type Db, openDatabase } from "../store/db.js";
@@ -221,7 +222,7 @@ describe("环境状态与连接", () => {
       await app.inject({ method: "GET", url: "/api/v1/environments/status" })
     ).json().statuses;
     expect(before).toContainEqual({ id: "local", state: "local" });
-    expect(before).toContainEqual({ id, state: "disconnected" });
+    expect(before).toContainEqual({ id, state: "disconnected", hostKey: null });
 
     const conn = await post(`/api/v1/environments/${id}/connect`, {});
     expect(conn.statusCode).toBe(200);
@@ -234,6 +235,148 @@ describe("环境状态与连接", () => {
     expect(
       (await post("/api/v1/environments/nope/connect", {})).statusCode,
     ).toBe(404);
+  });
+});
+
+describe("评审 M1#3：主机密钥记录", () => {
+  const FP = `ssh-ed25519:${"ab".repeat(32)}`;
+  const mk = async (name = "h") =>
+    (
+      await post("/api/v1/environments", {
+        name,
+        host: "10.0.0.1",
+        port: 22,
+        username: "u",
+      })
+    ).json().id as string;
+  const patch = (id: string, payload: unknown) =>
+    app.inject({
+      method: "PATCH",
+      url: `/api/v1/environments/${id}`,
+      payload: payload as object,
+    });
+  const hostKeyOf = (id: string) =>
+    (
+      db.prepare("SELECT host_key FROM environments WHERE id = ?").get(id) as {
+        host_key: string | null;
+      }
+    ).host_key;
+
+  test("新环境没有指纹；列表与状态都展示已记录的指纹", async () => {
+    const id = await mk();
+    const list = (
+      await app.inject({ method: "GET", url: "/api/v1/environments" })
+    ).json().environments as { id: string; hostKey: string | null }[];
+    expect(list.find((e) => e.id === id)?.hostKey).toBeNull();
+
+    db.prepare("UPDATE environments SET host_key = ? WHERE id = ?").run(FP, id);
+    const after = (
+      await app.inject({ method: "GET", url: "/api/v1/environments" })
+    ).json().environments as { id: string; hostKey: string | null }[];
+    expect(after.find((e) => e.id === id)?.hostKey).toBe(FP);
+    const statuses = (
+      await app.inject({ method: "GET", url: "/api/v1/environments/status" })
+    ).json().statuses as { id: string; hostKey?: string | null }[];
+    expect(statuses.find((e) => e.id === id)?.hostKey).toBe(FP);
+  });
+
+  test("PATCH hostKey:null 清除指纹；非 null 的值一律拒绝，改名不影响指纹", async () => {
+    const id = await mk();
+    db.prepare("UPDATE environments SET host_key = ? WHERE id = ?").run(FP, id);
+    expect((await patch(id, { hostKey: FP })).statusCode).toBe(400);
+    expect((await patch(id, { hostKey: "" })).statusCode).toBe(400);
+    expect(hostKeyOf(id)).toBe(FP);
+
+    expect((await patch(id, { name: "renamed" })).statusCode).toBe(200);
+    expect(hostKeyOf(id)).toBe(FP);
+
+    const r = await patch(id, { hostKey: null });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().hostKey).toBeNull();
+    expect(hostKeyOf(id)).toBeNull();
+  });
+
+  test("目标 host 或 port 变了，旧指纹随之清除", async () => {
+    for (const change of [{ host: "10.0.0.2" }, { port: 2222 }]) {
+      const id = await mk(`h-${Object.keys(change)[0]}`);
+      db.prepare("UPDATE environments SET host_key = ? WHERE id = ?").run(
+        FP,
+        id,
+      );
+      expect((await patch(id, change)).statusCode).toBe(200);
+      expect(hostKeyOf(id)).toBeNull();
+    }
+  });
+
+  test.skipIf(!hasSshd)(
+    "真实 sshd：首连记录指纹且不断开现有连接；指纹不符拒绝；清除后重新记录",
+    async () => {
+      const sshd = await startSshd();
+      try {
+        const key = (
+          await post("/api/v1/secrets", {
+            name: "hk",
+            kind: "ssh_key",
+            value: sshd.privateKey,
+          })
+        ).json().id as string;
+        const id = (
+          await post("/api/v1/environments", {
+            name: "real",
+            host: "127.0.0.1",
+            port: sshd.port,
+            username: sshd.user,
+            secretId: key,
+          })
+        ).json().id as string;
+        const connect = async () =>
+          (await post(`/api/v1/environments/${id}/connect`, {})).json();
+        const stateOf = async () =>
+          (
+            await app.inject({
+              method: "GET",
+              url: "/api/v1/environments/status",
+            })
+          )
+            .json()
+            .statuses.find((e: { id: string }) => e.id === id);
+
+        const first = await connect();
+        expect(first.state).toBe("connected");
+        expect(first.hostKey).toMatch(/^ssh-ed25519:[0-9a-f]{64}$/);
+        expect(hostKeyOf(id)).toBe(first.hostKey);
+        // 写回指纹不能让 hub 把刚建立的连接当成配置变更而换掉
+        expect((await stateOf()).state).toBe("connected");
+
+        // 记录与服务器不符：拒绝，且不覆盖记录
+        db.prepare("UPDATE environments SET host_key = ? WHERE id = ?").run(
+          FP,
+          id,
+        );
+        hub.forget(id);
+        const bad = await connect();
+        expect(bad.state).toBe("error");
+        expect(bad.error).toContain("主机密钥与记录不符");
+        expect(bad.error).toContain(FP);
+        expect(hostKeyOf(id)).toBe(FP);
+
+        // 清除后重新记录
+        expect((await patch(id, { hostKey: null })).statusCode).toBe(200);
+        const again = await connect();
+        expect(again.state).toBe("connected");
+        expect(again.hostKey).toBe(first.hostKey);
+      } finally {
+        await sshd.close();
+      }
+    },
+  );
+
+  test("setHostKey 只写入空记录，不覆盖已有指纹", async () => {
+    const id = await mk();
+    const store = new EnvironmentStore(db);
+    store.setHostKey(id, FP);
+    store.setHostKey(id, `ssh-ed25519:${"cd".repeat(32)}`);
+    expect(hostKeyOf(id)).toBe(FP);
   });
 });
 

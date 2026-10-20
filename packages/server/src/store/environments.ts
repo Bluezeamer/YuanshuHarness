@@ -16,6 +16,8 @@ export interface Environment {
   username: string | null;
   os: OsType;
   secretId: string | null;
+  /** 首次连接记录的主机密钥指纹（`算法:sha256 hex`）；未连过或已清除为 null。 */
+  hostKey: string | null;
   createdAt: string;
 }
 
@@ -28,6 +30,11 @@ export interface EnvironmentInput {
   secretId: string | null;
 }
 
+/** PATCH 内容：hostKey 只能清除（置 null）；改 host 或 port 时也会一并清除。 */
+export type EnvironmentPatch = Partial<EnvironmentInput> & {
+  hostKey?: null;
+};
+
 type Row = {
   id: string;
   name: string;
@@ -36,6 +43,7 @@ type Row = {
   username: string;
   os: string;
   secret_id: string | null;
+  host_key: string | null;
   created_at: string;
 };
 const toEnv = (r: Row): Environment => ({
@@ -47,6 +55,7 @@ const toEnv = (r: Row): Environment => ({
   username: r.username,
   os: r.os as OsType,
   secretId: r.secret_id,
+  hostKey: r.host_key,
   createdAt: r.created_at,
 });
 
@@ -59,6 +68,7 @@ const LOCAL: Environment = {
   username: null,
   os: process.platform === "win32" ? "windows" : "posix",
   secretId: null,
+  hostKey: null,
   createdAt: "",
 };
 
@@ -112,17 +122,20 @@ export class EnvironmentStore {
   }
 
   // 返回 undefined=不存在，null=名称重复。
-  update(
-    id: string,
-    patch: Partial<EnvironmentInput>,
-  ): Environment | null | undefined {
+  update(id: string, patch: EnvironmentPatch): Environment | null | undefined {
     const cur = this.get(id);
     if (!cur || cur.kind === "local") return undefined;
-    const next = { ...cur, ...patch };
+    const { hostKey: _clear, ...fields } = patch;
+    const next = { ...cur, ...fields };
+    // 指纹属于具体的 host:port，目标变了旧指纹就没有意义
+    const keepKey =
+      patch.hostKey !== null &&
+      next.host === cur.host &&
+      next.port === cur.port;
     try {
       this.db
         .prepare(
-          `UPDATE environments SET name=?, host=?, port=?, username=?, os=?, secret_id=? WHERE id=?`,
+          `UPDATE environments SET name=?, host=?, port=?, username=?, os=?, secret_id=?, host_key=? WHERE id=?`,
         )
         .run(
           next.name,
@@ -131,6 +144,7 @@ export class EnvironmentStore {
           next.username,
           next.os,
           next.secretId,
+          keepKey ? cur.hostKey : null,
           id,
         );
     } catch (err) {
@@ -138,6 +152,15 @@ export class EnvironmentStore {
       throw err;
     }
     return this.get(id);
+  }
+
+  // accept-new：只在尚无指纹时写入，已记录的指纹不会被连接路径覆盖。
+  setHostKey(id: string, hostKey: string): void {
+    this.db
+      .prepare(
+        "UPDATE environments SET host_key = ? WHERE id = ? AND host_key IS NULL",
+      )
+      .run(hostKey, id);
   }
 
   // 有 workspace 引用时返回 "in_use"。

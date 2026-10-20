@@ -145,7 +145,8 @@ export function grepScript(
   limit: number,
 ): string {
   const rg = [
-    "rg --null --no-heading --line-number --with-filename --color=never --hidden -g '!.git'",
+    // 与扫描器（findSensitiveBelow）及 grep 回退一致，一律不进 node_modules（评审 M1#4）。
+    "rg --null --no-heading --line-number --with-filename --color=never --hidden -g '!.git' -g '!node_modules'",
     input.ignoreCase ? "--ignore-case" : "",
     input.literal ? "--fixed-strings" : "",
     input.glob ? `--glob ${shq(input.glob)}` : "",

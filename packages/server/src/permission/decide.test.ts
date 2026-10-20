@@ -46,12 +46,16 @@ const pathAct = async (
   access,
   targets: [await target(p)],
 });
-const cmdAct = async (line: string): Promise<Action> => {
+const cmdAct = async (
+  line: string,
+  resolved: string[] = [],
+): Promise<Action> => {
   const a = await analyzeCommand(line);
   return {
     kind: "command",
     line,
     words: a.words,
+    resolved,
     opaque: a.opaque,
     readOnly: await isReadOnlyCommand(line),
     normalized: await normalizeCommand(line),
@@ -259,5 +263,34 @@ describe("decide 其余", () => {
       remember: null,
       reviewable: false,
     });
+  });
+});
+
+describe("评审 M1#1：命令操作数解析后的真实路径", () => {
+  const sensitive = [path.join(cwd, ".env")];
+
+  test("原词无害但解析到敏感文件：只读白名单也强制审批，不可记住", async () => {
+    const a = await cmdAct("cat public", sensitive);
+    expect(a).toMatchObject({ readOnly: true });
+    expect(decide(a, ctx())).toEqual({
+      verdict: "ask",
+      remember: null,
+      reviewable: false,
+    });
+  });
+
+  test("已记住的命令在链接改指敏感文件后不再放行", async () => {
+    const a = await cmdAct("rm public", sensitive);
+    expect(decide(a, ctx({ commandRules: ["rm public"] })).verdict).toBe("ask");
+    // 链接指向普通文件时记住规则照常生效
+    const b = await cmdAct("rm public", [path.join(cwd, "a.txt")]);
+    expect(decide(b, ctx({ commandRules: ["rm public"] })).verdict).toBe(
+      "allow",
+    );
+  });
+
+  test("full 档位不受影响", async () => {
+    const a = await cmdAct("cat public", sensitive);
+    expect(decide(a, ctx({ tier: "full" })).verdict).toBe("allow");
   });
 });

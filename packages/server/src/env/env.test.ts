@@ -1,3 +1,4 @@
+import { once } from "node:events";
 import {
   mkdirSync,
   mkdtempSync,
@@ -111,6 +112,37 @@ function contract(make: () => Promise<{ env: ExecEnv; work: string }>) {
     await env.remove(path.join(work, "t"), true);
     expect(await env.lstat(path.join(work, "t"))).toBeNull();
     await expect(env.remove(path.join(work, "missing"))).rejects.toThrow();
+  });
+
+  // 评审 M1#6/#7：stat 带权限位；写流可指定 mode 与排他创建；mkdirp 可指定新目录的 mode
+  test("stat 带 mode；writeStream 的 mode 不受 umask 收窄", async () => {
+    const p = path.join(work, "m.bin");
+    const out = await env.writeStream(p, { mode: 0o755, exclusive: true });
+    out.end("x");
+    await once(out, "close");
+    expect(((await env.stat(p))?.mode ?? 0) & 0o777).toBe(0o755);
+    expect(
+      ((await env.lstat(path.join(work, "sub")))?.mode ?? 0) & 0o170000,
+    ).toBe(0o040000);
+  });
+
+  test("writeStream exclusive：目标已存在时在返回前失败，且不截断", async () => {
+    await expect(
+      env.writeStream(path.join(work, "a.txt"), { exclusive: true }),
+    ).rejects.toThrow();
+    expect((await env.readFile(path.join(work, "a.txt"))).toString()).toBe(
+      "hello",
+    );
+  });
+
+  test("mkdirp 的 mode 只作用于本次新建的最后一级", async () => {
+    const mid = path.join(work, "p");
+    const leaf = path.join(mid, "q");
+    await env.mkdirp(leaf, 0o750);
+    expect(((await env.stat(leaf))?.mode ?? 0) & 0o777).toBe(0o750);
+    // 已存在的目录不被改动
+    await env.mkdirp(leaf, 0o700);
+    expect(((await env.stat(leaf))?.mode ?? 0) & 0o777).toBe(0o750);
   });
 
   test("readStream 支持闭区间字节范围", async () => {

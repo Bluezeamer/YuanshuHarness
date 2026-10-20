@@ -50,6 +50,10 @@ export class EnvHub {
           secretId: def.secretId,
         },
         this.secrets,
+        {
+          get: () => this.environments.get(id)?.hostKey ?? null,
+          save: (fp) => this.environments.setHostKey(id, fp),
+        },
       ),
     );
     this.ssh.set(id, { sig, env });
@@ -58,7 +62,9 @@ export class EnvHub {
 
   status(id: string): EnvStatus | null {
     if (id === LOCAL_ENV_ID) return { id, state: "local" };
-    return this.getSsh(id)?.status() ?? null;
+    const status = this.getSsh(id)?.status();
+    if (!status) return null;
+    return { ...status, hostKey: this.environments.get(id)?.hostKey ?? null };
   }
 
   /** 环境被删除后释放连接。 */

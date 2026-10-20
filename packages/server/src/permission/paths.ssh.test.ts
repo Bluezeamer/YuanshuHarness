@@ -115,6 +115,14 @@ describe.skipIf(!hasSshd)("权限路径判定在 ssh 环境（真实 sshd）", (
     expect(await resolveTarget(p, cwd, ssh)).toBeNull();
   });
 
+  test.each([
+    ["file:// 前缀", "file:///tmp/outside"],
+    ["U+00A0", "a\u00A0b"],
+    ["U+2003", "a\u2003b/x"],
+  ])("SDK 会改写的写法返回 null：%s", async (_n, p) => {
+    expect(await resolveTarget(p, cwd, ssh)).toBeNull();
+  });
+
   test("~ 展开为环境的 home，而不是 Server 本机的", async () => {
     const s = spy(ssh);
     const r = await resolveTarget("~/", cwd, s.env);

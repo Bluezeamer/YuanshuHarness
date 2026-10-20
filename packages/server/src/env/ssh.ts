@@ -7,6 +7,7 @@ import type {
   ExecEnv,
   ExecOptions,
   FileStat,
+  WriteOptions,
 } from "./types.js";
 
 /** POSIX shell 单引号转义。 */
@@ -105,16 +106,16 @@ export class SshEnv implements ExecEnv {
     await (await this.c()).writeFile(p, data);
   }
 
-  async mkdirp(p: string): Promise<void> {
-    await (await this.c()).mkdirp(p);
+  async mkdirp(p: string, mode?: number): Promise<void> {
+    await (await this.c()).mkdirp(p, mode);
   }
 
   async readStream(p: string, range?: { start: number; end: number }) {
     return (await this.c()).readStream(p, range);
   }
 
-  async writeStream(p: string) {
-    return (await this.c()).writeStream(p);
+  async writeStream(p: string, opts?: WriteOptions) {
+    return (await this.c()).writeStream(p, opts);
   }
 
   // 交互 shell（终端用）。给了 cwd 就先进入目录再换成登录 shell；Windows 的 Git Bash 分支未验证。

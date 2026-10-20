@@ -22,7 +22,7 @@ import { type Db, openDatabase } from "../store/db.js";
 import { loadMasterKey, SecretStore } from "../store/secrets.js";
 import { LocalEnv } from "./local.js";
 import { SshEnv } from "./ssh.js";
-import { routedToolsExtension, type Where } from "./tools.js";
+import { grepScript, routedToolsExtension, type Where } from "./tools.js";
 import type { ExecEnv } from "./types.js";
 
 interface Tool {
@@ -248,6 +248,33 @@ describe.skipIf(!hasSshd)("ssh 环境的工具（真实 sshd）", () => {
     expect(await call("grep", { pattern: "absent-token-xyz" })).toContain(
       "No matches found",
     );
+  });
+
+  // 评审 M1#4：无 .gitignore 时 rg 不会自己排除 node_modules，脚本必须显式排除。
+  // 测试机的 sshd 会话里没有 rg 二进制，端到端只走得到 grep 回退；
+  // rg 分支用脚本文本断言，其 `-g` 语义已另行用真实 rg 验证。
+  test("grep 脚本的 rg 与 grep 两个分支都排除 node_modules", () => {
+    const script = grepScript({ pattern: "p" }, "/w", 10);
+    const [rgLine, grepLine] = script
+      .split("\n")
+      .filter((l) => l.startsWith("rg ") || l.startsWith("grep "));
+    expect(rgLine).toContain("-g '!node_modules'");
+    expect(rgLine).toContain("-g '!.git'");
+    expect(grepLine).toContain("--exclude-dir=node_modules");
+  });
+
+  test("grep 默认不读 node_modules（无 .gitignore，ssh 端到端）", async () => {
+    mkdirSync(path.join(work, "node_modules", "pkg"), { recursive: true });
+    writeFileSync(
+      path.join(work, "node_modules", "pkg", "id_rsa"),
+      "needle-in-deps\n",
+    );
+    const call = await load(() => ({ env: ssh, cwd: work }));
+    expect(await call("grep", { pattern: "needle-in-deps" })).toContain(
+      "No matches found",
+    );
+    // 目录外的正常匹配不受影响
+    expect(await call("grep", { pattern: "needle" })).toContain("x.txt:2:");
   });
 
   test("隐私变量：远端收到真值，远端任何进程的命令行里都没有", async () => {

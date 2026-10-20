@@ -15,14 +15,18 @@
 - **主密钥**：数据目录下 `secret.key`，32 字节随机数的 hex，权限 0600，首次使用时生成。丢失即所有密码不可恢复；本期不做口令派生与密钥轮换。
 - **只进不出**：REST 只能创建、列出元数据（id、名称、种类、时间）和删除，没有任何读取值的接口。值只在 Server 内部经 `reveal` 取出，用于建立 ssh 连接。
 - **种类**：`ssh_key`（私钥文本）、`password`。ADR-0007 的适用范围、档位、占位符替换随第 8 条之后的隐私变量能力补，本期不建这些列。
-- **环境**：`environments(id, name UNIQUE, host, port, username, os, secret_id, created_at)`，`os` 取 `posix`/`windows`。本机环境隐含存在（id `local`，不入表，不可改不可删）。`secret_id` 外键引用密码库；被引用的密码不可删。workspace 引用的环境不可删。
+- **环境**：`environments(id, name UNIQUE, host, port, username, os, secret_id, host_key, created_at)`，`os` 取 `posix`/`windows`。本机环境隐含存在（id `local`，不入表，不可改不可删）。`secret_id` 外键引用密码库；被引用的密码不可删。workspace 引用的环境不可删。
+- **主机密钥与 accept-new 校验**：`host_key` 存 `算法:sha256hex` 形式的指纹（如 `ssh-ed25519:abc...`），建连时比对，不符则拒绝。首次连接指纹为空时记录该次服务器提供的值；再次连接必须匹配。目标主机或端口变更、或用户显式清除（PATCH `hostKey: null`）时归零，下次重新学习。不主动收录 `~/.ssh/known_hosts`，不信任 DNS 记录。
 
 ## 理由
 - 数据库文件和密钥分开：只拿到库文件（备份、拷贝）解不出密码。
 - GCM 自带认证，篡改密文会解密失败，不会得到错误明文。
 - 用 Node 内置 `crypto`，不引入新依赖。
+- accept-new 与 OpenSSH 的 `StrictHostKeyChecking=accept-new` 同义：首次信任、之后钉住。不校验时，中间人替换服务器就能骗走 ssh 凭据，而 Server 常驻、连接长期复用，窗口比一次性命令更长。
+- 指纹放在 `environments` 表而不是另存文件，随环境一起增删、一起备份。
 
 ## 影响
-- 迁移 v6：建 `secrets`、`environments`。
+- 迁移 v6：建 `secrets`、`environments`；迁移追加 `host_key` 列（已有环境为空，首次连接时记录）。
+- 首次连接那一刻仍是“信任首次”，用户可在环境状态里核对指纹；服务器确实换了密钥时，需要手动清除指纹后重连。
 - 与数据目录一起备份时必须带上 `secret.key`，否则密码库作废。
 - 排除：口令派生主密钥、密钥轮换、外部密钥管理服务、密码的范围与档位。
