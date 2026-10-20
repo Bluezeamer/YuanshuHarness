@@ -6,7 +6,8 @@ import { Registry } from "./registry";
 afterEach(cleanup);
 
 const registry = defaultRegistry();
-const pendingIds = PANE_META.filter((m) => m.id !== "chat").map((m) => m.id);
+// 目前只剩协作拓扑没有真实面板（依赖后续的协作模型）。
+const pendingIds = ["topology"];
 
 test("注册表覆盖 mock 的 8 个视图类型，元数据完整", () => {
   expect(PANE_META.map((m) => m.id).sort()).toEqual(

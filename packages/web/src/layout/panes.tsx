@@ -1,3 +1,15 @@
+import { type AuditConfig, AuditPane } from "../panes/AuditPane";
+import {
+  type FileDiscoveryConfig,
+  FileDiscoveryPane,
+} from "../panes/FileDiscoveryPane";
+import {
+  type FilePreviewConfig,
+  FilePreviewPane,
+} from "../panes/FilePreviewPane";
+import { type PdfConfig, PdfPane } from "../panes/PdfPane";
+import { type TerminalConfig, TerminalPane } from "../panes/TerminalPane";
+import { type WebPreviewConfig, WebPreviewPane } from "../panes/WebPreviewPane";
 import { type ChatConfig, ChatPane } from "./ChatPane";
 import { Registry } from "./registry";
 import type { PaneFollow, PaneGroup, PaneImpl, PaneProps } from "./types";
@@ -90,6 +102,41 @@ const IMPLEMENTED: Record<string, PaneImpl<never>> = {
   chat: impl<ChatConfig>({
     component: ChatPane,
     defaultConfig: () => ({ sessionId: null }),
+    configVersion: 1,
+  }),
+  terminal: impl<TerminalConfig>({
+    component: TerminalPane,
+    defaultConfig: () => ({ label: null }),
+    configVersion: 1,
+  }),
+  filediscovery: impl<FileDiscoveryConfig>({
+    component: FileDiscoveryPane,
+    defaultConfig: () => ({ environmentId: null, path: null }),
+    configVersion: 1,
+  }),
+  file_preview: impl<FilePreviewConfig>({
+    component: FilePreviewPane,
+    defaultConfig: () => ({ environmentId: null, path: null }),
+    configVersion: 1,
+  }),
+  pdf: impl<PdfConfig>({
+    component: PdfPane,
+    defaultConfig: () => ({
+      environmentId: null,
+      path: null,
+      page: 1,
+      scale: 1,
+    }),
+    configVersion: 1,
+  }),
+  web_preview: impl<WebPreviewConfig>({
+    component: WebPreviewPane,
+    defaultConfig: () => ({ url: "" }),
+    configVersion: 1,
+  }),
+  audit: impl<AuditConfig>({
+    component: AuditPane,
+    defaultConfig: () => ({ kind: null }),
     configVersion: 1,
   }),
 };
