@@ -1,6 +1,6 @@
 # 进度：元枢 usable-v1（长周期任务）
 
-> 最后更新：2026-10-19。活文档：就地更新，不追加快照；变更流水记在文末 Changelog。
+> 最后更新：2026-10-20。活文档：就地更新，不追加快照；变更流水记在文末 Changelog。
 
 ## 接手须知（上下文被压缩或换会话后，先读这里）
 
@@ -50,24 +50,26 @@
 
 ## 当前状态
 
-M1 代码与测试完成（a694538…1db1064、731f9da），`scripts/check.sh` 在 1db1064 exit 0；真实模型 + 本机 sshd 的冒烟（`test/live/ssh-session.live.test.ts`）通过。M1 的 codex 评审在后台跑（输出 `tmp/codex/m1.last.md`），结果出来后写 `docs/reviews/m1.md` 再勾选 M1。
+M0 完成。M1 代码、测试、真实模型冒烟完成，codex 评审已落 `docs/reviews/m1.md`，其中 7 条已采纳/部分采纳，**修复待做**（等 task/* 合并后做，避免与改 env/、ssh/ 的分支冲突），修完才勾 M1。
 
-**波次 1 并行进行中**（各自独立 worktree，基于 731f9da；只有主 agent 合并）：
-- `.worktrees/term-files` 分支 task/term-files：M2 服务端——审计、文件管理 API、终端（ADR 号段 0035–0039）
-- `.worktrees/web-layout` 分支 task/web-layout：M2 WebUI 骨架——视觉 token 迁移、mock 布局模型、pane 注册、rail/总览、顶栏（0040–0044）
-- `.worktrees/agent-defs` 分支 task/agent-defs：M3——模型向导 compat、提示词块与组装、agent 定义、build/plan 模式、capabilities 页骨架（0045–0049）
-- `.worktrees/private-vars` 分支 task/private-vars：M4——隐私变量、占位符替换、回显遮罩、sudo（0050–0054）
-- `.worktrees/skills-mcp` 分支 task/skills-mcp：M5——skill 库与同步、MCP 登记与注入（0055–0059）
+上一会话被中断后，5 个半成品分支（基线 731f9da）各留了已提交的第一块和一批**未提交**改动；本会话已重新派 5 个后台 subagent 在原 worktree 里续做，各自收尾后自行提交：
+- `task/term-files`（.worktrees/term-files）：M2 服务端——终端(pty/ssh shell)、审计、文件管理 API、传输入口、预览支撑（ADR 0035–0039）
+- `task/web-layout`（.worktrees/web-layout）：M2 WebUI 骨架——token 迁移已提交；布局模型对齐 mock、rail/总览、topnav 与路由骨架、pane 注册扩展点（0040–0044）
+- `task/agent-defs`（.worktrees/agent-defs）：M3——提示词块、agent 定义、build/plan、能力引用位、编辑器面板（0045–0049）
+- `task/private-vars`（.worktrees/private-vars）：M4 剩余——回显遮罩、sudo、interactive 判定接口、隐私变量面板（0050–0054）
+- `task/skills-mcp`（.worktrees/skills-mcp）：M5 剩余——skill 同步、MCP（先查 SDK 接入点）、SkillsPanel/McpPanel（0055–0059）
 
-合并预期冲突点：`store/db.ts` MIGRATIONS 末尾、`server.ts` 注册块、`session/pool.ts`、web 的 `App`/路由。subagent 回报后逐个 squash 合并到 feat/usable-v1，跑 check.sh，再开下一波。
+合并预期冲突点：`store/db.ts` MIGRATIONS 末尾、`server.ts` 注册块、`session/pool.ts`、`env/ssh.ts`、`ssh/connection.ts`、web 的 `api.ts`/路由。
 
 ## 下一步
 
-1. 等 5 个 subagent 回报；逐个核对提交（trust but verify：看 diff、跑测试）再 squash 合并，解决冲突，每次合并后跑相关测试，全部合完跑 `scripts/check.sh`。
-2. 合并后接线（subagent 刻意留给主 agent 的）：topnav 挂 `CapabilitiesPage`（含 `SkillsPanel`/`McpPanel`）、agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计的真实组件、审计钩子接服务端。
-3. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 的 agent 定义与 M4 的 interactive 判定参数）；M7 设置页逐 tab 对齐。
-4. 波次 3：M8、M9（hook/输出脱敏/凭证网关）、M10、M11；M12 收口。
-5. 评审节点：M1（已启动）、M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
+1. 等 5 个 subagent 回报；逐个核对（看 diff、跑测试）再 squash 合并到 feat/usable-v1，解冲突，每次合并后跑相关测试，全合完跑 `scripts/check.sh`。
+2. 修 M1 评审 7 条（见 `docs/reviews/m1.md`），提交后把处理列改为「已修（提交号）」，勾 M1。
+3. 合并后接线（subagent 刻意留给主 agent）：topnav 挂 `CapabilitiesPage`（含 AgentsPanel/PromptBlocksPanel/SkillsPanel/McpPanel）、agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计真实组件、审计钩子、VariablesPanel 已挂设置页则核对。
+4. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 agent 定义与 M4 interactive 判定）；M7 设置页逐 tab 对齐。
+5. 波次 3：M8、M9、M10、M11；M12 收口。
+6. 评审节点：M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
+7. 调研素材（pi 检索，`tmp/pi/`）：browser-embed（M8）、lsp-dap（M11）、rg-fd（M11）、hooks（M9）。
 
 ## 决策与偏差
 
