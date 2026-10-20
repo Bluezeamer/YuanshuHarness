@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { SessionInfo } from "../api";
 import type { SessionHub } from "../sessions/hub";
+import type { OpenRequest } from "./doc";
 import type { PaneBinding } from "./types";
 
 export interface WorkbenchEnv {
@@ -10,6 +11,8 @@ export interface WorkbenchEnv {
   activeSessionId: string | null;
   // 打开新建会话面板；创建成功并刷新列表后以新会话 id 回调。
   newSession?: (done: (sessionId: string) => void) => void;
+  // 经打开路由开内容面板（文件管理器点文件开预览等）：已开则切换，否则加入同类 tab 组或分屏。
+  openContent?: (req: OpenRequest) => void;
 }
 
 export const EnvContext = createContext<WorkbenchEnv | null>(null);

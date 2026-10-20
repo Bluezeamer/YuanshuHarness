@@ -81,6 +81,8 @@ test("R2 构建产物：色值只剩调色板变量与 Tailwind 自带的 #0000 
   }));
   expect(files.some((f) => f.name.endsWith(".css"))).toBe(true);
   for (const { name, text, lazy } of files) {
+    // pdf.js 的 worker 以独立 .mjs 文件产出（类型是 asset），同样是按需加载的第三方代码。
+    if (/(^|\/)pdf\.worker[^/]*\.mjs$/.test(name)) continue;
     if (name.endsWith(".js")) {
       // 按需加载的第三方块（mermaid）自带主题色，不在我们的调色板约束内；只查入口包。
       if (lazy) continue;

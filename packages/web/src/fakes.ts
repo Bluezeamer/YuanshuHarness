@@ -1,5 +1,8 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import type { ChatEntry } from "./api";
+import type { OpenRequest } from "./layout/doc";
+import type { WorkbenchEnv } from "./layout/env";
+import { SessionHub } from "./sessions/hub";
 
 type Listener = (ev: { data?: unknown }) => void;
 
@@ -40,6 +43,11 @@ export class FakeWS {
   serve(o: unknown) {
     this.readyState = 1;
     this.fire("message", { data: JSON.stringify(o) });
+  }
+  // 终端输出走二进制帧。
+  serveBytes(b: Uint8Array) {
+    this.readyState = 1;
+    this.fire("message", { data: b.buffer });
   }
   // 对端断开：浏览器只触发 close。
   drop() {
@@ -380,4 +388,231 @@ export function installFs(
     });
   });
   return fs;
+}
+
+export interface FileFixture {
+  type: string;
+  bytes: Uint8Array;
+}
+
+export interface PaneApi {
+  calls: {
+    method: string;
+    path: string;
+    body: unknown;
+    range: string | null;
+  }[];
+  // 目录路径 -> list 响应里的条目
+  dirs: Record<string, object[]>;
+  files: Record<string, FileFixture>;
+  // 全部审计记录，id 从大到小
+  audit: Record<string, unknown>[];
+  auditPage: number;
+  terminalsMade: number;
+  // 下一次 "METHOD 路径"（不含查询串）返回的状态码（一次性）。
+  fail: Record<string, number>;
+}
+
+export const bytes = (s: string) => new TextEncoder().encode(s);
+
+// 在 installApi 之上叠加 pane 内容用到的接口：环境 / workspace、文件、终端、审计。
+// workspace w1 在本机 /work/proj，w2 在 ssh1 的 /srv/app。
+export function installPaneApi(): PaneApi {
+  const base = globalThis.fetch;
+  const api: PaneApi = {
+    calls: [],
+    dirs: {
+      "/work/proj": [
+        { name: "src", type: "dir", size: 0, mtimeMs: 0 },
+        { name: "a.txt", type: "file", size: 5, mtimeMs: 0 },
+      ],
+      "/work/proj/src": [],
+    },
+    files: {
+      "/work/proj/a.txt": { type: "text/plain", bytes: bytes("hello") },
+    },
+    audit: [],
+    auditPage: 100,
+    terminalsMade: 0,
+    fail: {},
+  };
+  const dirname = (p: string) => p.slice(0, p.lastIndexOf("/")) || "/";
+  const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
+  vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
+    const [pathname = "", query] = input.split("?");
+    const q = new URLSearchParams(query);
+    const method = init?.method ?? "GET";
+    const mine =
+      pathname === "/api/v1/workspaces" ||
+      pathname === "/api/v1/environments" ||
+      pathname.startsWith("/api/v1/environments/") ||
+      pathname.startsWith("/api/v1/terminals") ||
+      pathname === "/api/v1/audit";
+    if (!mine) return base(input, init);
+    const body =
+      typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+    api.calls.push({
+      method,
+      path: input,
+      body: init?.body instanceof Blob ? `blob:${init.body.size}` : body,
+      range: new Headers(init?.headers).get("Range"),
+    });
+    const json = (s: number, b: object, h?: HeadersInit) =>
+      new Response(JSON.stringify(b), { status: s, headers: h });
+    const key = `${method} ${pathname}`;
+    const forced = api.fail[key];
+    if (forced) {
+      delete api.fail[key];
+      return json(forced, {});
+    }
+    if (pathname === "/api/v1/workspaces")
+      return json(200, {
+        workspaces: [
+          {
+            id: "w1",
+            name: "proj",
+            path: "/work/proj",
+            environmentId: "local",
+            tier: "rules",
+            createdAt: "t",
+          },
+          {
+            id: "w2",
+            name: "app",
+            path: "/srv/app",
+            environmentId: "ssh1",
+            tier: "rules",
+            createdAt: "t",
+          },
+        ],
+      });
+    if (pathname === "/api/v1/environments")
+      return json(200, {
+        environments: [
+          { id: "local", name: "本机", kind: "local" },
+          { id: "ssh1", name: "dev-box", kind: "ssh" },
+        ],
+      });
+    if (pathname === "/api/v1/terminals") {
+      api.terminalsMade += 1;
+      return json(201, {
+        id: `term${api.terminalsMade}`,
+        environmentId: body.environmentId,
+        cwd: body.cwd ?? "/home/u",
+        cols: body.cols,
+        rows: body.rows,
+      });
+    }
+    if (pathname.startsWith("/api/v1/terminals/"))
+      return new Response(null, { status: 204 });
+    if (pathname === "/api/v1/audit") {
+      const kind = q.get("kind");
+      const session = q.get("session");
+      const before = q.get("before");
+      const rest = api.audit.filter(
+        (e) =>
+          (!kind || e.kind === kind) &&
+          (!session || e.sessionId === session) &&
+          (!before || (e.id as number) < Number(before)),
+      );
+      const page = rest.slice(0, api.auditPage);
+      const more = rest.length > page.length;
+      return json(200, {
+        entries: page,
+        nextBefore: more ? (page[page.length - 1]?.id ?? null) : null,
+      });
+    }
+    // /api/v1/environments/:env/files/...
+    const m = /^\/api\/v1\/environments\/[^/]+\/files\/(\w+)$/.exec(pathname);
+    const path = q.get("path") ?? "";
+    if (m?.[1] === "list") {
+      const entries = api.dirs[path];
+      if (!entries) return json(404, {});
+      return json(200, {
+        path,
+        parent: path === "/" ? null : dirname(path),
+        entries,
+        truncated: false,
+      });
+    }
+    if (m?.[1] === "mkdir") {
+      const p = body.path as string;
+      api.dirs[p] = [];
+      api.dirs[dirname(p)]?.push({
+        name: basename(p),
+        type: "dir",
+        size: 0,
+        mtimeMs: 0,
+      });
+      return json(201, { path: p });
+    }
+    if (m?.[1] === "entry") {
+      const dir = dirname(path);
+      api.dirs[dir] = (api.dirs[dir] ?? []).filter(
+        (e) => (e as { name: string }).name !== basename(path),
+      );
+      delete api.files[path];
+      return new Response(null, { status: 204 });
+    }
+    if (m?.[1] === "content") {
+      if (method === "PUT") {
+        if (api.files[path] && q.get("overwrite") !== "1") return json(409, {});
+        api.files[path] = {
+          type: "application/octet-stream",
+          bytes: bytes(""),
+        };
+        return new Response(null, { status: 204 });
+      }
+      const f = api.files[path];
+      if (!f) return json(404, {});
+      const range = /^bytes=0-(\d+)$/.exec(
+        new Headers(init?.headers).get("Range") ?? "",
+      );
+      if (!range)
+        return new Response(f.bytes as BodyInit, {
+          headers: { "Content-Type": f.type },
+        });
+      const part = f.bytes.slice(0, Number(range[1]) + 1);
+      return new Response(part as BodyInit, {
+        status: 206,
+        headers: {
+          "Content-Type": f.type,
+          "Content-Range": `bytes 0-${part.length - 1}/${f.bytes.length}`,
+        },
+      });
+    }
+    return json(404, {});
+  });
+  return api;
+}
+
+// pane 的运行环境：会话 s1 属于 w1（本机 /work/proj），s2 属于 w2（ssh1）。
+export function paneEnv(
+  active: string | null = "s1",
+): WorkbenchEnv & { openContent: Mock<(req: OpenRequest) => void> } {
+  const hub = new SessionHub();
+  hub.onUnauthorized = vi.fn();
+  return {
+    hub,
+    activeSessionId: active,
+    openContent: vi.fn<(req: OpenRequest) => void>(),
+    sessions: [
+      {
+        id: "s1",
+        name: "甲",
+        createdAt: "t",
+        updatedAt: "t",
+        running: false,
+        workspaceId: "w1",
+      },
+      {
+        id: "s2",
+        name: "乙",
+        createdAt: "t",
+        updatedAt: "t",
+        running: false,
+        workspaceId: "w2",
+      },
+    ],
+  };
 }

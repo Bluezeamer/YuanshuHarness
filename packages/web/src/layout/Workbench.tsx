@@ -11,6 +11,7 @@ import {
   movePane,
   moveToTab,
   newId,
+  type OpenRequest,
   openPane,
   renamePane,
   renameWindow,
@@ -82,8 +83,16 @@ export function Workbench({
     )?.focus();
   }, [focusReq]);
   const [activeSessionId, selectSession] = useActiveSession(sessions);
+  // 打开路由要读最新的布局文档，env 里放稳定的转发函数，避免每次布局变化都让所有 pane 重渲。
+  const openRef = useRef<(req: OpenRequest) => void>(() => {});
   const env = useMemo(
-    () => ({ hub, sessions, activeSessionId, newSession }),
+    () => ({
+      hub,
+      sessions,
+      activeSessionId,
+      newSession,
+      openContent: (req: OpenRequest) => openRef.current(req),
+    }),
     [hub, sessions, activeSessionId, newSession],
   );
 
@@ -399,10 +408,10 @@ export function Workbench({
 
   const [notice, setNotice] = useState<string | null>(null);
   // 打开路由：已开则切换 / 加入同类 tab 组 / 分屏（见 openPane）。
-  const open = (type: string) => {
+  const openContent = (req: OpenRequest) => {
     const r = openPane(
       doc,
-      { type, host: null, anchor: focused ?? undefined },
+      { anchor: focused ?? undefined, ...req },
       registry,
       (e) => (e.binding?.mode === "fixed" ? e.binding.host : null),
     );
@@ -415,6 +424,8 @@ export function Workbench({
     update(() => r.doc);
     goto(r.paneId);
   };
+  openRef.current = openContent;
+  const open = (type: string) => openContent({ type, host: null });
   const groups = [...new Set(registry.list().map((t) => t.group))];
   const select = "border border-line bg-bg px-1.5 py-0.5 text-xs font-semibold";
 
