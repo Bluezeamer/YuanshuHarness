@@ -50,19 +50,20 @@
 
 ## 当前状态
 
-M1 进行中，已提交三笔：a694538（权限判定改走环境原语、async）、6c77148（工具按 workspace 环境路由、list/switch_workspace、pool 接线）、27d38a5（ExecEnv 流式读写 + `env/transfer.ts`，含 local/ssh 契约测试与 transfer 测试）。最近一次 server 全量 vitest：854 通过；`tsc --noEmit` 干净。**`scripts/check.sh` 尚未跑过。**
+M1 进行中，已提交：a694538（权限判定改走环境原语、async）、6c77148（工具按 workspace 环境路由、list/switch_workspace、pool 接线）、27d38a5（ExecEnv 流式读写 + `env/transfer.ts`）、15347a0（环境 status / connect / transfers 端点）、4a16593（routed tools 对本机与真实 sshd 的测试）、81bd5be（权限路径判定经 ssh 环境的测试）、d246776（web 测试严格类型修正）、1db1064（workspace 可登记到 ssh 环境，按 `(环境, 路径)` 唯一）。`scripts/check.sh` 在 1db1064 上 exit 0（含真实 sshd 用例）。
 
-M1 还缺：环境状态与传输没有 REST 端点（`api/environments.ts` 里没有 status / transfer）；没有「ssh workspace 里真实走远程」的端到端测试，也没有真实模型冒烟；M1 末的 codex 评审未做。
+M1 还缺：真实模型冒烟（对 ssh workspace 跑一次真实会话）；M1 末的 codex 评审；勾选 M1 与更新 ROADMAP 第 6 条。
 
-未跟踪文件 `packages/server/src/session/workspaces.ts` 与 `workspace-tools.ts` 注册了同名的两个工具，且无人 import。来源不明（会话中被标记为用户或 linter 改过，且是有意的）：不删、不提交，等用户确认去留。
+未跟踪的 `packages/server/src/session/workspaces.ts` 与已提交的 `workspace-tools.ts` 注册同名工具（`list_workspaces` / `switch_workspace`），但接口不同（前者 `deps.list/get/current/setCurrent` + 参数 `workspace_id`，后者 `WorkspaceToolsApi` + 参数 `workspace`），且前者无人 import；`pool.ts` 用的是后者。来源不明（会话中被标记为用户或 linter 改过，且是有意的）：不删、不提交，等用户确认去留。
 
 ## 下一步
 
 M1 收尾，按顺序：
-1. `api/environments.ts` 加环境状态（`SshEnv.status()`）与传输端点，调用 `transfer()`，补 API 测试。
-2. 写 ssh workspace 的工具路由端到端测试（对 `tmp/sshd`）：read/ls/grep/bash 确认走远程，权限判定按远程路径解析。
-3. 跑 `scripts/check.sh`，全绿后再进 codex 评审（权限绕过、数据损坏、密钥泄露），结果写 `docs/reviews/m1.md`。
-4. 真实模型冒烟（`packages/server/test/live/`），再勾选 M1、更新 ROADMAP 第 6 条。
+1. （已完成）环境状态与传输端点。
+2. （已完成）权限路径判定的 ssh 用例（`permission/paths.ssh.test.ts`：链接逃逸、悬空/循环、`~` 展开、敏感文件扫描）与工具路由用例。
+3. （已完成）`scripts/check.sh` 全绿；workspace 可登记到 ssh 环境。
+4. 真实模型冒烟（`packages/server/test/live/`，对本机 sshd 的 ssh workspace 跑真实会话，密钥只读不打印）。
+5. codex 评审（权限绕过、数据损坏、密钥泄露），结果写 `docs/reviews/m1.md`；再勾选 M1、更新 ROADMAP 第 6 条。
 
 ## 决策与偏差
 
