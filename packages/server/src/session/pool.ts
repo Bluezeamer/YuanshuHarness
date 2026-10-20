@@ -17,6 +17,7 @@ import {
   type ReviewerFactory,
   runReview,
 } from "../permission/review.js";
+import type { AuditInput, AuditLog } from "../store/audit.js";
 import { type EnvironmentStore, LOCAL_ENV_ID } from "../store/environments.js";
 import {
   type ChatEntry,
@@ -38,6 +39,7 @@ import {
   type Workspace,
   type WorkspaceStore,
 } from "../store/workspaces.js";
+import { toolAudit } from "./audit.js";
 import {
   type Block,
   type ChatMessage,
@@ -126,6 +128,11 @@ export interface EntryOptions {
   interrupted?: boolean;
   // 每次运行结束后调用（持久化索引）；抛错不影响事件流。
   onRunEnded?: (entry: SessionEntry) => void;
+  // 工具调用开始/结束时记审计。
+  onAudit?: (
+    entry: SessionEntry,
+    rec: Pick<AuditInput, "summary" | "detail">,
+  ) => void;
   // 弹窗超时（毫秒），缺省 30 分钟；测试用。
   promptTimeoutMs?: number;
 }
@@ -192,6 +199,8 @@ export class SessionEntry {
   private onSdkEvent(e: AgentSessionEvent): void {
     const mapped = mapEvent(e);
     if (!mapped) return;
+    if (e.type === "tool_execution_start" || e.type === "tool_execution_end")
+      this.opts.onAudit?.(this, toolAudit(e));
     if (mapped.type === "run.started") {
       // 自动重试会反复 agent_start；一次运行只对外开始一次。
       if (this.running) return;
@@ -534,6 +543,8 @@ export interface PoolDeps {
   // 环境服务与登记；缺省时所有 workspace 按本机处理（只用于没有远程环境的测试）。
   envHub?: EnvHub;
   environments?: EnvironmentStore;
+  // 执行审计；缺省时不记录。
+  audit?: AuditLog;
 }
 
 const NAME_MAX = 200;
@@ -662,6 +673,13 @@ export class SessionPool {
         },
         addRule: (r) => rules.add(current().id, r),
         ask,
+        audit: (rec) =>
+          this.deps.audit?.record({
+            ...rec,
+            kind: "permission",
+            sessionId: id,
+            environmentId: current().environmentId,
+          }),
         ...(reviewerFactory
           ? {
               review: (call) => {
@@ -698,9 +716,26 @@ export class SessionPool {
     ];
   }
 
-  private entryOptions(): Pick<EntryOptions, "onRunEnded" | "promptTimeoutMs"> {
+  private entryOptions(): Pick<
+    EntryOptions,
+    "onRunEnded" | "promptTimeoutMs" | "onAudit"
+  > {
+    const { audit, workspaces } = this.deps;
     return {
       onRunEnded: (e) => this.persist(e),
+      ...(audit
+        ? {
+            onAudit: (e, rec) =>
+              audit.record({
+                ...rec,
+                actor: "agent",
+                kind: "tool",
+                sessionId: e.id,
+                environmentId:
+                  workspaces.get(e.workspaceId)?.environmentId ?? null,
+              }),
+          }
+        : {}),
       ...(this.deps.promptTimeoutMs === undefined
         ? {}
         : { promptTimeoutMs: this.deps.promptTimeoutMs }),

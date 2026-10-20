@@ -10,10 +10,13 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { auditApi } from "./api/audit.js";
 import { environmentsApi } from "./api/environments.js";
+import { filesApi } from "./api/files.js";
 import { fsApi } from "./api/fs.js";
 import { modelsApi } from "./api/models.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
+import { terminalsApi } from "./api/terminals.js";
 import { workbenchApi } from "./api/workbench.js";
 import { workspacesApi } from "./api/workspaces.js";
 import { createAuthHook, type RateLimitOptions } from "./auth.js";
@@ -22,6 +25,7 @@ import { prepareDataDir } from "./data-dir.js";
 import { EnvHub } from "./env/hub.js";
 import type { ReviewerFactory } from "./permission/review.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
+import { AuditLog } from "./store/audit.js";
 import { type Db, openDatabase } from "./store/db.js";
 import { EnvironmentStore } from "./store/environments.js";
 import { ModelStore } from "./store/models.js";
@@ -30,6 +34,7 @@ import { loadMasterKey, SecretStore } from "./store/secrets.js";
 import { SessionStore } from "./store/sessions.js";
 import { WorkbenchStore } from "./store/workbench.js";
 import { WorkspaceStore } from "./store/workspaces.js";
+import { TerminalManager, type TerminalOptions } from "./terminal/manager.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
 const PACKAGE_ROOT = new URL("../", import.meta.url);
@@ -51,6 +56,8 @@ export interface ServerOptions {
   reviewTimeoutMs?: number;
   // 首次启动登记为默认 workspace 的目录；缺省取进程工作目录。
   startDir?: string;
+  // 仅供测试缩短终端的数量上限、空闲回收与回放缓冲。
+  terminals?: Partial<TerminalOptions>;
   // 仅供测试注入限流的时钟与数值。
   authLimiter?: Partial<RateLimitOptions>;
   // 仅供测试缩短心跳与背压阈值。
@@ -221,7 +228,9 @@ export function createServer(
         const environments = new EnvironmentStore(db as Db);
         const hub = new EnvHub(environments, secrets);
         envHub = hub;
+        const audit = new AuditLog(db as Db);
         const pool = new SessionPool({
+          audit,
           envHub: hub,
           environments,
           factory:
@@ -249,7 +258,19 @@ export function createServer(
           scope.addHook("onRequest", hook);
           scope.register(sessionsApi, { ...DEFAULTS, ...options.tuning, pool });
           scope.register(workspacesApi, { workspaces, rules, pool, hub });
-          scope.register(environmentsApi, { environments, secrets, hub });
+          scope.register(environmentsApi, {
+            environments,
+            secrets,
+            hub,
+            audit,
+          });
+          scope.register(auditApi, { audit });
+          scope.register(filesApi, { hub, audit });
+          scope.register(terminalsApi, {
+            hub,
+            manager: new TerminalManager(audit, options.terminals),
+            ...options.tuning,
+          });
           scope.register(modelsApi, { models, secrets, agentDir });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });

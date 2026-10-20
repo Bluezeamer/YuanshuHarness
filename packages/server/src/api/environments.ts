@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { EnvHub } from "../env/hub.js";
 import { TransferError, transfer } from "../env/transfer.js";
+import { recordTransfer, TransferJobs } from "../env/transfer-jobs.js";
 import type { ExecEnv } from "../env/types.js";
 import { pathOf } from "../permission/paths.js";
+import { type AuditLog, auditSession } from "../store/audit.js";
 import {
   type EnvironmentInput,
   type EnvironmentStore,
@@ -25,9 +27,15 @@ const str = (v: unknown, max: number): string | null =>
 // 密码库与 ssh 环境的登记接口。密码值只进不出：列表与返回体都不含 value。
 export async function environmentsApi(
   app: FastifyInstance,
-  opts: { environments: EnvironmentStore; secrets: SecretStore; hub: EnvHub },
+  opts: {
+    environments: EnvironmentStore;
+    secrets: SecretStore;
+    hub: EnvHub;
+    audit?: AuditLog;
+  },
 ): Promise<void> {
-  const { environments, secrets, hub } = opts;
+  const { environments, secrets, hub, audit } = opts;
+  const jobs = new TransferJobs(audit);
 
   app.get("/api/v1/secrets", async () => ({ secrets: secrets.list() }));
 
@@ -155,35 +163,71 @@ export async function environmentsApi(
     async (req, reply) => {
       const env = hub.getSsh(req.params.id);
       if (!env) return reply.code(404).send({ error: "not_found" });
+      const t0 = Date.now();
       await env.connect().catch(() => {});
-      return env.status();
+      const status = env.status();
+      audit?.record({
+        actor: "user",
+        kind: "env",
+        environmentId: req.params.id,
+        summary: `connect ${status.state}`,
+        detail: {
+          op: "connect",
+          result: status.state === "connected" ? "ok" : "error",
+          durationMs: Date.now() - t0,
+          state: status.state,
+        },
+      });
+      return status;
     },
   );
 
   // 用户在界面里拖拽触发的跨环境复制，不经 agent 权限判定；两端都必须是绝对路径。
+  const endpoint = (v: unknown): { env: ExecEnv; path: string } | null => {
+    if (!isObject(v) || typeof v.env !== "string") return null;
+    const env = hub.get(v.env);
+    const p = v.path;
+    if (
+      !env ||
+      typeof p !== "string" ||
+      p.length > 4096 ||
+      p.includes("\0") ||
+      !pathOf(env).isAbsolute(p)
+    )
+      return null;
+    return { env, path: p };
+  };
+
   app.post("/api/v1/transfers", async (req, reply) => {
     const body = isObject(req.body) ? req.body : {};
-    const end = (v: unknown): { env: ExecEnv; path: string } | null => {
-      if (!isObject(v) || typeof v.env !== "string") return null;
-      const env = hub.get(v.env);
-      const p = v.path;
-      if (
-        !env ||
-        typeof p !== "string" ||
-        p.length > 4096 ||
-        p.includes("\0") ||
-        !pathOf(env).isAbsolute(p)
-      )
-        return null;
-      return { env, path: p };
-    };
-    const from = end(body.from);
-    const to = end(body.to);
+    const from = endpoint(body.from);
+    const to = endpoint(body.to);
     if (!from || !to) return bad(reply, "invalid_endpoint");
+    const sessionId = auditSession(body.sessionId);
+    const t0 = Date.now();
     try {
-      return await transfer(from, to, { overwrite: body.overwrite === true });
+      const r = await transfer(from, to, {
+        overwrite: body.overwrite === true,
+      });
+      recordTransfer(audit, {
+        from,
+        to,
+        sessionId,
+        outcome: "ok",
+        durationMs: Date.now() - t0,
+        files: r.files,
+        bytes: r.bytes,
+      });
+      return r;
     } catch (err) {
       if (!(err instanceof TransferError)) throw err;
+      recordTransfer(audit, {
+        from,
+        to,
+        sessionId,
+        outcome: err.code,
+        durationMs: Date.now() - t0,
+      });
       const status = {
         src_missing: 404,
         conflict: 409,
@@ -193,4 +237,23 @@ export async function environmentsApi(
       return reply.code(status).send({ error: err.code, message: err.message });
     }
   });
+
+  // 后台传输：立即返回任务，进度与结果经 GET 轮询；失败原因在任务的 error 里，HTTP 仍是 200。
+  app.post("/api/v1/transfer-jobs", async (req, reply) => {
+    const body = isObject(req.body) ? req.body : {};
+    const from = endpoint(body.from);
+    const to = endpoint(body.to);
+    if (!from || !to) return bad(reply, "invalid_endpoint");
+    const job = jobs.start(from, to, {
+      overwrite: body.overwrite === true,
+      sessionId: auditSession(body.sessionId),
+    });
+    return reply.code(202).send(job);
+  });
+
+  app.get<{ Params: { id: string } }>(
+    "/api/v1/transfer-jobs/:id",
+    async (req, reply) =>
+      jobs.get(req.params.id) ?? reply.code(404).send({ error: "not_found" }),
+  );
 }

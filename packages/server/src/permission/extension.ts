@@ -54,6 +54,12 @@ export interface PermissionDeps {
     summary: string;
     input: Record<string, unknown>;
   }) => Promise<ReviewVerdict>;
+  /** 记录需要裁决的调用的结论（规则内自动放行不记）。 */
+  audit?: (rec: {
+    actor: "user" | "system";
+    summary: string;
+    detail: Record<string, unknown>;
+  }) => void;
 }
 
 const clip = (s: string) =>
@@ -148,6 +154,31 @@ function redact(
 }
 
 export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
+  // 审计失败不能改变裁决：这里是 fail-closed 路径，审计抛错不得变成拒绝。
+  const note = (
+    actor: "user" | "system",
+    decision: "allow" | "deny" | "remember",
+    by: "user" | "review" | "timeout" | "cancelled" | "error",
+    tool: string,
+    summary: string,
+    reason?: string,
+  ) => {
+    try {
+      deps.audit?.({
+        actor,
+        summary: `${decision} ${tool}: ${summary}`,
+        detail: {
+          op: tool,
+          target: summary,
+          result: decision,
+          tool,
+          decision,
+          by,
+          ...(reason ? { reason } : {}),
+        },
+      });
+    } catch {}
+  };
   return (pi) => {
     pi.on("tool_call", async (e) => {
       try {
@@ -189,9 +220,14 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
             summary,
             input: redact(e.toolName, input),
           });
-          if (v.decision === "allow") return;
-          if (v.decision === "deny")
+          if (v.decision === "allow") {
+            note("system", "allow", "review", e.toolName, summary);
+            return;
+          }
+          if (v.decision === "deny") {
+            note("system", "deny", "review", e.toolName, summary, v.reason);
             return { block: true, reason: `自动审核拒绝：${v.reason}` };
+          }
           downgrade = `审核方拿不准，交由你决定${v.reason ? `（${v.reason}）` : ""}`;
         }
 
@@ -208,17 +244,27 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
           options,
           detail: { tool: e.toolName, summary },
         });
-        if (r.outcome === "timeout")
+        if (r.outcome === "timeout") {
+          note("system", "deny", "timeout", e.toolName, summary);
           return { block: true, reason: "审批超时，已拒绝" };
-        if (r.outcome === "cancelled")
+        }
+        if (r.outcome === "cancelled") {
+          note("system", "deny", "cancelled", e.toolName, summary);
           return { block: true, reason: "审批已取消，已拒绝" };
-        if (r.optionId === "allow") return;
-        if (r.optionId === "remember" && d.remember) {
-          deps.addRule(d.remember);
+        }
+        if (r.optionId === "allow") {
+          note("user", "allow", "user", e.toolName, summary);
           return;
         }
+        if (r.optionId === "remember" && d.remember) {
+          deps.addRule(d.remember);
+          note("user", "remember", "user", e.toolName, summary);
+          return;
+        }
+        note("user", "deny", "user", e.toolName, summary);
         return { block: true, reason: "用户拒绝了该操作" };
       } catch {
+        note("system", "deny", "error", e.toolName, "");
         return { block: true, reason: "权限检查出错，已拒绝" };
       }
     });

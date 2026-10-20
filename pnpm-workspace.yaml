@@ -1,6 +1,7 @@
 packages:
   - packages/*
 allowBuilds:
+  '@homebridge/node-pty-prebuilt-multiarch': false
   '@google/genai': false
   protobufjs: false
   cpu-features: false

@@ -1,4 +1,5 @@
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -10,6 +11,7 @@ import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { EnvHub } from "../env/hub.js";
+import { AuditLog } from "../store/audit.js";
 import { type Db, openDatabase } from "../store/db.js";
 import { EnvironmentStore } from "../store/environments.js";
 import { KEY_FILE, loadMasterKey, SecretStore } from "../store/secrets.js";
@@ -21,6 +23,7 @@ let db: Db;
 let app: FastifyInstance;
 let secrets: SecretStore;
 let hub: EnvHub;
+let audit: AuditLog;
 
 beforeEach(async () => {
   dir = mkdtempSync(path.join(tmpdir(), "yuanshu-env-"));
@@ -28,8 +31,9 @@ beforeEach(async () => {
   secrets = new SecretStore(db, loadMasterKey(dir));
   const environments = new EnvironmentStore(db);
   hub = new EnvHub(environments, secrets);
+  audit = new AuditLog(db);
   app = Fastify();
-  app.register(environmentsApi, { environments, secrets, hub });
+  app.register(environmentsApi, { environments, secrets, hub, audit });
   await app.ready();
 });
 afterEach(async () => {
@@ -259,6 +263,52 @@ describe("跨环境传输", () => {
     expect((await tr(path.join(dir, "nope"), dst)).statusCode).toBe(404);
   });
 
+  test("传输与连接尝试写审计（actor=user），只记路径与统计", async () => {
+    const src = path.join(dir, "a.txt");
+    const dst = path.join(dir, "b.txt");
+    writeFileSync(src, "one");
+    await tr(src, dst);
+    await tr(src, dst); // 冲突
+    const secret = await post("/api/v1/secrets", {
+      name: "pw",
+      kind: "password",
+      value: "AUDIT-LEAK-MARKER",
+    });
+    const env = await post("/api/v1/environments", {
+      name: "dead",
+      host: "127.0.0.1",
+      port: 1,
+      username: "u",
+      secretId: secret.json().id,
+    });
+    await post(`/api/v1/environments/${env.json().id}/connect`, {});
+    const rows = audit.list().entries;
+    expect(JSON.stringify(rows)).not.toContain("AUDIT-LEAK-MARKER");
+    expect(
+      rows.map((r) => [r.kind, r.actor, r.detail?.outcome ?? null]),
+    ).toEqual([
+      ["env", "user", null],
+      ["transfer", "user", "conflict"],
+      ["transfer", "user", "ok"],
+    ]);
+    expect(rows[2]?.summary).toBe(`transfer ok: local:${src} -> local:${dst}`);
+    expect(rows[2]?.detail).toMatchObject({
+      op: "transfer",
+      result: "ok",
+      outcome: "ok",
+      files: 1,
+      bytes: 3,
+      target: `local:${src} -> local:${dst}`,
+    });
+    expect(rows[2]?.detail?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(rows[1]?.detail).toMatchObject({ result: "error" });
+    expect(rows[0]).toMatchObject({
+      environmentId: env.json().id,
+      detail: { op: "connect", result: "error", state: "error" },
+    });
+    expect(rows[0]?.detail?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
   test("端点必须是已登记环境上的绝对路径", async () => {
     const bad = (body: unknown) => post("/api/v1/transfers", body);
     const abs = path.join(dir, "x");
@@ -273,5 +323,78 @@ describe("跨环境传输", () => {
       ).statusCode,
     ).toBe(400);
     expect((await bad({})).statusCode).toBe(400);
+  });
+});
+
+describe("后台传输任务", () => {
+  const job = (body: unknown) => post("/api/v1/transfer-jobs", body);
+  const poll = async (id: string) => {
+    for (let i = 0; i < 200; i++) {
+      const r = await app.inject({
+        method: "GET",
+        url: `/api/v1/transfer-jobs/${id}`,
+      });
+      if (r.json().state !== "running") return r.json();
+      await new Promise((ok) => setTimeout(ok, 10));
+    }
+    throw new Error("任务没有结束");
+  };
+  const ends = (from: string, to: string) => ({
+    from: { env: "local", path: from },
+    to: { env: "local", path: to },
+  });
+
+  test("复制整个目录：202 返回任务，轮询得到进度与结果，完成后写审计并归属会话", async () => {
+    const src = path.join(dir, "tree");
+    mkdirSync(path.join(src, "sub"), { recursive: true });
+    writeFileSync(path.join(src, "a.txt"), "aaa");
+    writeFileSync(path.join(src, "sub", "b.txt"), "bb");
+    const dst = path.join(dir, "copy");
+    const r = await job({ ...ends(src, dst), sessionId: "s-1" });
+    expect(r.statusCode).toBe(202);
+    expect(r.json()).toMatchObject({ state: "running", sessionId: "s-1" });
+    const done = await poll(r.json().id);
+    expect(done).toMatchObject({
+      state: "done",
+      totalFiles: 2,
+      files: 2,
+      bytes: 5,
+      skippedLinks: 0,
+    });
+    expect(done.finishedAt).toBeTruthy();
+    expect(readFileSync(path.join(dst, "sub", "b.txt"), "utf8")).toBe("bb");
+    const [row] = audit.list({ kind: "transfer" }).entries;
+    expect(row).toMatchObject({
+      sessionId: "s-1",
+      actor: "user",
+      detail: { op: "transfer", result: "ok", files: 2, bytes: 5 },
+    });
+  });
+
+  test("单文件任务带 totalBytes；冲突时任务失败，错误码在 error 里，审计记 error", async () => {
+    const src = path.join(dir, "a.txt");
+    const dst = path.join(dir, "b.txt");
+    writeFileSync(src, "one");
+    writeFileSync(dst, "old");
+    const failed = await poll((await job(ends(src, dst))).json().id);
+    expect(failed.state).toBe("failed");
+    expect(failed.error.code).toBe("conflict");
+    expect(readFileSync(dst, "utf8")).toBe("old");
+    const ok = await poll(
+      (await job({ ...ends(src, dst), overwrite: true })).json().id,
+    );
+    expect(ok).toMatchObject({ state: "done", totalBytes: 3, bytes: 3 });
+    expect(
+      audit.list({ kind: "transfer" }).entries.map((e) => e.detail?.result),
+    ).toEqual(["ok", "error"]);
+  });
+
+  test("端点非法 400；未知任务 404", async () => {
+    expect((await job({})).statusCode).toBe(400);
+    expect((await job(ends("rel", dir))).statusCode).toBe(400);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/v1/transfer-jobs/nope" }))
+        .statusCode,
+    ).toBe(404);
   });
 });

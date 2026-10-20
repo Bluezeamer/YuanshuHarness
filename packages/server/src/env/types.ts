@@ -35,11 +35,20 @@ export interface ExecEnv {
   /** 完整规范化（含中间目录的符号链接）；不存在、悬空、循环返回 null。 */
   realpath(p: string): Promise<string | null>;
   readdir(p: string): Promise<DirEntry[]>;
+  /** 链接目标原文；不是链接或不存在返回 null。 */
+  readlink(p: string): Promise<string | null>;
   readFile(p: string): Promise<Buffer>;
   writeFile(p: string, data: Buffer | string): Promise<void>;
   mkdirp(p: string): Promise<void>;
-  /** 流式读写，供跨环境传输使用，避免大文件整个进内存。 */
-  readStream(p: string): Promise<Readable>;
+  /** POSIX 语义：目标是已存在的文件时原子替换；目标是非空目录则失败。 */
+  rename(from: string, to: string): Promise<void>;
+  /** 不跟随符号链接；目录须 recursive，否则只删空目录。不存在抛错。 */
+  remove(p: string, recursive?: boolean): Promise<void>;
+  /** 流式读写，供传输与文件接口使用，避免大文件整个进内存。range 为闭区间字节偏移。 */
+  readStream(
+    p: string,
+    range?: { start: number; end: number },
+  ): Promise<Readable>;
   writeStream(p: string): Promise<Writable>;
   /** 命令原样执行；stdout 与 stderr 合并交给 onData。被信号终止报 128+n。 */
   exec(

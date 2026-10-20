@@ -4,7 +4,11 @@ import {
   mkdir,
   readdir,
   readFile,
+  readlink,
   realpath,
+  rename,
+  rm,
+  rmdir,
   stat,
   writeFile,
 } from "node:fs/promises";
@@ -45,7 +49,15 @@ export class LocalEnv implements ExecEnv {
   mkdirp = async (p: string) => {
     await mkdir(p, { recursive: true });
   };
-  readStream = async (p: string) => createReadStream(p);
+  readlink = (p: string) => orNull(() => readlink(p));
+  rename = (from: string, to: string) => rename(from, to);
+  remove = async (p: string, recursive = false) => {
+    if (recursive || !(await lstat(p)).isDirectory())
+      await rm(p, { recursive });
+    else await rmdir(p);
+  };
+  readStream = async (p: string, range?: { start: number; end: number }) =>
+    createReadStream(p, range);
   writeStream = async (p: string) => createWriteStream(p);
 
   async readdir(p: string): Promise<DirEntry[]> {

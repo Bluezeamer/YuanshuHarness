@@ -119,7 +119,7 @@ describe("R1 迁移 v3", () => {
     const file = path.join(a.dataDir, DB_FILE);
     const db = new Database(file);
     db.exec(
-      "DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id",
+      "DROP TABLE audit_log; DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id",
     );
     db.pragma("user_version = 2");
     db.close();

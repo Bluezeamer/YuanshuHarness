@@ -99,6 +99,22 @@ export const MIGRATIONS: Migration[] = [
        ALTER TABLE workspaces_new RENAME TO workspaces`,
     );
   },
+  // 执行审计日志，只追加；id 自增兼作分页游标。不外键到 sessions：会话删除后审计仍保留。
+  (db) =>
+    db.exec(
+      `CREATE TABLE audit_log (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         ts TEXT NOT NULL,
+         session_id TEXT,
+         actor TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         environment_id TEXT,
+         summary TEXT NOT NULL,
+         detail TEXT
+       );
+       CREATE INDEX audit_log_session ON audit_log(session_id, id);
+       CREATE INDEX audit_log_kind ON audit_log(kind, id)`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

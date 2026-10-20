@@ -15,6 +15,14 @@ export interface TransferResult {
   skippedLinks: number;
 }
 
+/** 扫描完成后才有总量；totalBytes 仅在源是单个文件时已知。 */
+export interface TransferProgress {
+  totalFiles: number;
+  totalBytes: number | null;
+  files: number;
+  bytes: number;
+}
+
 export class TransferError extends Error {
   constructor(
     readonly code: "src_missing" | "conflict" | "bad_request" | "copy_failed",
@@ -40,7 +48,11 @@ interface Item {
 export async function transfer(
   src: TransferEnd,
   dst: TransferEnd,
-  opts: { overwrite?: boolean; signal?: AbortSignal } = {},
+  opts: {
+    overwrite?: boolean;
+    signal?: AbortSignal;
+    onProgress?: (p: TransferProgress) => void;
+  } = {},
 ): Promise<TransferResult> {
   const sp = pathOf(src.env);
   const dp = pathOf(dst.env);
@@ -101,12 +113,22 @@ export async function transfer(
   for (const d of dirs) await dst.env.mkdirp(d);
 
   let bytes = 0;
+  let done = 0;
+  const emit = () =>
+    opts.onProgress?.({
+      totalFiles: items.length,
+      totalBytes: st.isFile ? st.size : null,
+      files: done,
+      bytes,
+    });
   const count = async function* (chunks: AsyncIterable<Buffer>) {
     for await (const c of chunks) {
       bytes += c.length;
+      emit();
       yield c;
     }
   };
+  emit();
   for (const it of items) {
     try {
       await pipeline(
@@ -115,6 +137,8 @@ export async function transfer(
         await dst.env.writeStream(it.to),
         opts.signal ? { signal: opts.signal } : {},
       );
+      done++;
+      emit();
     } catch (err) {
       if (opts.signal?.aborted) throw err;
       throw new TransferError(

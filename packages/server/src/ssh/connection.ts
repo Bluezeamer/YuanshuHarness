@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
-import { Client, type SFTPWrapper, type Stats } from "ssh2";
+import { Client, type ClientChannel, type SFTPWrapper, type Stats } from "ssh2";
 import type { DirEntry, FileStat } from "../env/types.js";
 import type { SecretStore } from "../store/secrets.js";
 
@@ -131,6 +131,26 @@ export class SshConnection {
     });
   }
 
+  // 交互终端：申请 pty；给了命令就在 pty 下执行它（用来先进入目录再换成登录 shell）。
+  openShell(opts: {
+    cols: number;
+    rows: number;
+    command?: string;
+  }): Promise<ClientChannel> {
+    return new Promise((ok, fail) => {
+      const window = {
+        term: "xterm-256color",
+        cols: opts.cols,
+        rows: opts.rows,
+      };
+      const done = (err: Error | undefined, ch: ClientChannel) =>
+        err ? fail(err) : ok(ch);
+      const client = this.requireClient();
+      if (opts.command === undefined) client.shell(window, done);
+      else client.exec(opts.command, { pty: window }, done);
+    });
+  }
+
   async readFile(remotePath: string): Promise<Buffer> {
     const s = await this.sftp();
     return new Promise((ok, fail) =>
@@ -145,8 +165,60 @@ export class SshConnection {
     );
   }
 
-  async readStream(remotePath: string): Promise<Readable> {
-    return (await this.sftp()).createReadStream(remotePath);
+  async readStream(
+    remotePath: string,
+    range?: { start: number; end: number },
+  ): Promise<Readable> {
+    const stream = (await this.sftp()).createReadStream(remotePath, range);
+    // 读完后 autoClose 的 close 请求若遇上连接断开，ssh2 会把错误发给已无人监听的流，变成进程级未捕获异常
+    stream.on("error", () => {});
+    return stream;
+  }
+
+  async readlink(remotePath: string): Promise<string | null> {
+    const s = await this.sftp();
+    return new Promise((ok) =>
+      s.readlink(remotePath, (e, t) => ok(e ? null : t)),
+    );
+  }
+
+  // 优先用 OpenSSH 的 posix-rename（原子替换已存在的目标）；服务端不支持时先删目标文件再改名。
+  async rename(from: string, to: string): Promise<void> {
+    const s = await this.sftp();
+    const plain = () =>
+      new Promise<void>((ok, fail) =>
+        s.rename(from, to, (e) => (e ? fail(e) : ok())),
+      );
+    try {
+      return await new Promise<void>((ok, fail) =>
+        s.ext_openssh_rename(from, to, (e) => (e ? fail(e) : ok())),
+      );
+    } catch (err) {
+      // 不支持扩展时 ssh2 同步抛错；扩展自身失败（目标是非空目录等）如实上抛
+      if (!(err instanceof Error) || !/support/i.test(err.message)) throw err;
+    }
+    const target = await this.lstat(to);
+    if (target && !target.isDirectory)
+      await new Promise<void>((ok, fail) =>
+        s.unlink(to, (e) => (e ? fail(e) : ok())),
+      );
+    return plain();
+  }
+
+  // 不跟随链接；recursive 时自底向上删目录树。
+  async remove(remotePath: string, recursive = false): Promise<void> {
+    const s = await this.sftp();
+    const call = (f: (cb: (e: Error | null | undefined) => void) => void) =>
+      new Promise<void>((ok, fail) => f((e) => (e ? fail(e) : ok())));
+    const walk = async (p: string): Promise<void> => {
+      const st = await this.lstat(p);
+      if (!st) throw new Error(`不存在：${p}`);
+      if (!st.isDirectory) return call((cb) => s.unlink(p, cb));
+      if (recursive)
+        for (const name of await this.readdir(p)) await walk(`${p}/${name}`);
+      return call((cb) => s.rmdir(p, cb));
+    };
+    await walk(remotePath);
   }
 
   async writeStream(remotePath: string): Promise<Writable> {

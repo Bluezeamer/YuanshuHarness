@@ -85,6 +85,18 @@ export class SshEnv implements ExecEnv {
     return (await this.c()).readdirEntries(p);
   }
 
+  async readlink(p: string): Promise<string | null> {
+    return (await this.c()).readlink(p);
+  }
+
+  async rename(from: string, to: string): Promise<void> {
+    await (await this.c()).rename(from, to);
+  }
+
+  async remove(p: string, recursive = false): Promise<void> {
+    await (await this.c()).remove(p, recursive);
+  }
+
   async readFile(p: string): Promise<Buffer> {
     return (await this.c()).readFile(p);
   }
@@ -97,12 +109,25 @@ export class SshEnv implements ExecEnv {
     await (await this.c()).mkdirp(p);
   }
 
-  async readStream(p: string) {
-    return (await this.c()).readStream(p);
+  async readStream(p: string, range?: { start: number; end: number }) {
+    return (await this.c()).readStream(p, range);
   }
 
   async writeStream(p: string) {
     return (await this.c()).writeStream(p);
+  }
+
+  // 交互 shell（终端用）。给了 cwd 就先进入目录再换成登录 shell；Windows 的 Git Bash 分支未验证。
+  async shell(opts: { cols: number; rows: number; cwd?: string }) {
+    const conn = await this.c();
+    const sh = this.os === "windows" ? "bash" : `"\${SHELL:-/bin/sh}"`;
+    return conn.openShell({
+      cols: opts.cols,
+      rows: opts.rows,
+      ...(opts.cwd === undefined
+        ? {}
+        : { command: `cd ${shq(opts.cwd)} && exec ${sh} -l` }),
+    });
   }
 
   async exec(command: string, cwd: string, opts: ExecOptions) {

@@ -86,6 +86,48 @@ function contract(make: () => Promise<{ env: ExecEnv; work: string }>) {
     );
   });
 
+  test("readlink 返回原文；rename 原子替换已存在的文件", async () => {
+    expect(await env.readlink(path.join(work, "a.txt"))).toBeNull();
+    expect(await env.readlink(path.join(work, "link"))).toContain("sub");
+    await env.writeFile(path.join(work, "new.txt"), "n");
+    await env.rename(path.join(work, "new.txt"), path.join(work, "a.txt"));
+    expect((await env.readFile(path.join(work, "a.txt"))).toString()).toBe("n");
+    expect(await env.lstat(path.join(work, "new.txt"))).toBeNull();
+    await env.mkdirp(path.join(work, "full"));
+    await env.writeFile(path.join(work, "full", "f"), "x");
+    await expect(
+      env.rename(path.join(work, "a.txt"), path.join(work, "full")),
+    ).rejects.toThrow();
+  });
+
+  test("remove 不跟随链接；目录非递归只删空目录；递归删整棵树", async () => {
+    await env.remove(path.join(work, "link"));
+    expect(await env.lstat(path.join(work, "link"))).toBeNull();
+    expect((await env.lstat(path.join(work, "sub")))?.isDirectory).toBe(true);
+    await env.mkdirp(path.join(work, "t", "u"));
+    await env.writeFile(path.join(work, "t", "u", "f"), "x");
+    await expect(env.remove(path.join(work, "t"))).rejects.toThrow();
+    await env.remove(path.join(work, "sub"));
+    await env.remove(path.join(work, "t"), true);
+    expect(await env.lstat(path.join(work, "t"))).toBeNull();
+    await expect(env.remove(path.join(work, "missing"))).rejects.toThrow();
+  });
+
+  test("readStream 支持闭区间字节范围", async () => {
+    const read = async (range?: { start: number; end: number }) => {
+      const chunks: Buffer[] = [];
+      for await (const c of await env.readStream(
+        path.join(work, "a.txt"),
+        range,
+      ))
+        chunks.push(c as Buffer);
+      return Buffer.concat(chunks).toString();
+    };
+    expect(await read()).toBe("hello");
+    expect(await read({ start: 1, end: 3 })).toBe("ell");
+    expect(await read({ start: 3, end: 100 })).toBe("lo");
+  });
+
   test("exec 在 cwd 执行，stderr 合并，退出码原样返回", async () => {
     const r = await run(env, "pwd; echo err >&2; exit 3", work);
     expect(r.exitCode).toBe(3);
