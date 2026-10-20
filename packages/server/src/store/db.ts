@@ -184,6 +184,27 @@ export const MIGRATIONS: Migration[] = [
          updated_at TEXT NOT NULL
        )`,
     ),
+  // subagent 父子关系（ADR-0010、ADR-0060）。不外键到 sessions：子会话的索引行要等第一次运行结束才有。
+  // state: running | done | failed | interrupted；spec 是派发时的约束（档位上限、环境子集、模型、继承的工具），
+  // 子会话被恢复时按它重建；denied/denied_reasons 记子会话被拒的操作；told 记父是否已得知终态。
+  (db) =>
+    db.exec(
+      `CREATE TABLE subagents (
+         child_id TEXT PRIMARY KEY,
+         parent_id TEXT NOT NULL,
+         depth INTEGER NOT NULL,
+         task TEXT NOT NULL,
+         spec TEXT NOT NULL,
+         state TEXT NOT NULL,
+         result TEXT,
+         told INTEGER NOT NULL DEFAULT 0,
+         denied INTEGER NOT NULL DEFAULT 0,
+         denied_reasons TEXT NOT NULL DEFAULT '[]',
+         created_at TEXT NOT NULL,
+         finished_at TEXT
+       );
+       CREATE INDEX subagents_parent ON subagents(parent_id)`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

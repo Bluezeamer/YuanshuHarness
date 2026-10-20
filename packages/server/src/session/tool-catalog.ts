@@ -34,7 +34,32 @@ export const TOOLS: ToolInfo[] = [
     readOnly: true,
     server: true,
   },
+  // subagent 三件套（ADR-0010、ADR-0060）。plan 模式下放行：子会话继承 plan，不会因此多出写权限。
+  {
+    name: "spawn_subagent",
+    description: "派发子代理（异步，返回子会话 id）",
+    readOnly: true,
+    server: true,
+  },
+  {
+    name: "wait_subagent",
+    description: "等待子代理完成并取回结果",
+    readOnly: true,
+    server: true,
+  },
+  {
+    name: "interrupt_subagent",
+    description: "中断运行中的子代理",
+    readOnly: true,
+    server: true,
+  },
 ];
+
+export const SUBAGENT_TOOL_NAMES = [
+  "spawn_subagent",
+  "wait_subagent",
+  "interrupt_subagent",
+] as const;
 
 export const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
 export const toolNames = (pick: (t: ToolInfo) => boolean): string[] =>

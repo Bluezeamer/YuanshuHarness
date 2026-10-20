@@ -48,11 +48,13 @@ import {
   type SessionStore,
   UUID_RE,
 } from "../store/sessions.js";
+import type { SubagentSpec, SubagentStore } from "../store/subagents.js";
 import {
   resolveDirectory,
   type Workspace,
   type WorkspaceStore,
 } from "../store/workspaces.js";
+import { SUBAGENT_LIMITS } from "../subagent/limits.js";
 import { toolAudit } from "./audit.js";
 import {
   type Block,
@@ -78,6 +80,35 @@ import {
 // 索引或 agent 里的模式值读作模式；迁移前或空值按 build。
 const modeOf = (v: string | null | undefined): Mode =>
   isMode(v) ? v : "build";
+
+// 一次运行的结局；subagent 据此给子会话落终态。
+export interface RunOutcome {
+  aborted: boolean;
+  error: string | undefined;
+  // 本次运行里最后一条有文字的助手消息。
+  text: string;
+}
+
+// subagent 运行时挂进池的钩子（ADR-0060）；池本身不依赖它的实现。
+export interface SubagentHooks {
+  // 该会话可用的 spawn/wait/interrupt 工具。
+  tools(sessionId: string): ExtensionFactory;
+  runEnded(entry: SessionEntry, outcome: RunOutcome): void;
+  // 该会话被用户中断或删除：它运行中的子会话一并中断。
+  stopped(sessionId: string): void;
+  // 取走要告知该会话的提示（如“某子会话因重启被中断”）。
+  notices(sessionId: string): string[];
+}
+
+// 子会话创建时给池的父子信息。
+export interface ChildInit {
+  parentId: string;
+  depth: number;
+  task: string;
+  spec: SubagentSpec;
+  // 父的模式：父是 plan 则子也是 plan（只收窄）。
+  parentMode: Mode;
+}
 
 // 工厂按 agent 定义装配会话：工具白名单、提示词基线、模型与推理强度。
 export interface FactoryAgent {
@@ -165,7 +196,11 @@ export interface EntryOptions {
   // 恢复时发现悬挂的工具调用：下一次发送前先附加“上次被中断”的通知。
   interrupted?: boolean;
   // 每次运行结束后调用（持久化索引）；抛错不影响事件流。
-  onRunEnded?: (entry: SessionEntry) => void;
+  onRunEnded?: (entry: SessionEntry, outcome: RunOutcome) => void;
+  // 用户中断该会话时调用（先于 abort）。
+  onStop?: (entry: SessionEntry) => void;
+  // 发消息前取走待告知的系统提示，随这条消息的下一轮带给模型。
+  takeNotices?: (entry: SessionEntry) => string[];
   // 工具调用开始/结束时记审计。
   onAudit?: (
     entry: SessionEntry,
@@ -257,6 +292,7 @@ export class SessionEntry {
     if (!mapped) return;
     if (e.type === "tool_execution_start" || e.type === "tool_execution_end")
       this.opts.onAudit?.(this, toolAudit(e));
+    let outcome: RunOutcome | undefined;
     if (mapped.type === "run.started") {
       // 自动重试会反复 agent_start；一次运行只对外开始一次。
       if (this.running) return;
@@ -276,18 +312,32 @@ export class SessionEntry {
     } else if (mapped.type === "run.ended") {
       if (this.runError !== undefined)
         this.emit("run.failed", { message: this.runError });
+      outcome = {
+        aborted: (mapped.data as { aborted?: unknown }).aborted === true,
+        error: this.runError,
+        text: this.lastAssistantText(),
+      };
       this.runError = undefined;
       this.running = false;
     }
     this.emit(mapped.type, mapped.data);
-    if (mapped.type === "run.ended") {
+    if (outcome) {
       this.updatedAt = new Date().toISOString();
       try {
-        this.opts.onRunEnded?.(this);
+        this.opts.onRunEnded?.(this, outcome);
       } catch {
         // 索引写入失败不得影响事件流；下次启动对账会补齐。
       }
     }
+  }
+
+  // 窗口里最近一条有文字的助手消息（子会话的最终结果取自这里）。
+  private lastAssistantText(): string {
+    for (let i = this.recent.length - 1; i >= 0; i--) {
+      const m = this.recent[i];
+      if (m?.role === "assistant" && m.text.trim() !== "") return m.text;
+    }
+    return "";
   }
 
   get name(): string | null {
@@ -525,6 +575,7 @@ export class SessionEntry {
       throw new PoolError("bad_request", "当前模型不支持图片输入");
     const notice = this.interrupted;
     this.interrupted = false;
+    const notices = this.opts.takeNotices?.(this) ?? [];
     this.starting++;
     (async () => {
       await this.reloading?.catch(() => {});
@@ -537,6 +588,11 @@ export class SessionEntry {
           },
           { deliverAs: "nextTurn" },
         );
+      for (const n of notices)
+        await this.session.sendCustomMessage(
+          { customType: "yuanshu.subagent", content: n, display: false },
+          { deliverAs: "nextTurn" },
+        );
       await this.session.prompt(text, {
         streamingBehavior: "steer",
         ...(images.length
@@ -544,6 +600,21 @@ export class SessionEntry {
           : {}),
       });
     })()
+      .catch((err) => this.emit("run.failed", { message: reason(err) }))
+      .finally(() => {
+        this.starting--;
+      });
+  }
+
+  // 系统消息（子会话的结果等）：不是用户输入，不进可信证据；运行中排在当前步骤之后，空闲则唤醒本会话。
+  notify(text: string): void {
+    if (this.disposed) return;
+    this.starting++;
+    this.session
+      .sendCustomMessage(
+        { customType: "yuanshu.subagent", content: text, display: false },
+        { triggerTurn: true, deliverAs: "followUp" },
+      )
       .catch((err) => this.emit("run.failed", { message: reason(err) }))
       .finally(() => {
         this.starting--;
@@ -575,6 +646,11 @@ export class SessionEntry {
 
   async stop(): Promise<void> {
     if (this.disposed) throw new PoolError("disposed", "会话已关闭");
+    try {
+      this.opts.onStop?.(this);
+    } catch {
+      // 子会话的联动中断失败不得挡住本会话的停止。
+    }
     // 先撤销弹窗，让卡在审批/提问上的工具调用按拒绝收场，abort 才能结束运行。
     this.prompts.cancelAll();
     await this.session.abort();
@@ -622,6 +698,8 @@ export interface PoolDeps {
   skills?: SkillRuntime;
   // MCP 工具注入；缺省时会话不带 MCP 工具。
   mcp?: McpRuntime;
+  // 父子关系存储；缺省时没有 subagent（所有会话都是根）。
+  subagents?: SubagentStore;
 }
 
 const NAME_MAX = 200;
@@ -638,7 +716,14 @@ export class SessionPool {
   // sudo 探测缓存按环境共享给所有会话。
   private readonly sudoProbe = new SudoProbe();
 
+  private subagentHooks: SubagentHooks | null = null;
+
   constructor(private readonly deps: PoolDeps) {}
+
+  // subagent 运行时与池互相引用，所以事后挂接；挂接前创建的会话没有 subagent 工具。
+  attachSubagents(hooks: SubagentHooks): void {
+    this.subagentHooks = hooks;
+  }
 
   private localEnv = new LocalEnv();
 
@@ -671,15 +756,27 @@ export class SessionPool {
     };
   }
 
-  private workspaceViews(currentId: string): WorkspaceView[] {
-    return this.deps.workspaces.list().map((w) => this.viewOf(w, currentId));
+  // 会话可见、可切换的 workspace：子会话限于派发时定下的子集，其余是全部已登记的。
+  private visibleWorkspaces(sessionId: string): Workspace[] {
+    const all = this.deps.workspaces.list();
+    const spec = this.deps.subagents?.get(sessionId)?.spec;
+    return spec ? all.filter((w) => spec.workspaceIds.includes(w.id)) : all;
+  }
+
+  private workspaceViews(
+    sessionId: string,
+    currentId: string,
+  ): WorkspaceView[] {
+    return this.visibleWorkspaces(sessionId).map((w) =>
+      this.viewOf(w, currentId),
+    );
   }
 
   // 供 switch_workspace 工具调用，失败抛 Error（信息直接给模型看）。
   private switchWorkspace(sessionId: string, target: string): WorkspaceView {
     const entry = this.entries.get(sessionId);
     if (!entry) throw new Error("会话已关闭");
-    const all = this.deps.workspaces.list();
+    const all = this.visibleWorkspaces(sessionId);
     const byId = all.find((w) => w.id === target);
     const byName = all.filter((w) => w.name === target);
     if (!byId && byName.length > 1)
@@ -742,6 +839,8 @@ export class SessionPool {
     ws: Workspace,
     mode: Mode,
     mcpTools: McpToolDef[] = [],
+    // 子会话的派发约束；有它就是无人值守，档位与可切换的 workspace 都被收窄。
+    spec?: SubagentSpec,
   ): ExtensionFactory[] {
     const ask = (spec: PromptSpec) =>
       this.entries.get(id)?.ask(spec) ??
@@ -759,7 +858,8 @@ export class SessionPool {
     return [
       // 模式是上限，排在权限扩展之前。
       modeExtension(mode),
-      askUserExtension(ask),
+      // 子会话没有弹窗，也就没有可提问的人（ADR-0010）。
+      ...(spec ? [] : [askUserExtension(ask)]),
       routedToolsExtension(where, () => {
         const vars = this.deps.secrets?.variableValues() ?? [];
         return new Map(vars.map((v) => [v.name, v.value]));
@@ -779,8 +879,9 @@ export class SessionPool {
             ),
           ]
         : []),
+      ...(this.subagentHooks ? [this.subagentHooks.tools(id)] : []),
       workspaceExtension({
-        list: () => this.workspaceViews(current().id),
+        list: () => this.workspaceViews(id, current().id),
         switchTo: (target) => this.switchWorkspace(id, target),
         takeNotice: async () => {
           const entry = this.entries.get(id);
@@ -793,7 +894,15 @@ export class SessionPool {
       permissionExtension({
         where,
         // 每次工具调用即时读取：改档位/删规则立刻生效；workspace 被删时按最严的一档。
-        tier: () => workspaces.get(current().id)?.tier ?? "rules",
+        tier: () => {
+          const t = workspaces.get(current().id)?.tier ?? "rules";
+          // 子会话取 workspace 档位与派发上限中较严的一档，且永远不到 full。
+          return spec &&
+            (t === "full" || (t === "auto" && spec.tierCap === "rules"))
+            ? spec.tierCap
+            : t;
+        },
+        unattended: spec !== undefined,
         rules: () => {
           const all = rules.list(current().id);
           return {
@@ -807,15 +916,28 @@ export class SessionPool {
               .map((r) => r.value),
           };
         },
-        addRule: (r) => rules.add(current().id, r),
+        // 子会话不产生新的记住规则；无人值守时本来也走不到这里。
+        addRule: (r) => {
+          if (!spec) rules.add(current().id, r);
+        },
         ask,
-        audit: (rec) =>
+        audit: (rec) => {
+          if (spec && rec.detail.decision === "deny")
+            this.deps.subagents?.addDenial(
+              id,
+              `${String(rec.detail.tool)}：${String(rec.detail.reason ?? rec.detail.by)}`.slice(
+                0,
+                160,
+              ),
+              SUBAGENT_LIMITS.deniedReasons,
+            );
           this.deps.audit?.record({
             ...rec,
             kind: "permission",
             sessionId: id,
             environmentId: current().environmentId,
-          }),
+          });
+        },
         variables: () => this.deps.secrets?.listVariables() ?? [],
         sudo: {
           probe: (cwd, args) => this.sudoProbe.probe(where().env, cwd, args),
@@ -859,14 +981,25 @@ export class SessionPool {
 
   private entryOptions(): Pick<
     EntryOptions,
-    "onRunEnded" | "onCompacted" | "promptTimeoutMs" | "onAudit"
+    | "onRunEnded"
+    | "onCompacted"
+    | "promptTimeoutMs"
+    | "onAudit"
+    | "onStop"
+    | "takeNotices"
   > {
     const { audit, workspaces } = this.deps;
     return {
-      onRunEnded: (e) => {
-        this.persist(e);
-        if (e.rebasePending) void this.rebase(e.id).catch(() => {});
+      onRunEnded: (e, outcome) => {
+        try {
+          this.persist(e);
+          if (e.rebasePending) void this.rebase(e.id).catch(() => {});
+        } finally {
+          this.subagentHooks?.runEnded(e, outcome);
+        }
       },
+      onStop: (e) => this.subagentHooks?.stopped(e.id),
+      takeNotices: (e) => this.subagentHooks?.notices(e.id) ?? [],
       onCompacted: (e) => {
         if (!e.busy) void this.rebase(e.id).catch(() => {});
       },
@@ -933,6 +1066,7 @@ export class SessionPool {
     id: string,
     agent: Agent,
     initial: string,
+    spec?: SubagentSpec,
   ): FactoryAgent {
     return {
       // ask_user 是会话与用户的交互通道，不属于可勾选的能力；SDK 的白名单会把未列出的扩展工具一并关掉。
@@ -941,11 +1075,12 @@ export class SessionPool {
           ...agent.capabilities
             .filter((c) => c.kind === "tool")
             .map((c) => c.name),
-          "ask_user",
+          ...(spec?.inheritTools ?? []),
+          ...(spec ? [] : ["ask_user"]),
         ]),
       ],
       promptText: () => this.entries.get(id)?.promptText ?? initial,
-      modelId: agent.model,
+      modelId: spec?.modelId ?? agent.model,
       thinkingLevel: agent.defaultThinkingLevel,
     };
   }
@@ -1011,7 +1146,7 @@ export class SessionPool {
   }
 
   async create(
-    opts: { workspaceId?: string; agentId?: string } = {},
+    opts: { workspaceId?: string; agentId?: string; child?: ChildInit } = {},
   ): Promise<SessionInfo> {
     if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
     const factory = this.deps.factory;
@@ -1026,7 +1161,9 @@ export class SessionPool {
     const agent = this.agentOf(opts.agentId);
     if (!agent && opts.agentId !== undefined)
       throw new PoolError("bad_request", "agent 不存在");
-    const mode = modeOf(agent?.defaultMode);
+    // 父是 plan 则子也是 plan；否则取 agent 的默认模式。
+    const mode =
+      opts.child?.parentMode === "plan" ? "plan" : modeOf(agent?.defaultMode);
     const promptText = agent
       ? (await this.assemblePrompt(agent.promptBlocks, ws, mode)).text
       : null;
@@ -1042,9 +1179,16 @@ export class SessionPool {
         id,
         sessionDir: this.deps.sessionDir,
         cwd: ws.path,
-        extensions: this.extensions(id, ws, mode, mcpTools),
+        extensions: this.extensions(id, ws, mode, mcpTools, opts.child?.spec),
         ...(agent
-          ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
+          ? {
+              agent: this.factoryAgent(
+                id,
+                agent,
+                promptText ?? "",
+                opts.child?.spec,
+              ),
+            }
           : {}),
         ...(skills ? { skills } : {}),
       });
@@ -1062,6 +1206,8 @@ export class SessionPool {
       session.dispose();
       throw new PoolError("bad_request", "workspace 已被删除");
     }
+    // 父子关系在所有可能失败的步骤之后登记，失败时不留悬空行。
+    if (opts.child) this.deps.subagents?.create({ childId: id, ...opts.child });
     const entry = new SessionEntry(session, {
       id,
       workspaceId: ws.id,
@@ -1132,15 +1278,17 @@ export class SessionPool {
     let session: AgentSession;
     const skills = await this.prepareSkills(id, ws);
     const mcpTools = await this.prepareMcp(id, ws);
+    // 子会话恢复时按派发约束重建，保证只收窄不放宽跨重启成立。
+    const spec = this.deps.subagents?.get(id)?.spec;
     try {
       session = await factory({
         id,
         sessionDir,
         file,
         cwd: ws.path,
-        extensions: this.extensions(id, ws, mode, mcpTools),
+        extensions: this.extensions(id, ws, mode, mcpTools, spec),
         ...(agent
-          ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
+          ? { agent: this.factoryAgent(id, agent, promptText ?? "", spec) }
           : {}),
         ...(skills ? { skills } : {}),
       });
@@ -1307,6 +1455,8 @@ export class SessionPool {
         throw new PoolError("delete_failed", reason(err));
       }
     }
+    this.subagentHooks?.stopped(id);
+    this.deps.subagents?.removeSession(id);
     store.remove(id);
     if (entry) {
       this.entries.delete(id);
