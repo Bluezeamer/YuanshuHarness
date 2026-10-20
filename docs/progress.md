@@ -56,15 +56,17 @@ M2 pane 内容已合入（`task/pane-content`，--no-ff）：终端（xterm，�
 
 M2 未完成：划选提问、跨主机拖拽传输；协作拓扑 pane 仍是占位（等 M6）。
 
-M6 进行中：`.worktrees/subagent`（`task/subagent`）有 2 笔提交——subagent store/tools/runtime、topology API 与运行时接线；WebUI（会话详情页、拓扑图）未做，未合并，未评审。
+M6 已合入（e31e485，`task/subagent`）：subagent store/tools/runtime（`subagent/`）、`api/topology.ts`、会话详情页（`detail/SessionDetail.tsx`、`SubagentCard.tsx`）、拓扑图 pane（`layout/TopologyPane.tsx`），ADR-0060。合并没有改依赖。**尚未做 codex 评审**，M6 因此不勾选。
 
-合并后尚未跑 `scripts/check.sh` 全绿的记录（已在后台启动，结果见下次更新）。
+合并后 `scripts/check.sh` 全绿（退出码 0，含装包与镜像冒烟、aisdlc 校验）：server 80 个文件 1290 通过 / 1 跳过，web 36 个文件 336 通过。日志在 `tmp/check-after-m6-merge.log`。冲突已解：`store/db.ts` 迁移顺序、`layout/panes.test.tsx`（拓扑 pane 已有真实组件，删掉“待接入占位”用例）、`pages.tsx`。
+
+`.worktrees/subagent` 仍在，分支已合入，可清理。`task/private-vars`、`task/skills-mcp` 是 squash 合并，`git branch --merged` 查不到，属预期。
 
 ## 下一步
 
-1. 看 `scripts/check.sh` 结果；有红的先修，保持分支可用。
-2. M6：核对 `task/subagent` 两笔提交（权限边界：子会话继承的审批、interrupt 级联），补 WebUI（会话详情页、拓扑图 pane），合并；M6 结束时委派 codex 评审。
-3. M2 余项：划选提问、跨主机拖拽传输；`GET|PUT /api/v1/prompt/conventions` 的 UI；agent 级 skill/MCP 分配接线（`McpRuntime.agentMcp`、`skills/resolve.ts`）。
+1. M6 评审：委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/m6.md`；重点看子会话的审批继承与 interrupt 级联；采纳条修完后勾 M6。
+2. M2 余项：划选提问、跨主机拖拽传输；`GET|PUT /api/v1/prompt/conventions` 的 UI；agent 级 skill/MCP 分配接线（`McpRuntime.agentMcp`、`skills/resolve.ts`）。
+3. 清理 `.worktrees/subagent` 与已合入的 `task/*` 分支（先确认各 worktree 干净）。
 4. M7 设置页逐 tab 对齐 mock。
 5. 波次 3：M8、M9、M10、M11；M12 收口。M4、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
 6. 调研素材（pi 检索，`tmp/pi/`）：browser-embed（M8）、lsp-dap（M11）、rg-fd（M11）、hooks（M9）。
