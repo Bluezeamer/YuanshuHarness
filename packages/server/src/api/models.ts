@@ -3,10 +3,12 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { uuidv7 } from "../id.js";
 import {
   buildRuntime,
+  type Compat,
   MODEL_APIS,
   type ModelApi,
   type ModelEntry,
   type ModelStore,
+  type ThinkingLevelMap,
   toView,
 } from "../store/models.js";
 import type { SecretStore } from "../store/secrets.js";
@@ -22,14 +24,65 @@ const text = (v: unknown, max: number): string | null =>
     ? v.trim()
     : null;
 
+const COMPAT_BOOLS = [
+  "supportsDeveloperRole",
+  "supportsMidConvoSystemMessages",
+  "supportsMidConvoToolAdditions",
+  "supportsMidConvoToolChanges",
+  "supportsStrictMode",
+  "supportsOpenAIGrammarTools",
+] as const;
+const MAX_TOKENS_FIELDS = ["max_completion_tokens", "max_tokens"];
+const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+// 只收白名单内的 compat 键（pi 的完整 compat 远多于向导需要的）；空对象视为未设置。
+function parseCompat(v: unknown): Compat | null | string {
+  if (v === undefined || v === null) return null;
+  if (!isObject(v)) return "invalid_compat";
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (val === undefined || val === null) continue;
+    if ((COMPAT_BOOLS as readonly string[]).includes(k)) {
+      if (typeof val !== "boolean") return "invalid_compat";
+    } else if (k === "maxTokensField") {
+      if (!MAX_TOKENS_FIELDS.includes(val as string)) return "invalid_compat";
+    } else return "invalid_compat";
+    out[k] = val;
+  }
+  return Object.keys(out).length ? (out as Compat) : null;
+}
+
+// 值为字符串或 null（null 表示该档位不支持）；键必须是 pi 的推理档位。
+function parseLevelMap(v: unknown): ThinkingLevelMap | null | string {
+  if (v === undefined || v === null) return null;
+  if (!isObject(v)) return "invalid_thinking_level_map";
+  const out: ThinkingLevelMap = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (!LEVELS.includes(k) || (val !== null && typeof val !== "string"))
+      return "invalid_thinking_level_map";
+    out[k as keyof ThinkingLevelMap] = val;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+const positiveInt = (v: unknown): number | null | false =>
+  v === undefined || v === null
+    ? null
+    : typeof v === "number" && Number.isInteger(v) && v > 0
+      ? v
+      : false;
+
 interface Parsed {
   name: string;
   api: ModelApi;
   baseUrl: string;
   modelId: string;
   contextWindow: number | null;
+  maxTokens: number | null;
   reasoning: boolean;
-  image: boolean;
+  input: Array<"text" | "image">;
+  thinkingLevelMap: ThinkingLevelMap | null;
+  compat: Compat | null;
   apiKey: string | null;
 }
 
@@ -42,13 +95,24 @@ function parse(body: unknown): Parsed | string {
   if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) return "invalid_base_url";
   const modelId = text(body.modelId, 200);
   if (!modelId) return "invalid_model_id";
-  let contextWindow: number | null = null;
-  if (body.contextWindow !== undefined && body.contextWindow !== null) {
-    const n = body.contextWindow;
-    if (typeof n !== "number" || !Number.isInteger(n) || n <= 0)
-      return "invalid_context_window";
-    contextWindow = n;
+  const contextWindow = positiveInt(body.contextWindow);
+  if (contextWindow === false) return "invalid_context_window";
+  const maxTokens = positiveInt(body.maxTokens);
+  if (maxTokens === false) return "invalid_max_tokens";
+  // input 缺省为纯文本；text 必含。
+  let input: Array<"text" | "image"> = ["text"];
+  if (body.input !== undefined) {
+    if (
+      !Array.isArray(body.input) ||
+      body.input.some((x) => x !== "text" && x !== "image")
+    )
+      return "invalid_input";
+    input = body.input.includes("image") ? ["text", "image"] : ["text"];
   }
+  const compat = parseCompat(body.compat);
+  if (typeof compat === "string") return compat;
+  const thinkingLevelMap = parseLevelMap(body.thinkingLevelMap);
+  if (typeof thinkingLevelMap === "string") return thinkingLevelMap;
   const apiKey =
     typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : null;
   return {
@@ -57,8 +121,11 @@ function parse(body: unknown): Parsed | string {
     baseUrl,
     modelId,
     contextWindow,
+    maxTokens,
     reasoning: body.reasoning === true,
-    image: body.image === true,
+    input,
+    thinkingLevelMap,
+    compat,
     apiKey,
   };
 }
@@ -93,8 +160,11 @@ export async function modelsApi(
       baseUrl: p.baseUrl,
       modelId: p.modelId,
       contextWindow: p.contextWindow,
+      maxTokens: p.maxTokens,
       reasoning: p.reasoning,
-      image: p.image,
+      input: p.input,
+      thinkingLevelMap: p.thinkingLevelMap,
+      compat: p.compat,
       secretId,
       isDefault: false,
     };
@@ -135,8 +205,11 @@ export async function modelsApi(
       baseUrl: p.baseUrl,
       modelId: p.modelId,
       contextWindow: p.contextWindow,
+      maxTokens: p.maxTokens,
       reasoning: p.reasoning,
-      image: p.image,
+      input: p.input,
+      thinkingLevelMap: p.thinkingLevelMap,
+      compat: p.compat,
       secretId: null,
       isDefault: false,
     };

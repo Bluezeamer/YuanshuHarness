@@ -275,3 +275,31 @@ test("会话审核策略：保存、清除（空串）", async () => {
   fireEvent.click(screen.getByRole("button", { name: "清除策略" }));
   await waitFor(() => expect(patches()[1]?.body).toEqual({ reviewPolicy: "" }));
 });
+
+test("新建会话：选了 agent 定义时带上 agentId", async () => {
+  const inner = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: string, init?: RequestInit) =>
+    input === "/api/v1/agents"
+      ? new Response(
+          JSON.stringify({
+            agents: [
+              { id: "a1", name: "默认", defaultMode: "build" },
+              { id: "a2", name: "只读审阅", defaultMode: "plan" },
+            ],
+          }),
+          { status: 200 },
+        )
+      : inner(input, init),
+  );
+  await openNew();
+  fireEvent.click(await screen.findByRole("button", { name: /项目乙/ }));
+  const sel = await screen.findByLabelText("Agent 定义");
+  await waitFor(() => expect(createBtn()).toHaveProperty("disabled", false));
+  fireEvent.change(sel, { target: { value: "a2" } });
+  fireEvent.click(createBtn());
+  await waitFor(() => expect(posts("/api/v1/sessions")).toHaveLength(1));
+  expect(posts("/api/v1/sessions")[0]?.body).toEqual({
+    workspaceId: "w2",
+    agentId: "a2",
+  });
+});

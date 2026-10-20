@@ -11,12 +11,16 @@ import { routedToolsExtension } from "../env/tools.js";
 import type { ExecEnv } from "../env/types.js";
 import { uuidv7 } from "../id.js";
 import { permissionExtension } from "../permission/extension.js";
+import { isMode, type Mode, modeExtension } from "../permission/mode.js";
 import {
   type Evidence,
   POLICY_MAX,
   type ReviewerFactory,
   runReview,
 } from "../permission/review.js";
+import type { Assembled } from "../prompt/assemble.js";
+import type { PromptService } from "../prompt/service.js";
+import type { Agent, AgentStore } from "../store/agents.js";
 import type { AuditInput, AuditLog } from "../store/audit.js";
 import { type EnvironmentStore, LOCAL_ENV_ID } from "../store/environments.js";
 import {
@@ -60,6 +64,19 @@ import {
   workspaceExtension,
 } from "./workspace-tools.js";
 
+// 索引或 agent 里的模式值读作模式；迁移前或空值按 build。
+const modeOf = (v: string | null | undefined): Mode =>
+  isMode(v) ? v : "build";
+
+// 工厂按 agent 定义装配会话：工具白名单、提示词基线、模型与推理强度。
+export interface FactoryAgent {
+  tools: string[];
+  // 每次 reload 时重新取，所以基线更新后下一次 compaction 重建即可生效。
+  promptText: () => string;
+  modelId: string | null;
+  thinkingLevel: string | null;
+}
+
 export interface FactoryOptions {
   id: string;
   sessionDir: string;
@@ -69,6 +86,8 @@ export interface FactoryOptions {
   file?: string;
   // 池提供的扩展（ask_user、权限拦截），由工厂交给资源加载器的 extensionFactories。
   extensions: ExtensionFactory[];
+  // 缺省（测试里的假工厂）时不做 agent 装配。
+  agent?: FactoryAgent;
 }
 export type SessionFactory = (opts: FactoryOptions) => Promise<AgentSession>;
 
@@ -87,6 +106,8 @@ export interface SessionInfo {
   running: boolean;
   workspaceId: string;
   reviewPolicy: string | null;
+  agentId: string | null;
+  mode: Mode;
 }
 
 export interface ImageInput {
@@ -120,6 +141,10 @@ export interface EntryOptions {
   updatedAt?: string;
   workspaceId?: string;
   reviewPolicy?: string | null;
+  agentId?: string | null;
+  mode?: Mode;
+  // 提示词基线（会话创建或最近一次同步时拼好的文本）。
+  promptText?: string | null;
   // 恢复时用 JSONL 里最近的消息播种窗口。
   seed?: ChatMessage[];
   // 恢复时会话里已有的消息总数（含窗口之外的）；缺省等于 seed 的条数。
@@ -133,6 +158,8 @@ export interface EntryOptions {
     entry: SessionEntry,
     rec: Pick<AuditInput, "summary" | "detail">,
   ) => void;
+  // 压缩成功后调用：提示词基线在此挂点重建。
+  onCompacted?: (entry: SessionEntry) => void;
   // 弹窗超时（毫秒），缺省 30 分钟；测试用。
   promptTimeoutMs?: number;
 }
@@ -147,6 +174,13 @@ export class SessionEntry {
   // 切换 workspace 后待在下一轮末尾追加的通知。
   workspaceNotice: string | null = null;
   reviewPolicy: string | null;
+  readonly agentId: string | null;
+  // 创建时由 agent 的默认模式定下，会话内固定。
+  readonly mode: Mode;
+  promptText: string | null;
+  // 压缩后待重建基线（运行中不能 reload，等空闲）。
+  rebasePending = false;
+  private reloading: Promise<void> | null = null;
   updatedAt: string;
   running = false;
   // send 已接受但 SDK 尚未发出 agent_start 的窗口；删除必须把它当作运行中。
@@ -177,6 +211,9 @@ export class SessionEntry {
     this.updatedAt = opts.updatedAt ?? this.createdAt;
     this.workspaceId = opts.workspaceId ?? "";
     this.reviewPolicy = opts.reviewPolicy ?? null;
+    this.agentId = opts.agentId ?? null;
+    this.mode = opts.mode ?? "build";
+    this.promptText = opts.promptText ?? null;
     this.interrupted = opts.interrupted === true;
     this.prompts = new PromptTable(
       {
@@ -197,6 +234,10 @@ export class SessionEntry {
   }
 
   private onSdkEvent(e: AgentSessionEvent): void {
+    if (e.type === "compaction_end" && e.result && !e.aborted) {
+      this.rebasePending = true;
+      this.opts.onCompacted?.(this);
+    }
     const mapped = mapEvent(e);
     if (!mapped) return;
     if (e.type === "tool_execution_start" || e.type === "tool_execution_end")
@@ -252,7 +293,18 @@ export class SessionEntry {
       running: this.running,
       workspaceId: this.workspaceId,
       reviewPolicy: this.reviewPolicy,
+      agentId: this.agentId,
+      mode: this.mode,
     };
+  }
+
+  // 让 SDK 重新读取提示词基线（resourceLoader.reload）；发送会等它完成。
+  reloadPrompt(): Promise<void> {
+    const p = this.session.reload().finally(() => {
+      if (this.reloading === p) this.reloading = null;
+    });
+    this.reloading = p;
+    return p;
   }
 
   // 自动审核取证：用户消息与已解决弹窗问答可信；助手输出不可信。
@@ -460,6 +512,7 @@ export class SessionEntry {
     this.interrupted = false;
     this.starting++;
     (async () => {
+      await this.reloading?.catch(() => {});
       if (notice)
         await this.session.sendCustomMessage(
           {
@@ -538,6 +591,9 @@ export interface PoolDeps {
   promptTimeoutMs?: number;
   // 注入的审核会话工厂；缺省时 auto 档同 rules。
   reviewerFactory?: ReviewerFactory;
+  // agent 定义与提示词组装；缺省时不做 agent 装配（只用于没有 agent 的测试）。
+  agents?: AgentStore;
+  prompts?: PromptService;
   // 审核超时（毫秒），缺省 60 秒；测试用。
   reviewTimeoutMs?: number;
   // 环境服务与登记；缺省时所有 workspace 按本机处理（只用于没有远程环境的测试）。
@@ -627,7 +683,11 @@ export class SessionPool {
   }
 
   // 会话创建时会话条目还不存在，扩展按 id 惰性取。
-  private extensions(id: string, ws: Workspace): ExtensionFactory[] {
+  private extensions(
+    id: string,
+    ws: Workspace,
+    mode: Mode,
+  ): ExtensionFactory[] {
     const ask = (spec: PromptSpec) =>
       this.entries.get(id)?.ask(spec) ??
       Promise.resolve<PromptResult>({ outcome: "cancelled" });
@@ -642,6 +702,8 @@ export class SessionPool {
       return { env, cwd: w.path };
     };
     return [
+      // 模式是上限，排在权限扩展之前。
+      modeExtension(mode),
       askUserExtension(ask),
       routedToolsExtension(where),
       workspaceExtension({
@@ -718,11 +780,17 @@ export class SessionPool {
 
   private entryOptions(): Pick<
     EntryOptions,
-    "onRunEnded" | "promptTimeoutMs" | "onAudit"
+    "onRunEnded" | "onCompacted" | "promptTimeoutMs" | "onAudit"
   > {
     const { audit, workspaces } = this.deps;
     return {
-      onRunEnded: (e) => this.persist(e),
+      onRunEnded: (e) => {
+        this.persist(e);
+        if (e.rebasePending) void this.rebase(e.id).catch(() => {});
+      },
+      onCompacted: (e) => {
+        if (!e.busy) void this.rebase(e.id).catch(() => {});
+      },
       ...(audit
         ? {
             onAudit: (e, rec) =>
@@ -752,7 +820,99 @@ export class SessionPool {
       updatedAt: e.updatedAt,
       workspaceId: e.workspaceId,
       reviewPolicy: e.reviewPolicy,
+      agentId: e.agentId,
+      promptText: e.promptText,
+      mode: e.mode,
     });
+  }
+
+  private agentOf(agentId: string | null | undefined): Agent | undefined {
+    const { agents } = this.deps;
+    if (!agents) return undefined;
+    return agentId ? agents.get(agentId) : agents.default();
+  }
+
+  // 按 agent 的块引用与 workspace 拼提示词；供会话创建、同步与预览共用。
+  async assemblePrompt(
+    blockIds: string[],
+    ws: Workspace | undefined,
+    mode: Mode = "build",
+  ): Promise<Assembled> {
+    const prompts = this.deps.prompts;
+    if (!prompts) return { text: "", parts: [] };
+    const env = ws ? this.envOf(ws) : null;
+    return prompts.assemble(
+      blockIds,
+      ws && env
+        ? { env, cwd: ws.path, injectProject: ws.injectConventions }
+        : null,
+      mode,
+    );
+  }
+
+  private factoryAgent(
+    id: string,
+    agent: Agent,
+    initial: string,
+  ): FactoryAgent {
+    return {
+      // ask_user 是会话与用户的交互通道，不属于可勾选的能力；SDK 的白名单会把未列出的扩展工具一并关掉。
+      tools: [
+        ...new Set([
+          ...agent.capabilities
+            .filter((c) => c.kind === "tool")
+            .map((c) => c.name),
+          "ask_user",
+        ]),
+      ],
+      promptText: () => this.entries.get(id)?.promptText ?? initial,
+      modelId: agent.model,
+      thinkingLevel: agent.defaultThinkingLevel,
+    };
+  }
+
+  // 立即同步：按当前块内容重建提示词基线。运行中的会话不动（返回 busy），压缩后会自动重建。
+  async rebase(
+    id: string,
+  ): Promise<"synced" | "unchanged" | "busy" | "not_found"> {
+    const { store, workspaces } = this.deps;
+    const entry = this.entries.get(id);
+    const row = store.get(id);
+    if (!entry && !row) return "not_found";
+    if (entry?.busy) return "busy";
+    const agent =
+      this.agentOf(entry ? entry.agentId : row?.agentId) ?? this.agentOf(null);
+    if (!agent) return "unchanged";
+    const wsId = entry ? entry.workspaceId : row?.workspaceId;
+    const ws =
+      (wsId ? workspaces.get(wsId) : undefined) ?? workspaces.getDefault();
+    const mode = entry ? entry.mode : modeOf(row?.mode);
+    const { text } = await this.assemblePrompt(agent.promptBlocks, ws, mode);
+    // 拼装期间可能开始了新一轮运行。
+    if (entry?.busy) return "busy";
+    if (entry) entry.rebasePending = false;
+    if (text === (entry ? entry.promptText : row?.promptText))
+      return "unchanged";
+    if (entry) {
+      entry.promptText = text;
+      await entry.reloadPrompt();
+    }
+    if (store.get(id)) store.setPromptText(id, text);
+    return "synced";
+  }
+
+  // 全部同步：只处理空闲会话，返回各结果的计数。
+  async rebaseAll(): Promise<Record<"synced" | "unchanged" | "busy", number>> {
+    const out = { synced: 0, unchanged: 0, busy: 0 };
+    const ids = new Set([
+      ...this.entries.keys(),
+      ...this.deps.store.list().map((r) => r.id),
+    ]);
+    for (const id of ids) {
+      const r = await this.rebase(id).catch(() => "unchanged" as const);
+      if (r !== "not_found") out[r]++;
+    }
+    return out;
   }
 
   // 索引行的 workspace：空值读作默认（最早登记）的 workspace。
@@ -771,7 +931,9 @@ export class SessionPool {
     return null;
   }
 
-  async create(opts: { workspaceId?: string } = {}): Promise<SessionInfo> {
+  async create(
+    opts: { workspaceId?: string; agentId?: string } = {},
+  ): Promise<SessionInfo> {
     if (this.disposed) throw new PoolError("disposed", "会话池已关闭");
     const factory = this.deps.factory;
     if (!factory) throw new PoolError("load_failed", "没有会话后端");
@@ -782,6 +944,13 @@ export class SessionPool {
     if (!ws) throw new PoolError("bad_request", "workspace 不存在");
     const bad = this.workspaceProblem(ws);
     if (bad) throw new PoolError("bad_request", bad);
+    const agent = this.agentOf(opts.agentId);
+    if (!agent && opts.agentId !== undefined)
+      throw new PoolError("bad_request", "agent 不存在");
+    const mode = modeOf(agent?.defaultMode);
+    const promptText = agent
+      ? (await this.assemblePrompt(agent.promptBlocks, ws, mode)).text
+      : null;
     const id = uuidv7();
     const n = this.pending.get(ws.id) ?? 0;
     this.pending.set(ws.id, n + 1);
@@ -791,7 +960,10 @@ export class SessionPool {
         id,
         sessionDir: this.deps.sessionDir,
         cwd: ws.path,
-        extensions: this.extensions(id, ws),
+        extensions: this.extensions(id, ws, mode),
+        ...(agent
+          ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
+          : {}),
       });
     } finally {
       const n = this.pending.get(ws.id) ?? 0;
@@ -810,6 +982,9 @@ export class SessionPool {
     const entry = new SessionEntry(session, {
       id,
       workspaceId: ws.id,
+      agentId: agent?.id ?? null,
+      mode,
+      promptText,
       ...this.entryOptions(),
     });
     this.entries.set(id, entry);
@@ -862,6 +1037,14 @@ export class SessionPool {
     if (!ws) throw new PoolError("load_failed", "没有可用的 workspace");
     const bad = this.workspaceProblem(ws);
     if (bad) throw new PoolError("load_failed", bad);
+    // 迁移前的会话没有 agent 记录，读作默认 agent；提示词基线沿用创建时记下的版本，没有就现拼。
+    const agent = this.agentOf(row?.agentId) ?? this.agentOf(null);
+    const mode = modeOf(row?.mode);
+    const promptText =
+      row?.promptText ??
+      (agent
+        ? (await this.assemblePrompt(agent.promptBlocks, ws, mode)).text
+        : null);
     let session: AgentSession;
     try {
       session = await factory({
@@ -869,7 +1052,10 @@ export class SessionPool {
         sessionDir,
         file,
         cwd: ws.path,
-        extensions: this.extensions(id, ws),
+        extensions: this.extensions(id, ws, mode),
+        ...(agent
+          ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
+          : {}),
       });
     } catch (err) {
       throw new PoolError("load_failed", reason(err));
@@ -882,6 +1068,9 @@ export class SessionPool {
       id,
       workspaceId: ws.id,
       reviewPolicy: row?.reviewPolicy ?? null,
+      agentId: agent?.id ?? null,
+      mode,
+      promptText,
       createdAt: row?.createdAt ?? createdAt,
       updatedAt: row?.updatedAt,
       seed,
@@ -920,6 +1109,8 @@ export class SessionPool {
       running: false,
       workspaceId: this.rowWorkspaceId(r.workspaceId),
       reviewPolicy: r.reviewPolicy ?? null,
+      agentId: r.agentId ?? this.deps.agents?.default()?.id ?? null,
+      mode: modeOf(r.mode),
     };
   }
 
@@ -929,6 +1120,12 @@ export class SessionPool {
       if (e.workspaceId === id) return true;
     const created = this.pending.get(id) ?? 0;
     return created > 0 || this.deps.workspaces.sessionCount(id) > 0;
+  }
+
+  // 池内未持久化的会话（还没跑过）也算引用，否则删 agent 会让它们悬空。
+  agentInUse(id: string): boolean {
+    for (const e of this.entries.values()) if (e.agentId === id) return true;
+    return this.deps.store.countByAgent(id) > 0;
   }
 
   // 改名：已加载的走池内会话；未加载的只追加 JSONL 并更新索引，不进池。

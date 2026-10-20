@@ -249,7 +249,7 @@ export type CallResult<T> =
   | ({ ok: false } & CallFailure);
 
 // 带请求体或非 GET 的调用。204 视为成功且无数据。
-async function call<T>(
+export async function call<T>(
   method: string,
   path: string,
   token: string | null,
@@ -281,7 +281,7 @@ async function call<T>(
   }
 }
 
-const enc = encodeURIComponent;
+export const enc = encodeURIComponent;
 
 export const listWorkspaces = (token: string | null) =>
   get("/api/v1/workspaces", token, (b: { workspaces: WorkspaceInfo[] }) => {
@@ -335,7 +335,7 @@ export const deleteRule = (
 
 export const createSession = (
   token: string | null,
-  body: { workspaceId?: string },
+  body: { workspaceId?: string; agentId?: string },
 ) =>
   call("POST", "/api/v1/sessions", token, body, (b: { id: string }) => {
     if (typeof b.id !== "string") throw new Error("shape");
@@ -377,6 +377,26 @@ export type ModelApiKind =
   | "openai-responses"
   | "anthropic-messages";
 
+export type ThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
+export type ThinkingLevelMap = Partial<Record<ThinkingLevel, string | null>>;
+
+export interface ModelCompat {
+  supportsDeveloperRole?: boolean;
+  maxTokensField?: "max_completion_tokens" | "max_tokens";
+  supportsMidConvoSystemMessages?: boolean;
+  supportsMidConvoToolAdditions?: boolean;
+  supportsMidConvoToolChanges?: boolean;
+  supportsStrictMode?: boolean;
+  supportsOpenAIGrammarTools?: boolean;
+}
+
 export interface ModelInfo {
   id: string;
   name: string;
@@ -384,8 +404,11 @@ export interface ModelInfo {
   baseUrl: string;
   modelId: string;
   contextWindow: number | null;
+  maxTokens: number | null;
   reasoning: boolean;
-  image: boolean;
+  input: Array<"text" | "image">;
+  thinkingLevelMap: ThinkingLevelMap | null;
+  compat: ModelCompat | null;
   hasKey: boolean;
   isDefault: boolean;
 }
@@ -396,8 +419,11 @@ export interface ModelInput {
   baseUrl: string;
   modelId: string;
   contextWindow?: number;
+  maxTokens?: number;
   reasoning: boolean;
-  image: boolean;
+  input: Array<"text" | "image">;
+  thinkingLevelMap?: ThinkingLevelMap;
+  compat?: ModelCompat;
   apiKey?: string;
 }
 

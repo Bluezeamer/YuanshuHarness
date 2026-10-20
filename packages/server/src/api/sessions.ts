@@ -86,18 +86,27 @@ export async function sessionsApi(
     if (!pool?.canCreate) {
       return reply.code(501).send({ error: "no_session_backend" });
     }
-    const body = req.body as { workspaceId?: unknown } | null | undefined;
+    const body = req.body as
+      | { workspaceId?: unknown; agentId?: unknown }
+      | null
+      | undefined;
     const workspaceId = body?.workspaceId;
+    const agentId = body?.agentId;
     if (workspaceId !== undefined && typeof workspaceId !== "string")
       return reply.code(400).send({ error: "bad_request" });
+    if (agentId !== undefined && typeof agentId !== "string")
+      return reply.code(400).send({ error: "bad_request" });
     try {
-      const info = await pool.create(
-        workspaceId === undefined ? {} : { workspaceId },
-      );
+      const info = await pool.create({
+        ...(workspaceId === undefined ? {} : { workspaceId }),
+        ...(agentId === undefined ? {} : { agentId }),
+      });
       return reply.code(201).send({
         id: info.id,
         createdAt: info.createdAt,
         workspaceId: info.workspaceId,
+        agentId: info.agentId,
+        mode: info.mode,
       });
     } catch (err) {
       if (err instanceof PoolError && err.code === "bad_request")

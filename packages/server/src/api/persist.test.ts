@@ -363,8 +363,10 @@ describe("R13-R17 REST", () => {
       running: false,
     });
     expect(Object.keys(list.sessions[0] ?? {}).sort()).toEqual([
+      "agentId",
       "createdAt",
       "id",
+      "mode",
       "name",
       "reviewPolicy",
       "running",

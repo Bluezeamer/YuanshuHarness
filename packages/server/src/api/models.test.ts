@@ -4,11 +4,15 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createServer, type YuanshuServer } from "../server.js";
+import { buildRuntime } from "../store/models.js";
+import type { SecretStore } from "../store/secrets.js";
 
 const TOKEN = "t".repeat(40);
 let base: string;
@@ -110,5 +114,109 @@ describe("模型登记", () => {
     expect(out.ok).toBe(false);
     expect(typeof out.error).toBe("string");
     expect(readdirSync(path.join(dataDir, "models"))).toEqual([]);
+  });
+});
+
+// 与真实 pi models.json 同形状的 provider（值全是假的）：向导登记后生成的配置应与之等价。
+const PI_SHAPE = {
+  providers: {
+    fake: {
+      baseUrl: "http://127.0.0.1:1/v1",
+      api: "openai-completions",
+      apiKey: "sk-fake",
+      compat: { supportsDeveloperRole: false, maxTokensField: "max_tokens" },
+      models: [
+        {
+          id: "m-fake",
+          name: "Fake",
+          reasoning: true,
+          thinkingLevelMap: {
+            minimal: null,
+            low: "low",
+            medium: null,
+            high: "xhigh",
+            xhigh: null,
+            max: null,
+          },
+          input: ["text", "image"],
+          contextWindow: 210000,
+          maxTokens: 131072,
+        },
+      ],
+    },
+  },
+};
+
+describe("模型向导的 compat / thinkingLevelMap", () => {
+  test("按 pi models.json 的形状登记，解析出的模型与手写配置等价", async () => {
+    const { json, dataDir } = await launch();
+    const p = PI_SHAPE.providers.fake;
+    const m = p.models[0] as (typeof p.models)[0];
+    const created = await json("POST", "", {
+      name: "Fake",
+      api: p.api,
+      baseUrl: p.baseUrl,
+      modelId: m.id,
+      apiKey: p.apiKey,
+      compat: p.compat,
+      reasoning: m.reasoning,
+      thinkingLevelMap: m.thinkingLevelMap,
+      input: m.input,
+      contextWindow: m.contextWindow,
+      maxTokens: m.maxTokens,
+    });
+    expect(created).toMatchObject({
+      compat: p.compat,
+      thinkingLevelMap: m.thinkingLevelMap,
+      input: ["text", "image"],
+      maxTokens: 131072,
+    });
+
+    // 手写：直接把 PI_SHAPE 当 models.json 让 SDK 解析
+    const handDir = path.join(base, "hand");
+    mkdirSync(handDir);
+    const handFile = path.join(handDir, "models.json");
+    writeFileSync(handFile, JSON.stringify(PI_SHAPE));
+    const hand = (
+      await ModelRuntime.create({
+        authPath: path.join(handDir, "auth.json"),
+        modelsPath: handFile,
+      })
+    ).getModel("fake", "m-fake");
+
+    const stored = JSON.parse(
+      readFileSync(path.join(dataDir, "models", `${created.id}.json`), "utf8"),
+    );
+    const { runtime, model } = await buildRuntime(
+      path.join(base, "agent"),
+      stored,
+      { reveal: () => null } as unknown as SecretStore,
+      "sk-fake",
+    );
+    expect(runtime).toBeDefined();
+    const pick = (x: NonNullable<typeof hand>) => ({
+      reasoning: x.reasoning,
+      input: x.input,
+      thinkingLevelMap: x.thinkingLevelMap,
+      contextWindow: x.contextWindow,
+      maxTokens: x.maxTokens,
+      compat: x.compat,
+      api: x.api,
+    });
+    expect(pick(model)).toEqual(pick(hand as NonNullable<typeof hand>));
+  });
+
+  test("非法 compat / thinkingLevelMap / input 返回 400", async () => {
+    const { call } = await launch();
+    for (const bad of [
+      { compat: { nope: true } },
+      { compat: { supportsDeveloperRole: "yes" } },
+      { compat: { maxTokensField: "x" } },
+      { thinkingLevelMap: { turbo: "x" } },
+      { thinkingLevelMap: { low: 3 } },
+      { input: ["audio"] },
+      { maxTokens: -1 },
+    ])
+      expect((await call("POST", "", body(bad))).status).toBe(400);
   });
 });

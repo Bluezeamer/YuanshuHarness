@@ -83,7 +83,12 @@ export async function workspacesApi(
     "/api/v1/workspaces/:id",
     async (req, reply) => {
       const body = isObject(req.body) ? req.body : {};
-      if (body.name === undefined && body.tier === undefined) return bad(reply);
+      if (
+        body.name === undefined &&
+        body.tier === undefined &&
+        body.injectConventions === undefined
+      )
+        return bad(reply);
       let name: string | undefined;
       if (body.name !== undefined) {
         const n = cleanName(body.name);
@@ -92,9 +97,17 @@ export async function workspacesApi(
       }
       if (body.tier !== undefined && !isTier(body.tier))
         return bad(reply, "invalid_tier");
+      if (
+        body.injectConventions !== undefined &&
+        typeof body.injectConventions !== "boolean"
+      )
+        return bad(reply, "invalid_inject_conventions");
       const ws = workspaces.update(req.params.id, {
         ...(name === undefined ? {} : { name }),
         ...(isTier(body.tier) ? { tier: body.tier } : {}),
+        ...(typeof body.injectConventions === "boolean"
+          ? { injectConventions: body.injectConventions }
+          : {}),
       });
       if (!ws) return reply.code(404).send({ error: "not_found" });
       return ws;

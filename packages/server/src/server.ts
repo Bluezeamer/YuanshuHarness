@@ -10,11 +10,13 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { agentsApi } from "./api/agents.js";
 import { auditApi } from "./api/audit.js";
 import { environmentsApi } from "./api/environments.js";
 import { filesApi } from "./api/files.js";
 import { fsApi } from "./api/fs.js";
 import { modelsApi } from "./api/models.js";
+import { promptApi } from "./api/prompt.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { terminalsApi } from "./api/terminals.js";
 import { workbenchApi } from "./api/workbench.js";
@@ -24,8 +26,13 @@ import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { EnvHub } from "./env/hub.js";
 import type { ReviewerFactory } from "./permission/review.js";
+import { GlobalConventions } from "./prompt/conventions.js";
+import { SEED_AGENTS, SEED_BLOCKS } from "./prompt/seeds.js";
+import { PromptService } from "./prompt/service.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
+import { AgentStore } from "./store/agents.js";
 import { AuditLog } from "./store/audit.js";
+import { BlockStore } from "./store/blocks.js";
 import { type Db, openDatabase } from "./store/db.js";
 import { EnvironmentStore } from "./store/environments.js";
 import { ModelStore } from "./store/models.js";
@@ -229,8 +236,15 @@ export function createServer(
         const hub = new EnvHub(environments, secrets);
         envHub = hub;
         const audit = new AuditLog(db as Db);
+        const blocks = new BlockStore(db as Db);
+        const agents = new AgentStore(db as Db);
+        blocks.seed(SEED_BLOCKS);
+        agents.seed(SEED_AGENTS);
+        const conventions = new GlobalConventions(config.dataDir);
         const pool = new SessionPool({
           audit,
+          agents,
+          prompts: new PromptService(blocks, conventions),
           envHub: hub,
           environments,
           factory:
@@ -272,6 +286,14 @@ export function createServer(
             ...options.tuning,
           });
           scope.register(modelsApi, { models, secrets, agentDir });
+          scope.register(agentsApi, { agents, pool });
+          scope.register(promptApi, {
+            blocks,
+            conventions,
+            agents,
+            workspaces,
+            pool,
+          });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });

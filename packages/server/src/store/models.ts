@@ -17,6 +17,23 @@ export const MODEL_APIS = [
 ] as const;
 export type ModelApi = (typeof MODEL_APIS)[number];
 
+export type ThinkingLevelMap = Partial<
+  Record<
+    "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
+    string | null
+  >
+>;
+
+export interface Compat {
+  supportsDeveloperRole?: boolean;
+  maxTokensField?: "max_completion_tokens" | "max_tokens";
+  supportsMidConvoSystemMessages?: boolean;
+  supportsMidConvoToolAdditions?: boolean;
+  supportsMidConvoToolChanges?: boolean;
+  supportsStrictMode?: boolean;
+  supportsOpenAIGrammarTools?: boolean;
+}
+
 export interface ModelEntry {
   id: string; // 供应商登记 id，同时作为 pi 的 provider id
   name: string;
@@ -24,8 +41,11 @@ export interface ModelEntry {
   baseUrl: string;
   modelId: string;
   contextWindow: number | null;
+  maxTokens: number | null;
   reasoning: boolean;
-  image: boolean;
+  input: Array<"text" | "image">;
+  thinkingLevelMap: ThinkingLevelMap | null;
+  compat: Compat | null;
   secretId: string | null; // API key 在密码库的 id；本地无鉴权的服务可为空
   isDefault: boolean;
 }
@@ -122,14 +142,19 @@ export async function buildRuntime(
           api: entry.api,
           // 无密钥的本地服务给占位值，否则 SDK 认为未配置鉴权。
           ...(entry.secretId || keyOverride ? {} : { apiKey: "none" }),
+          ...(entry.compat ? { compat: entry.compat } : {}),
           models: [
             {
               id: entry.modelId,
               reasoning: entry.reasoning,
-              input: entry.image ? ["text", "image"] : ["text"],
+              input: entry.input,
+              ...(entry.thinkingLevelMap
+                ? { thinkingLevelMap: entry.thinkingLevelMap }
+                : {}),
               ...(entry.contextWindow
                 ? { contextWindow: entry.contextWindow }
                 : {}),
+              ...(entry.maxTokens ? { maxTokens: entry.maxTokens } : {}),
             },
           ],
         },

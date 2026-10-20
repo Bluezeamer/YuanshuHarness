@@ -17,6 +17,8 @@ export interface Workspace {
   path: string;
   environmentId: string;
   tier: Tier;
+  // 会话创建时是否把 workspace 里的 AGENTS.md 注入提示词（项目约定）。
+  injectConventions: boolean;
   createdAt: string;
 }
 
@@ -26,6 +28,7 @@ type Row = {
   path: string;
   environment_id: string;
   tier: string;
+  inject_conventions: number;
   created_at: string;
 };
 const toWorkspace = (r: Row): Workspace => ({
@@ -34,6 +37,7 @@ const toWorkspace = (r: Row): Workspace => ({
   path: r.path,
   environmentId: r.environment_id,
   tier: r.tier as Tier,
+  injectConventions: r.inject_conventions !== 0,
   createdAt: r.created_at,
 });
 
@@ -107,6 +111,7 @@ export class WorkspaceStore {
       path: p,
       environmentId,
       tier: "rules",
+      injectConventions: true,
       createdAt: now.toISOString(),
     };
     this.db
@@ -143,13 +148,20 @@ export class WorkspaceStore {
 
   update(
     id: string,
-    patch: { name?: string; tier?: Tier },
+    patch: { name?: string; tier?: Tier; injectConventions?: boolean },
   ): Workspace | undefined {
     const cur = this.get(id);
     if (!cur) return undefined;
     this.db
-      .prepare("UPDATE workspaces SET name = ?, tier = ? WHERE id = ?")
-      .run(patch.name ?? cur.name, patch.tier ?? cur.tier, id);
+      .prepare(
+        "UPDATE workspaces SET name = ?, tier = ?, inject_conventions = ? WHERE id = ?",
+      )
+      .run(
+        patch.name ?? cur.name,
+        patch.tier ?? cur.tier,
+        (patch.injectConventions ?? cur.injectConventions) ? 1 : 0,
+        id,
+      );
     return this.get(id);
   }
 

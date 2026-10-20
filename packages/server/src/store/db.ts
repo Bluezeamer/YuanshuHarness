@@ -115,6 +115,36 @@ export const MIGRATIONS: Migration[] = [
        CREATE INDEX audit_log_session ON audit_log(session_id, id);
        CREATE INDEX audit_log_kind ON audit_log(kind, id)`,
     ),
+  // 提示词块（ADR-0009）；workspace 是否注入项目 AGENTS.md；会话创建时拼好的提示词快照。
+  (db) =>
+    db.exec(
+      `CREATE TABLE prompt_blocks (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL,
+         grp TEXT NOT NULL,
+         dimension TEXT,
+         content TEXT NOT NULL,
+         version INTEGER NOT NULL DEFAULT 1,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       );
+       CREATE TABLE agents (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL,
+         description TEXT NOT NULL,
+         prompt_blocks TEXT NOT NULL,
+         capabilities TEXT NOT NULL,
+         model TEXT,
+         thinking_level TEXT,
+         default_mode TEXT,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       );
+       ALTER TABLE workspaces ADD COLUMN inject_conventions INTEGER NOT NULL DEFAULT 1;
+       ALTER TABLE sessions ADD COLUMN prompt_text TEXT;
+       ALTER TABLE sessions ADD COLUMN agent_id TEXT;
+       ALTER TABLE sessions ADD COLUMN mode TEXT`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

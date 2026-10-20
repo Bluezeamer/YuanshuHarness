@@ -8,8 +8,9 @@ import {
   type Tier,
   type WorkspaceInfo,
 } from "../api";
+import { type AgentInfo, listAgents } from "../capabilities/agentsApi";
 import { type DirChoice, DirPicker } from "./DirPicker";
-import { actionBtn, describe, FULL_RISK, TIERS } from "./shared";
+import { actionBtn, describe, FULL_RISK, field, TIERS } from "./shared";
 
 const tierLabel = (t: Tier) => TIERS.find((x) => x.id === t)?.label ?? t;
 
@@ -29,6 +30,9 @@ export function NewSession({
   const [picked, setPicked] = useState<DirChoice | null>(null);
   const [jump, setJump] = useState<{ path: string } | undefined>();
   const [tier, setTier] = useState<Tier>("rules");
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  // 空串：不指定，用 Server 的默认 agent。
+  const [agentId, setAgentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -44,6 +48,16 @@ export function NewSession({
       live = false;
     };
   }, [onUnauthorized]);
+
+  useEffect(() => {
+    let live = true;
+    void listAgents(loadToken()).then((r) => {
+      if (live && r.ok) setAgents(r.data);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     box.current?.focus();
@@ -109,7 +123,10 @@ export function NewSession({
       }
       remember(r.data);
     }
-    const r = await createSession(token, { workspaceId: ws.id });
+    const r = await createSession(token, {
+      workspaceId: ws.id,
+      ...(agentId ? { agentId } : {}),
+    });
     setBusy(false);
     if (r.ok) {
       onCreated(r.data.id);
@@ -167,6 +184,27 @@ export function NewSession({
           onChange={onPick}
           onUnauthorized={onUnauthorized}
         />
+        {agents.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="ns-agent" className="text-xs font-semibold">
+              Agent 定义
+            </label>
+            <select
+              id="ns-agent"
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className={field}
+            >
+              <option value="">默认</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.defaultMode === "plan" ? "（plan）" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {picked && existing && (
           <p className="m-0 text-sm">
             该目录已登记，沿用档位：

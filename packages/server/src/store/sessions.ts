@@ -17,6 +17,11 @@ export interface IndexRow {
   // 空表示迁移前或对账补建的会话，读作默认 workspace。
   workspaceId?: string | null;
   reviewPolicy?: string | null;
+  // 会话生命周期内固定；空表示迁移前的会话，读作默认 agent。
+  agentId?: string | null;
+  // 会话创建（或最近一次同步）时拼好的提示词基线。
+  promptText?: string | null;
+  mode?: string | null;
 }
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -86,6 +91,9 @@ type Row = {
   updated_at: string;
   workspace_id: string | null;
   review_policy: string | null;
+  agent_id: string | null;
+  prompt_text: string | null;
+  mode: string | null;
 };
 const toRow = (r: Row): IndexRow => ({
   id: r.id,
@@ -94,6 +102,9 @@ const toRow = (r: Row): IndexRow => ({
   updatedAt: r.updated_at,
   workspaceId: r.workspace_id,
   reviewPolicy: r.review_policy,
+  agentId: r.agent_id,
+  promptText: r.prompt_text,
+  mode: r.mode,
 });
 
 export class SessionStore {
@@ -102,7 +113,7 @@ export class SessionStore {
   upsert(row: IndexRow): void {
     this.db
       .prepare(
-        `INSERT INTO sessions (id, name, created_at, updated_at, workspace_id, review_policy) VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO sessions (id, name, created_at, updated_at, workspace_id, review_policy, agent_id, prompt_text, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
       )
       .run(
@@ -112,7 +123,23 @@ export class SessionStore {
         row.updatedAt,
         row.workspaceId ?? null,
         row.reviewPolicy ?? null,
+        row.agentId ?? null,
+        row.promptText ?? null,
+        row.mode ?? null,
       );
+  }
+
+  setPromptText(id: string, text: string): void {
+    this.db
+      .prepare("UPDATE sessions SET prompt_text = ? WHERE id = ?")
+      .run(text, id);
+  }
+
+  countByAgent(agentId: string): number {
+    const r = this.db
+      .prepare("SELECT COUNT(*) AS n FROM sessions WHERE agent_id = ?")
+      .get(agentId) as { n: number };
+    return r.n;
   }
 
   touch(id: string, updatedAt: string): void {

@@ -100,8 +100,10 @@ describe("R6/R8/R15 索引与列表", () => {
     expect(ids).toContain(empty);
     for (const x of t.pool.list())
       expect(Object.keys(x).sort()).toEqual([
+        "agentId",
         "createdAt",
         "id",
+        "mode",
         "name",
         "reviewPolicy",
         "running",

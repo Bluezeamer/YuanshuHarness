@@ -6,9 +6,12 @@ import {
   listModels,
   loadToken,
   type ModelApiKind,
+  type ModelCompat,
   type ModelInfo,
   type ModelInput,
   setDefaultModel,
+  type ThinkingLevel,
+  type ThinkingLevelMap,
   testModel,
 } from "../api";
 import { actionBtn, dangerBtn, describe, field } from "./shared";
@@ -19,16 +22,64 @@ const APIS: { id: ModelApiKind; label: string }[] = [
   { id: "anthropic-messages", label: "Anthropic Messages" },
 ];
 
+const LEVELS: ThinkingLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
+
+// 三态：不设置（用 pi 默认）/ 是 / 否。
+const TRI_COMPAT: { key: keyof ModelCompat & string; label: string }[] = [
+  { key: "supportsDeveloperRole", label: "支持 developer 角色" },
+  { key: "supportsMidConvoSystemMessages", label: "支持中途 system 消息" },
+  { key: "supportsMidConvoToolAdditions", label: "支持中途追加工具" },
+  { key: "supportsStrictMode", label: "支持 strict 工具模式" },
+];
+
+type Tri = "" | "true" | "false";
+type LevelCell = { mode: "default" | "unsupported" | "map"; value: string };
+
 const EMPTY = {
   name: "",
   api: "openai-completions" as ModelApiKind,
   baseUrl: "",
   modelId: "",
   contextWindow: "",
+  maxTokens: "",
   apiKey: "",
   reasoning: false,
   image: false,
+  maxTokensField: "" as "" | "max_completion_tokens" | "max_tokens",
+  tri: {} as Record<string, Tri>,
+  levels: {} as Partial<Record<ThinkingLevel, LevelCell>>,
 };
+
+const positive = (v: string) => {
+  const n = Number(v);
+  return v && Number.isInteger(n) && n > 0 ? n : undefined;
+};
+
+function buildCompat(f: typeof EMPTY): ModelCompat | undefined {
+  const out: Record<string, unknown> = {};
+  for (const { key } of TRI_COMPAT)
+    if (f.tri[key]) out[key] = f.tri[key] === "true";
+  if (f.maxTokensField) out.maxTokensField = f.maxTokensField;
+  return Object.keys(out).length ? (out as ModelCompat) : undefined;
+}
+
+function buildLevelMap(f: typeof EMPTY): ThinkingLevelMap | undefined {
+  const out: ThinkingLevelMap = {};
+  for (const lv of LEVELS) {
+    const c = f.levels[lv];
+    if (c?.mode === "unsupported") out[lv] = null;
+    else if (c?.mode === "map" && c.value.trim()) out[lv] = c.value.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 function AddForm({
   onAdded,
@@ -42,19 +93,25 @@ function AddForm({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
     setF((cur) => ({ ...cur, [k]: v }));
-  const ctx = Number(f.contextWindow);
-  const input = (): ModelInput => ({
-    name: f.name.trim(),
-    api: f.api,
-    baseUrl: f.baseUrl.trim(),
-    modelId: f.modelId.trim(),
-    ...(f.contextWindow && Number.isInteger(ctx) && ctx > 0
-      ? { contextWindow: ctx }
-      : {}),
-    reasoning: f.reasoning,
-    image: f.image,
-    ...(f.apiKey ? { apiKey: f.apiKey } : {}),
-  });
+  const input = (): ModelInput => {
+    const contextWindow = positive(f.contextWindow);
+    const maxTokens = positive(f.maxTokens);
+    const compat = buildCompat(f);
+    const thinkingLevelMap = buildLevelMap(f);
+    return {
+      name: f.name.trim(),
+      api: f.api,
+      baseUrl: f.baseUrl.trim(),
+      modelId: f.modelId.trim(),
+      ...(contextWindow ? { contextWindow } : {}),
+      ...(maxTokens ? { maxTokens } : {}),
+      reasoning: f.reasoning,
+      input: f.image ? ["text", "image"] : ["text"],
+      ...(compat ? { compat } : {}),
+      ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+      ...(f.apiKey ? { apiKey: f.apiKey } : {}),
+    };
+  };
   const valid = f.name.trim() && f.baseUrl.trim() && f.modelId.trim();
   const bad = {
     bad_request: "请检查名称、地址（须以 http(s):// 开头）与上下文窗口",
@@ -175,6 +232,92 @@ function AddForm({
           支持图片输入
         </label>
       </div>
+      <details className="border border-line px-3 py-2">
+        <summary className="cursor-pointer text-sm font-semibold">
+          高级：兼容性与推理档位映射
+        </summary>
+        <div className="mt-3 flex flex-col gap-3">
+          <Field label="最大输出 token（可选）" id="m-maxtok">
+            <input
+              id="m-maxtok"
+              inputMode="numeric"
+              value={f.maxTokens}
+              onChange={(e) => set("maxTokens", e.target.value)}
+              className={field}
+            />
+          </Field>
+          <Field label="最大输出字段名" id="m-maxfield">
+            <select
+              id="m-maxfield"
+              value={f.maxTokensField}
+              onChange={(e) =>
+                set("maxTokensField", e.target.value as typeof f.maxTokensField)
+              }
+              className={field}
+            >
+              <option value="">默认</option>
+              <option value="max_completion_tokens">
+                max_completion_tokens
+              </option>
+              <option value="max_tokens">max_tokens</option>
+            </select>
+          </Field>
+          {TRI_COMPAT.map((c) => (
+            <Field key={c.key} label={c.label} id={`m-${c.key}`}>
+              <select
+                id={`m-${c.key}`}
+                value={f.tri[c.key] ?? ""}
+                onChange={(e) =>
+                  set("tri", { ...f.tri, [c.key]: e.target.value as Tri })
+                }
+                className={field}
+              >
+                <option value="">默认</option>
+                <option value="true">是</option>
+                <option value="false">否</option>
+              </select>
+            </Field>
+          ))}
+          <fieldset className="m-0 flex flex-col gap-2 border border-line p-3">
+            <legend className="px-1 text-xs font-semibold">
+              推理档位映射（pi 档位 → 服务端取值）
+            </legend>
+            {LEVELS.map((lv) => {
+              const cell = f.levels[lv] ?? { mode: "default", value: "" };
+              const upd = (c: LevelCell) =>
+                set("levels", { ...f.levels, [lv]: c });
+              return (
+                <div key={lv} className="flex items-center gap-2 text-sm">
+                  <span className="w-16 font-mono text-xs">{lv}</span>
+                  <select
+                    aria-label={`${lv} 映射方式`}
+                    value={cell.mode}
+                    onChange={(e) =>
+                      upd({
+                        ...cell,
+                        mode: e.target.value as LevelCell["mode"],
+                      })
+                    }
+                    className={field}
+                  >
+                    <option value="default">默认</option>
+                    <option value="unsupported">不支持</option>
+                    <option value="map">映射为</option>
+                  </select>
+                  {cell.mode === "map" && (
+                    <input
+                      aria-label={`${lv} 映射值`}
+                      value={cell.value}
+                      onChange={(e) => upd({ ...cell, value: e.target.value })}
+                      className={`${field} w-32`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </fieldset>
+        </div>
+      </details>
       {msg && (
         <p
           role={msg.ok ? "status" : "alert"}

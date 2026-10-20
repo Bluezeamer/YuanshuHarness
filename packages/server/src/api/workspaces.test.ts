@@ -119,7 +119,7 @@ describe("R1 迁移 v3", () => {
     const file = path.join(a.dataDir, DB_FILE);
     const db = new Database(file);
     db.exec(
-      "DROP TABLE audit_log; DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id",
+      "DROP TABLE audit_log; DROP TABLE prompt_blocks; DROP TABLE agents; DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id; ALTER TABLE sessions DROP COLUMN prompt_text; ALTER TABLE sessions DROP COLUMN agent_id; ALTER TABLE sessions DROP COLUMN mode",
     );
     db.pragma("user_version = 2");
     db.close();
@@ -154,6 +154,7 @@ describe("R2 默认 workspace", () => {
       "createdAt",
       "environmentId",
       "id",
+      "injectConventions",
       "name",
       "path",
       "tier",
