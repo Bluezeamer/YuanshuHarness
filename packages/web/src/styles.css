@@ -145,6 +145,156 @@ textarea:focus-visible {
   animation: blink 1.1s steps(2) infinite;
 }
 
+/* 文件预览：只读代码，带行号（对齐 mock 的 .code-ol） */
+.code-ol {
+  margin: 0;
+  padding: 10px 0;
+  list-style: none;
+  counter-reset: ln;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.code-ol li {
+  counter-increment: ln;
+  position: relative;
+  padding: 0 12px 0 44px;
+  white-space: pre;
+}
+
+.code-ol li::before {
+  content: counter(ln);
+  position: absolute;
+  left: 0;
+  width: 30px;
+  text-align: right;
+  color: var(--mute);
+  opacity: 0.6;
+}
+
+/* 终端（xterm）的结构样式：改自 @xterm/xterm 的 css/xterm.css（MIT），
+   去掉写死的色值与第三方网址，颜色改走调色板变量；那份样式表原样引入会破坏 R2 约束。 */
+.xterm {
+  cursor: text;
+  position: relative;
+  user-select: none;
+}
+
+.xterm.focus,
+.xterm:focus {
+  outline: none;
+}
+
+.xterm .xterm-helpers {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+}
+
+.xterm .xterm-helper-textarea {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  position: absolute;
+  opacity: 0;
+  left: -9999em;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: -5;
+  white-space: nowrap;
+  overflow: hidden;
+  resize: none;
+}
+
+.xterm .composition-view {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  display: none;
+  position: absolute;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.xterm .composition-view.active {
+  display: block;
+}
+
+.xterm .xterm-viewport {
+  background-color: var(--code-bg);
+  overflow-y: scroll;
+  cursor: default;
+  position: absolute;
+  inset: 0;
+}
+
+.xterm .xterm-screen {
+  position: relative;
+}
+
+.xterm .xterm-screen canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.xterm-char-measure-element {
+  display: inline-block;
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: -9999em;
+  line-height: normal;
+}
+
+.xterm.enable-mouse-events {
+  cursor: default;
+}
+
+.xterm .xterm-cursor-pointer {
+  cursor: pointer;
+}
+
+.xterm .xterm-accessibility:not(.debug),
+.xterm .xterm-message {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  color: transparent;
+  pointer-events: none;
+}
+
+.xterm .live-region {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.xterm-underline-1 {
+  text-decoration: underline;
+}
+
+.xterm-overline {
+  text-decoration: overline;
+}
+
+.xterm-strikethrough {
+  text-decoration: line-through;
+}
+
+.xterm-screen .xterm-decoration-container .xterm-decoration {
+  z-index: 6;
+  position: absolute;
+}
+
+.xterm .xterm-scrollable-element > .invisible {
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
