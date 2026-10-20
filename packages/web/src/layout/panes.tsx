@@ -1,5 +1,9 @@
 import { type AuditConfig, AuditPane } from "../panes/AuditPane";
 import {
+  type BrowserLiveConfig,
+  BrowserLivePane,
+} from "../panes/BrowserLivePane";
+import {
   type FileDiscoveryConfig,
   FileDiscoveryPane,
 } from "../panes/FileDiscoveryPane";
@@ -78,6 +82,14 @@ export const PANE_META: PaneMeta[] = [
     follow: "host",
   },
   {
+    id: "browser_live",
+    displayName: "侧边浏览器",
+    group: "预览",
+    code: "SB",
+    tabbed: false,
+    follow: "session",
+  },
+  {
     id: "audit",
     displayName: "执行审计",
     group: "协作",
@@ -133,6 +145,11 @@ const IMPLEMENTED: Record<string, PaneImpl<never>> = {
   web_preview: impl<WebPreviewConfig>({
     component: WebPreviewPane,
     defaultConfig: () => ({ url: "" }),
+    configVersion: 1,
+  }),
+  browser_live: impl<BrowserLiveConfig>({
+    component: BrowserLivePane,
+    defaultConfig: () => ({}),
     configVersion: 1,
   }),
   audit: impl<AuditConfig>({

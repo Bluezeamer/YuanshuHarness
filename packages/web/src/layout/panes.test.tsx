@@ -7,10 +7,11 @@ afterEach(cleanup);
 
 const registry = defaultRegistry();
 
-test("注册表覆盖 mock 的 8 个视图类型，元数据完整", () => {
+test("注册表覆盖 mock 的 8 个视图类型加侧边浏览器，元数据完整", () => {
   expect(PANE_META.map((m) => m.id).sort()).toEqual(
     [
       "audit",
+      "browser_live",
       "chat",
       "file_preview",
       "filediscovery",

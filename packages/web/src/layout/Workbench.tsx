@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionInfo } from "../api";
+import { openAppWindow } from "../appview";
 import type { SessionHub } from "../sessions/hub";
 import {
   addPane,
@@ -296,6 +297,24 @@ export function Workbench({
             {pinned ? "钉住" : "跟随"}
           </button>
         )}
+        <button
+          type="button"
+          className={`${iconBtn} text-xs font-semibold`}
+          title="在独立窗口打开（链接应用）"
+          aria-label="在独立窗口打开"
+          onClick={() =>
+            entry &&
+            openAppWindow(
+              entry.type,
+              entry.binding?.mode === "fixed"
+                ? entry.binding.sessionId
+                : activeSessionId,
+              entry.config,
+            )
+          }
+        >
+          ↗
+        </button>
         <button
           type="button"
           className={iconBtn}
