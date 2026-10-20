@@ -53,12 +53,51 @@ export const TOOLS: ToolInfo[] = [
     readOnly: true,
     server: true,
   },
+  // 侧边浏览器（ADR-0081）。不放行 plan 模式：打开网页是对外访问，页面操作会改变远端状态。
+  {
+    name: "browser_open",
+    description: "在侧边浏览器打开网页（需批准站点）",
+    readOnly: false,
+    server: true,
+  },
+  {
+    name: "browser_snapshot",
+    description: "读取侧边浏览器当前页面",
+    readOnly: false,
+    server: true,
+  },
+  {
+    name: "browser_click",
+    description: "点击页面元素",
+    readOnly: false,
+    server: true,
+  },
+  {
+    name: "browser_type",
+    description: "在页面输入文字",
+    readOnly: false,
+    server: true,
+  },
+  {
+    name: "browser_screenshot",
+    description: "截取页面画面",
+    readOnly: false,
+    server: true,
+  },
 ];
 
 export const SUBAGENT_TOOL_NAMES = [
   "spawn_subagent",
   "wait_subagent",
   "interrupt_subagent",
+] as const;
+
+// 只作用于已打开页面的浏览器工具：站点已在 browser_open 时审批过，这里不再单独审批。
+export const BROWSER_FOLLOWUP_TOOL_NAMES = [
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_screenshot",
 ] as const;
 
 export const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));

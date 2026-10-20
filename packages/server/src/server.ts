@@ -11,6 +11,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import { agentsApi } from "./api/agents.js";
+import { browserApi } from "./api/browser.js";
 import { auditApi } from "./api/audit.js";
 import { environmentsApi } from "./api/environments.js";
 import { filesApi } from "./api/files.js";
@@ -29,6 +30,7 @@ import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { EnvHub } from "./env/hub.js";
+import { BrowserManager } from "./browser/manager.js";
 import { McpRuntime } from "./mcp/runtime.js";
 import type { ReviewerFactory } from "./permission/review.js";
 import { GlobalConventions } from "./prompt/conventions.js";
@@ -183,6 +185,7 @@ export function createServer(
   let db: Db | null = null;
   let envHub: EnvHub | null = null;
   let mcpRuntime: McpRuntime | null = null;
+  let browserManager: BrowserManager | null = null;
   app.register(fastifyWebsocket, {
     options: {
       maxPayload: DEFAULTS.maxPayloadBytes,
@@ -263,6 +266,8 @@ export function createServer(
         const mcp = new McpRuntime({ mcp: mcpStore, secrets, capabilities });
         mcpRuntime = mcp;
         const subagentStore = new SubagentStore(db as Db);
+        const browser = new BrowserManager();
+        browserManager = browser;
         const pool = new SessionPool({
           audit,
           agents,
@@ -272,6 +277,7 @@ export function createServer(
           secrets,
           skills: skillRuntime,
           mcp,
+          browser,
           subagents: subagentStore,
           factory:
             options.sessionFactory ??
@@ -350,6 +356,11 @@ export function createServer(
             workspaces,
             runtime: mcp,
           });
+          scope.register(browserApi, {
+            manager: browser,
+            pool,
+            ...options.tuning,
+          });
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {
@@ -386,6 +397,8 @@ export function createServer(
     },
     async stop() {
       await app.close();
+      await browserManager?.closeAll();
+      browserManager = null;
       await mcpRuntime?.close();
       mcpRuntime = null;
       envHub?.close();

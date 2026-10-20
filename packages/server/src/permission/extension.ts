@@ -1,7 +1,11 @@
 // 权限扩展：拦截 tool_call，按 decide 放行或弹审批（ADR-0030）。任何异常、拒绝、超时、撤销都 block。
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { PromptResult, PromptSpec } from "../session/prompts.js";
-import { SUBAGENT_TOOL_NAMES } from "../session/tool-catalog.js";
+import { parseHttpUrl } from "../browser/guard.js";
+import {
+  BROWSER_FOLLOWUP_TOOL_NAMES,
+  SUBAGENT_TOOL_NAMES,
+} from "../session/tool-catalog.js";
 import type { VariableMeta } from "../store/secrets.js";
 import type { Tier } from "../store/workspaces.js";
 import {
@@ -33,7 +37,11 @@ const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["edit", "write"]);
 const COMMAND_TOOLS = new Set(["bash", "powershell"]);
 // 自带校验的工具，不走审批：ask_user 是交互通道，subagent 工具由池按父子约束校验（ADR-0060）。
-const SELF_GATED = new Set<string>(["ask_user", ...SUBAGENT_TOOL_NAMES]);
+const SELF_GATED = new Set<string>([
+  "ask_user",
+  ...SUBAGENT_TOOL_NAMES,
+  ...BROWSER_FOLLOWUP_TOOL_NAMES,
+]);
 // 只改变工具落点的 workspace 工具：无人值守时放行，可切换的范围由池限定在子会话的子集内。
 const WORKSPACE_TOOLS = new Set(["list_workspaces", "switch_workspace"]);
 const SUMMARY_MAX = 300;
@@ -76,6 +84,11 @@ export interface PermissionDeps {
    * 要密码的 sudo、占终端的命令）和拿不准的调用一律拒绝，且不产生新的记住规则。
    */
   unattended?: boolean;
+  /** 侧边浏览器（ADR-0081）：browser_open 按站点（协议+主机+端口）审批，批准记在会话内。 */
+  browser?: {
+    approved: (url: string) => boolean;
+    approve: (url: string) => void;
+  };
   /** 记录需要裁决的调用的结论（规则内自动放行不记）。 */
   audit?: (rec: {
     actor: "user" | "system";
@@ -219,6 +232,15 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
         if (SELF_GATED.has(e.toolName)) return;
         if (deps.unattended && WORKSPACE_TOOLS.has(e.toolName)) return;
         const input = e.input as Record<string, unknown>;
+        let browserUrl: URL | null = null;
+        if (e.toolName === "browser_open") {
+          browserUrl = parseHttpUrl(String(input.url ?? ""));
+          // 非 http(s) 地址不值得打扰用户，直接拒绝。
+          if (!browserUrl)
+            return { block: true, reason: "只能打开 http 或 https 地址" };
+          // 本会话已批准过的站点不再询问。
+          if (deps.browser?.approved(browserUrl.href)) return;
+        }
         const isCommand = COMMAND_TOOLS.has(e.toolName);
         const line =
           isCommand && typeof input.command === "string" ? input.command : "";
@@ -265,7 +287,9 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
             : { verdict: "ask", remember: null, reviewable: false };
         } else {
           // 未知工具（自定义/MCP）视为规则外，不可记住；无能力信息，auto 档也只交人工。
-          summary = clip(JSON.stringify(input));
+          summary = browserUrl
+            ? clip(`访问 ${browserUrl.href}`)
+            : clip(JSON.stringify(input));
           d = { verdict: "ask", remember: null, reviewable: false };
         }
         // 超出适用范围的变量用法一律交人工，已记住的规则也不放行。
@@ -338,6 +362,11 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
             ? ["警告：这条命令会打开 root shell，任何档位下都需要人工批准。"]
             : []),
           ...(sudoNote ? [sudoNote] : []),
+          ...(browserUrl && !deps.unattended
+            ? [
+                `由 Server 所在机器的浏览器访问。批准即允许本会话访问 ${browserUrl.origin} 下的页面，跳转到其他站点仍会被拦截。`,
+              ]
+            : []),
         ];
         if (deps.unattended)
           return denyUnattended(
@@ -375,6 +404,7 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
           note("user", "deny", "user", e.toolName, summary);
           return { block: true, reason: "用户拒绝了该操作" };
         }
+        if (browserUrl) deps.browser?.approve(browserUrl.href);
         // 批准的 sudo 命令可能改了 sudoers：丢掉该环境的探测缓存。
         if (/\bsudo\b/.test(line)) deps.sudo?.invalidate();
       } catch {

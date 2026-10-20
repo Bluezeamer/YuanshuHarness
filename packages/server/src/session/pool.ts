@@ -10,6 +10,8 @@ import { LocalEnv } from "../env/local.js";
 import { routedToolsExtension } from "../env/tools.js";
 import type { ExecEnv } from "../env/types.js";
 import { uuidv7 } from "../id.js";
+import type { BrowserManager } from "../browser/manager.js";
+import { browserExtension } from "../browser/tools.js";
 import type { McpRuntime } from "../mcp/runtime.js";
 import { type McpToolDef, mcpExtension } from "../mcp/tools.js";
 import { permissionExtension } from "../permission/extension.js";
@@ -698,6 +700,8 @@ export interface PoolDeps {
   skills?: SkillRuntime;
   // MCP 工具注入；缺省时会话不带 MCP 工具。
   mcp?: McpRuntime;
+  // 侧边浏览器（ADR-0081）；缺省则没有 browser_* 工具。
+  browser?: BrowserManager;
   // 父子关系存储；缺省时没有 subagent（所有会话都是根）。
   subagents?: SubagentStore;
 }
@@ -845,7 +849,7 @@ export class SessionPool {
     const ask = (spec: PromptSpec) =>
       this.entries.get(id)?.ask(spec) ??
       Promise.resolve<PromptResult>({ outcome: "cancelled" });
-    const { workspaces, rules, reviewerFactory } = this.deps;
+    const { workspaces, rules, reviewerFactory, browser } = this.deps;
     // 会话当前所在的 workspace：切换会改条目上的 id，创建期间条目还没有就用起始值。
     const current = (): Workspace =>
       workspaces.get(this.entries.get(id)?.workspaceId ?? ws.id) ?? ws;
@@ -876,6 +880,18 @@ export class SessionPool {
         ? [
             mcpExtension(mcpTools, (...a) =>
               (this.deps.mcp as McpRuntime).call(...a),
+            ),
+          ]
+        : []),
+      ...(browser && !spec
+        ? [
+            browserExtension(
+              browser,
+              id,
+              // 完全允许档不拦；其余只放行本会话批准过的站点。
+              (url) =>
+                (workspaces.get(current().id)?.tier ?? "rules") === "full" ||
+                browser.isApproved(id, url),
             ),
           ]
         : []),
@@ -939,6 +955,14 @@ export class SessionPool {
           });
         },
         variables: () => this.deps.secrets?.listVariables() ?? [],
+        ...(browser
+          ? {
+              browser: {
+                approved: (url: string) => browser.isApproved(id, url),
+                approve: (url: string) => browser.approve(id, url),
+              },
+            }
+          : {}),
         sudo: {
           probe: (cwd, args) => this.sudoProbe.probe(where().env, cwd, args),
           invalidate: () => this.sudoProbe.invalidate(where().env.id),
@@ -1457,6 +1481,7 @@ export class SessionPool {
     }
     this.subagentHooks?.stopped(id);
     this.deps.subagents?.removeSession(id);
+    this.deps.browser?.forget(id).catch(() => {});
     store.remove(id);
     if (entry) {
       this.entries.delete(id);
