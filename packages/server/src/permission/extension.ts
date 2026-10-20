@@ -1,6 +1,7 @@
 // 权限扩展：拦截 tool_call，按 decide 放行或弹审批（ADR-0030）。任何异常、拒绝、超时、撤销都 block。
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { PromptResult, PromptSpec } from "../session/prompts.js";
+import { SUBAGENT_TOOL_NAMES } from "../session/tool-catalog.js";
 import type { VariableMeta } from "../store/secrets.js";
 import type { Tier } from "../store/workspaces.js";
 import {
@@ -18,6 +19,7 @@ import {
   decide,
   type RememberRule,
 } from "./decide.js";
+import { isInteractive } from "./interactive.js";
 import {
   findSensitiveBelow,
   type PathEnv,
@@ -30,6 +32,10 @@ import { effectiveTier, variableUses } from "./variables.js";
 const READ_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["edit", "write"]);
 const COMMAND_TOOLS = new Set(["bash", "powershell"]);
+// 自带校验的工具，不走审批：ask_user 是交互通道，subagent 工具由池按父子约束校验（ADR-0060）。
+const SELF_GATED = new Set<string>(["ask_user", ...SUBAGENT_TOOL_NAMES]);
+// 只改变工具落点的 workspace 工具：无人值守时放行，可切换的范围由池限定在子会话的子集内。
+const WORKSPACE_TOOLS = new Set(["list_workspaces", "switch_workspace"]);
 const SUMMARY_MAX = 300;
 
 /** 自动审核结论；`ask` 表示降级给用户。 */
@@ -65,6 +71,11 @@ export interface PermissionDeps {
     summary: string;
     input: Record<string, unknown>;
   }) => Promise<ReviewVerdict>;
+  /**
+   * 无人值守（subagent 子会话，ADR-0060）：没有弹窗通道。需要人工的动作（root shell、
+   * 要密码的 sudo、占终端的命令）和拿不准的调用一律拒绝，且不产生新的记住规则。
+   */
+  unattended?: boolean;
   /** 记录需要裁决的调用的结论（规则内自动放行不记）。 */
   audit?: (rec: {
     actor: "user" | "system";
@@ -173,7 +184,7 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
   const note = (
     actor: "user" | "system",
     decision: "allow" | "deny" | "remember",
-    by: "user" | "review" | "timeout" | "cancelled" | "error",
+    by: "user" | "review" | "timeout" | "cancelled" | "error" | "unattended",
     tool: string,
     summary: string,
     reason?: string,
@@ -194,14 +205,31 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
       });
     } catch {}
   };
+  // 无人值守的拒绝：记审计（拓扑上的被拒计数由此而来），并让模型把缺少的权限写进最终结果。
+  const denyUnattended = (tool: string, summary: string, why: string) => {
+    note("system", "deny", "unattended", tool, summary, why);
+    return {
+      block: true,
+      reason: `子会话没有人工审批通道，操作已拒绝（${why}）。请改用允许范围内的做法；确实需要这项权限时，不要重试，在最终结果里写明缺少什么，由父会话决定。`,
+    };
+  };
   return (pi) => {
     pi.on("tool_call", async (e) => {
       try {
-        if (e.toolName === "ask_user") return;
+        if (SELF_GATED.has(e.toolName)) return;
+        if (deps.unattended && WORKSPACE_TOOLS.has(e.toolName)) return;
         const input = e.input as Record<string, unknown>;
         const isCommand = COMMAND_TOOLS.has(e.toolName);
         const line =
           isCommand && typeof input.command === "string" ? input.command : "";
+        if (deps.unattended && isCommand) {
+          const state = deps.sudo
+            ? await probeCommandLine(deps.sudo.probe, line, deps.where().cwd)
+            : "unknown";
+          const r = await isInteractive(line, state);
+          if (r.interactive)
+            return denyUnattended(e.toolName, clip(line), r.reason);
+        }
         const uses = deps.variables
           ? await variableUses(line, deps.variables())
           : [];
@@ -259,6 +287,15 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
             const names = (deps.variables?.() ?? [])
               .filter((v) => v.scopeKind === "sudo")
               .map((v) => `@${v.name}`);
+            if (deps.unattended)
+              note(
+                "system",
+                "deny",
+                "unattended",
+                e.toolName,
+                clip(line),
+                "sudo 需要密码",
+              );
             return {
               block: true,
               reason: names.length
@@ -302,6 +339,12 @@ export function permissionExtension(deps: PermissionDeps): ExtensionFactory {
             : []),
           ...(sudoNote ? [sudoNote] : []),
         ];
+        if (deps.unattended)
+          return denyUnattended(
+            e.toolName,
+            summary,
+            notes.length ? notes.join("；") : "超出规则范围，需要人工批准",
+          );
         const options = [
           { id: "allow", label: "仅此次通过" },
           { id: "deny", label: "拒绝" },

@@ -100,7 +100,7 @@ export function Shell({
         )}
         {route.name === "preview" && <PreviewPage />}
         {route.name === "session" && (
-          <SessionPage id={route.id} sessions={sessions} />
+          <SessionPage id={route.id} sessions={sessions} hub={hub} />
         )}
         {route.name === "notfound" && <NotFoundPage />}
         {panel === "new" && (

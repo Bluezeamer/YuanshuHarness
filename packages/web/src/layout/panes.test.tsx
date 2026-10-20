@@ -6,8 +6,6 @@ import { Registry } from "./registry";
 afterEach(cleanup);
 
 const registry = defaultRegistry();
-// 目前只剩协作拓扑没有真实面板（依赖后续的协作模型）。
-const pendingIds = ["topology"];
 
 test("注册表覆盖 mock 的 8 个视图类型，元数据完整", () => {
   expect(PANE_META.map((m) => m.id).sort()).toEqual(
@@ -35,27 +33,6 @@ test("follow 语义决定新条目的默认绑定：none 是钉住，其余跟�
   expect(registry.newEntry("pdf")?.binding?.mode).toBe("fixed");
   expect(registry.newEntry("terminal")?.binding?.mode).toBe("follow");
   expect(registry.newEntry("chat")?.binding?.mode).toBe("follow");
-});
-
-test("未接入的类型显示待接入占位，写明类型名", () => {
-  for (const id of pendingIds) {
-    const t = registry.get(id);
-    const Comp = t?.component;
-    if (!Comp) throw new Error(id);
-    render(
-      <Comp
-        config={t.defaultConfig() as never}
-        paneId="p"
-        focused={false}
-        binding={{ mode: "follow" }}
-        onUpdateConfig={() => {}}
-      />,
-    );
-    expect(screen.getByRole("status").textContent).toContain(
-      `「${PANE_META.find((m) => m.id === id)?.displayName}」待接入`,
-    );
-    cleanup();
-  }
 });
 
 test("扩展点：自己注册一个组件即替换占位，其余类型不受影响", () => {

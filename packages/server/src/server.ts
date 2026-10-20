@@ -21,6 +21,7 @@ import { promptApi } from "./api/prompt.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { skillsApi } from "./api/skills.js";
 import { terminalsApi } from "./api/terminals.js";
+import { topologyApi } from "./api/topology.js";
 import { variablesApi } from "./api/variables.js";
 import { workbenchApi } from "./api/workbench.js";
 import { workspacesApi } from "./api/workspaces.js";
@@ -47,8 +48,10 @@ import { RuleStore } from "./store/rules.js";
 import { loadMasterKey, SecretStore } from "./store/secrets.js";
 import { SessionStore } from "./store/sessions.js";
 import { SkillStore } from "./store/skills.js";
+import { SubagentStore } from "./store/subagents.js";
 import { WorkbenchStore } from "./store/workbench.js";
 import { WorkspaceStore } from "./store/workspaces.js";
+import { SubagentRuntime } from "./subagent/runtime.js";
 import { TerminalManager, type TerminalOptions } from "./terminal/manager.js";
 
 // src/ 与 dist/ 都在包根的下一层，所以源码、构建产物与 npm 安装后得到同样的包根。
@@ -259,6 +262,7 @@ export function createServer(
         const mcpStore = new McpStore(db as Db);
         const mcp = new McpRuntime({ mcp: mcpStore, secrets, capabilities });
         mcpRuntime = mcp;
+        const subagentStore = new SubagentStore(db as Db);
         const pool = new SessionPool({
           audit,
           agents,
@@ -268,6 +272,7 @@ export function createServer(
           secrets,
           skills: skillRuntime,
           mcp,
+          subagents: subagentStore,
           factory:
             options.sessionFactory ??
             options.makeSessionFactory?.({ models, secrets, agentDir }) ??
@@ -283,6 +288,17 @@ export function createServer(
           rules,
           sessionDir,
         });
+        // 先于监听：上一进程里还在跑的子会话在这里落成 interrupted。
+        pool.attachSubagents(
+          new SubagentRuntime({
+            pool,
+            store: subagentStore,
+            workspaces,
+            agents,
+            models,
+            sessionDir,
+          }).hooks(),
+        );
         const { hook } = createAuthHook({
           ...(config.token === undefined ? {} : { token: config.token }),
           allowCidrs: config.allowCidrs,
@@ -300,6 +316,7 @@ export function createServer(
             audit,
           });
           scope.register(auditApi, { audit });
+          scope.register(topologyApi, { pool, subagents: subagentStore });
           scope.register(filesApi, { hub, audit });
           scope.register(terminalsApi, {
             hub,

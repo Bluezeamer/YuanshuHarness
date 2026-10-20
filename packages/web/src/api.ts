@@ -6,6 +6,8 @@ export interface SessionInfo {
   running: boolean;
   workspaceId?: string | null;
   reviewPolicy?: string | null;
+  agentId?: string | null;
+  mode?: string;
 }
 
 export type Tier = "rules" | "auto" | "full";
@@ -761,3 +763,56 @@ export const refreshMcp = (token: string | null, name: string) =>
     {},
     (b: McpServerInfo) => b,
   );
+
+export interface AuditEntry {
+  id: number;
+  ts: string;
+  sessionId: string | null;
+  actor: "user" | "agent" | "system";
+  kind: "tool" | "permission" | "terminal" | "file" | "transfer" | "env";
+  environmentId: string | null;
+  summary: string;
+  detail: Record<string, unknown> | null;
+}
+
+export const listAudit = (
+  token: string | null,
+  query: { session?: string; limit?: number; before?: number } = {},
+) => {
+  const p = new URLSearchParams();
+  if (query.session) p.set("session", query.session);
+  if (query.limit !== undefined) p.set("limit", String(query.limit));
+  if (query.before !== undefined) p.set("before", String(query.before));
+  return get(
+    `/api/v1/audit?${p}`,
+    token,
+    (b: { entries: AuditEntry[]; nextBefore: number | null }) => b,
+  );
+};
+
+export interface AgentDetail {
+  id: string;
+  name: string;
+  description: string;
+  capabilities: Array<{ kind: "tool" | "skill" | "mcp"; name: string }>;
+  model: string | null;
+  defaultThinkingLevel: string | null;
+  defaultMode: string | null;
+}
+
+export const getAgent = (token: string | null, id: string) =>
+  get(`/api/v1/agents/${encodeURIComponent(id)}`, token, (b: AgentDetail) => b);
+
+export interface TopologyNode {
+  id: string;
+  name: string | null;
+  parentId: string | null;
+  depth: number;
+  state: "running" | "idle" | "done" | "failed" | "interrupted";
+  task: string | null;
+  denied: number;
+  deniedReasons: string[];
+}
+
+export const getTopology = (token: string | null) =>
+  get("/api/v1/topology", token, (b: { nodes: TopologyNode[] }) => b.nodes);

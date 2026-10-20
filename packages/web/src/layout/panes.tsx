@@ -12,6 +12,7 @@ import { type TerminalConfig, TerminalPane } from "../panes/TerminalPane";
 import { type WebPreviewConfig, WebPreviewPane } from "../panes/WebPreviewPane";
 import { type ChatConfig, ChatPane } from "./ChatPane";
 import { Registry } from "./registry";
+import { TopologyPane } from "./TopologyPane";
 import type { PaneFollow, PaneGroup, PaneImpl, PaneProps } from "./types";
 
 export type { ChatConfig } from "./ChatPane";
@@ -137,6 +138,11 @@ const IMPLEMENTED: Record<string, PaneImpl<never>> = {
   audit: impl<AuditConfig>({
     component: AuditPane,
     defaultConfig: () => ({ kind: null }),
+    configVersion: 1,
+  }),
+  topology: impl<Record<string, never>>({
+    component: TopologyPane,
+    defaultConfig: () => ({}),
     configVersion: 1,
   }),
 };

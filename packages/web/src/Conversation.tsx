@@ -10,6 +10,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatEntry } from "./api";
 import type { Prompt, Tool } from "./conversation";
+import { parseSpawn, SubagentCard, spawnTask } from "./detail/SubagentCard";
 import type { Block } from "./history";
 import { MermaidBlock } from "./MermaidBlock";
 import { PromptDialog } from "./PromptDialog";
@@ -104,6 +105,8 @@ function ToolBlock({
   const done = t.result !== undefined;
   const cls = done ? (t.isError ? "text-danger" : "text-ok-ink") : "text-mute";
   const status = done ? (t.isError ? "失败" : "完成") : "运行中";
+  const spawn =
+    t.name === "spawn_subagent" && !t.isError ? parseSpawn(t.result) : null;
   return (
     <details
       open={expanded}
@@ -123,6 +126,7 @@ function ToolBlock({
         <span className={`font-semibold ${cls}`}>{status}</span>
       </summary>
       <div className="space-y-2 px-3 py-2 text-xs">
+        {spawn && <SubagentCard info={spawn} task={spawnTask(t.args)} />}
         {t.args && (
           <div>
             <div className="mb-1 font-semibold text-mute">参数</div>
