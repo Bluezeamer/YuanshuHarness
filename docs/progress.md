@@ -50,24 +50,23 @@
 
 ## 当前状态
 
-M0、M1 完成。M1 评审（`docs/reviews/m1.md`）采纳的 7 条已由 `task/m1-fixes` 修复并合并，处理列已标「已修」；合并后 server typecheck 通过，全量测试 1269 通过、1 跳过。
+M0、M1 完成（M1 评审 7 条已修并合并，处理列已标「已修」）。M2–M5 的 5 个半成品分支（term-files / web-layout / agent-defs / private-vars / skills-mcp）已全部合入；能力集页已挂 Agent / 提示词块 / Skill / MCP 四个面板。
 
-上一会话被中断后，5 个半成品分支（基线 731f9da）各留了已提交的第一块和一批**未提交**改动；本会话已重新派 5 个后台 subagent 在原 worktree 里续做，各自收尾后自行提交：
-- `task/term-files`（.worktrees/term-files）：M2 服务端——终端(pty/ssh shell)、审计、文件管理 API、传输入口、预览支撑（ADR 0035–0039）
-- `task/web-layout`（.worktrees/web-layout）：M2 WebUI 骨架——token 迁移已提交；布局模型对齐 mock、rail/总览、topnav 与路由骨架、pane 注册扩展点（0040–0044）
-- `task/agent-defs`（.worktrees/agent-defs）：M3——提示词块、agent 定义、build/plan、能力引用位、编辑器面板（0045–0049）
-- `task/private-vars`（.worktrees/private-vars）：M4 剩余——回显遮罩、sudo、interactive 判定接口、隐私变量面板（0050–0054）
-- `task/skills-mcp`（.worktrees/skills-mcp）：M5 剩余——skill 同步、MCP（先查 SDK 接入点）、SkillsPanel/McpPanel（0055–0059）
+M2 pane 内容已合入（`task/pane-content`，--no-ff）：终端（xterm，令牌走 WS 子协议）、文件管理、文件预览、PDF、网页预览（同源页面不放开 allow-same-origin）、审计，均有组件测试；web typecheck、328 个用例、构建通过。新增依赖 `@xterm/xterm` 6.0.0、`@xterm/addon-fit` 0.11.0、`pdfjs-dist` 6.4.299（精确版本）。
 
-合并预期冲突点：`store/db.ts` MIGRATIONS 末尾、`server.ts` 注册块、`session/pool.ts`、`env/ssh.ts`、`ssh/connection.ts`、web 的 `api.ts`/路由。
+M2 未完成：划选提问、跨主机拖拽传输；协作拓扑 pane 仍是占位（等 M6）。
+
+M6 进行中：`.worktrees/subagent`（`task/subagent`）有 2 笔提交——subagent store/tools/runtime、topology API 与运行时接线；WebUI（会话详情页、拓扑图）未做，未合并，未评审。
+
+合并后尚未跑 `scripts/check.sh` 全绿的记录（已在后台启动，结果见下次更新）。
 
 ## 下一步
 
-1. 等 5 个 subagent 回报；逐个核对（看 diff、跑测试）再 squash 合并到 feat/usable-v1，解冲突，每次合并后跑相关测试，全合完跑 `scripts/check.sh`。
-2. 合并后接线（subagent 刻意留给主 agent）：`CapabilitiesPage` 已挂四个面板（Agent/提示词块/Skill/MCP）；全局约定文件 `GET|PUT /api/v1/prompt/conventions` 仍无 UI；agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计真实组件、审计钩子、VariablesPanel 已挂设置页则核对。
-3. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 agent 定义与 M4 interactive 判定）；M7 设置页逐 tab 对齐。
-4. 波次 3：M8、M9、M10、M11；M12 收口。
-5. 评审节点：M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
+1. 看 `scripts/check.sh` 结果；有红的先修，保持分支可用。
+2. M6：核对 `task/subagent` 两笔提交（权限边界：子会话继承的审批、interrupt 级联），补 WebUI（会话详情页、拓扑图 pane），合并；M6 结束时委派 codex 评审。
+3. M2 余项：划选提问、跨主机拖拽传输；`GET|PUT /api/v1/prompt/conventions` 的 UI；agent 级 skill/MCP 分配接线（`McpRuntime.agentMcp`、`skills/resolve.ts`）。
+4. M7 设置页逐 tab 对齐 mock。
+5. 波次 3：M8、M9、M10、M11；M12 收口。M4、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
 6. 调研素材（pi 检索，`tmp/pi/`）：browser-embed（M8）、lsp-dap（M11）、rg-fd（M11）、hooks（M9）。
 
 ## 决策与偏差
