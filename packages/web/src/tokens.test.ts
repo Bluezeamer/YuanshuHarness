@@ -104,6 +104,56 @@ test("R2 构建产物：色值只剩调色板变量与 Tailwind 自带的 #0000 
   }
 });
 
+// 只解析 :root 里纯 oklch() 字面量；color-mix 派生色（-soft）只做底色，不参与文字对比。
+function oklchToLinear(L: number, C: number, hDeg: number) {
+  const h = (hDeg * Math.PI) / 180;
+  const a = C * Math.cos(h);
+  const b = C * Math.sin(h);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  return [
+    clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    clamp(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ];
+}
+function tokenLuminance(name: string): number {
+  const css = sources.find((x) => x.f === "styles.css")?.text ?? "";
+  const m = css.match(
+    new RegExp(`--${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`),
+  );
+  if (!m) throw new Error(`:root 里没有纯 oklch 字面量 --${name}`);
+  const [r = 0, g = 0, b = 0] = oklchToLinear(
+    Number(m[1]) / 100,
+    Number(m[2]),
+    Number(m[3]),
+  );
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (fg: string, bg: string) => {
+  const [x, y] = [tokenLuminance(fg), tokenLuminance(bg)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+test("R3 文字色在 bg / panel 上对比度 ≥ 4.5:1", () => {
+  // ok / warn / accent 本色只做点、线、环，文字走 -ink / -deep。
+  for (const fg of [
+    "ink",
+    "mute",
+    "accent-deep",
+    "ok-ink",
+    "warn-ink",
+    "danger",
+  ])
+    for (const bg of ["bg", "panel"])
+      expect(contrast(fg, bg), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+  // 实心按钮：浅字压在 deep / danger 底上。
+  expect(contrast("panel", "accent-deep")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("bg", "danger")).toBeGreaterThanOrEqual(4.5);
+});
+
 test("R9 样式表尊重 prefers-reduced-motion", () => {
   const css = sources.find((x) => x.f === "styles.css")?.text ?? "";
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);

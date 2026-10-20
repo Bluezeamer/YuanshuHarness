@@ -24,6 +24,10 @@ export class Registry {
       type: id,
       configVersion: t.configVersion,
       config: t.defaultConfig(),
+      binding:
+        t.follow === "none"
+          ? { mode: "fixed", sessionId: null, host: null }
+          : { mode: "follow" },
     };
   }
 

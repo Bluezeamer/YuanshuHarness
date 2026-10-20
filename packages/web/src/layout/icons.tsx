@@ -39,12 +39,6 @@ export const CloseIcon = () => (
   </Svg>
 );
 
-export const ListIcon = () => (
-  <Svg>
-    <path d="M2 3.5h10M2 7h10M2 10.5h10" />
-  </Svg>
-);
-
 export const NavIcon = () => (
   <Svg>
     <path d="M2 3.5h10M2 7h6M2 10.5h8" />

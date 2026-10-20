@@ -104,7 +104,7 @@ export function SavedLayouts({
             存当前 window
           </button>
           {error && (
-            <p role="alert" className="py-1 text-xs text-acc">
+            <p role="alert" className="py-1 text-xs text-danger">
               {error}
             </p>
           )}

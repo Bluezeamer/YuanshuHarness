@@ -59,11 +59,11 @@ function Editor({
         拿不准时会交给你决定。 {text.length}/{MAX}
       </p>
       {error && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {error}
         </p>
       )}
-      {done && <p className="m-0 text-ok">已保存</p>}
+      {done && <p className="m-0 text-ok-ink">已保存</p>}
       <div className="flex gap-3">
         <button
           type="button"
@@ -113,7 +113,7 @@ export function ReviewPanel({
   if (sessions === "loading") return <p className="p-6 text-mute">加载中…</p>;
   if (sessions === "failed")
     return (
-      <p role="alert" className="p-6 font-semibold text-acc">
+      <p role="alert" className="p-6 font-semibold text-danger">
         会话加载失败
       </p>
     );

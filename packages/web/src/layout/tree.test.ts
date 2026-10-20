@@ -10,6 +10,7 @@ import {
   resize,
   selectTab,
   split,
+  swap,
   tabGroups,
   visibleIds,
 } from "./tree";
@@ -172,4 +173,26 @@ test("R9a repair：tabs 不含选中项或有重复时退化为普通叶子/去�
   expect(repair(grp("z", ["a", "b"])).tree).toEqual(leaf("z"));
   expect(repair(grp("a", ["a", "a", "b"])).tree).toEqual(grp("a", ["a", "b"]));
   expect(repair(grp("a", ["a"])).tree).toEqual(leaf("a"));
+});
+
+test("swap 互换两个叶子，比例不动；tab 组整组一起走", () => {
+  const t = split(split(leaf("a"), "a", "h", "b"), "b", "v", "c");
+  const swapped = swap(t, "a", "c");
+  expect(layout(swapped, box).get("c")).toEqual(layout(t, box).get("a"));
+  expect(layout(swapped, box).get("a")).toEqual(layout(t, box).get("c"));
+
+  const g = split(grp("b", ["a", "b"]), "a", "h", "c");
+  const r = swap(g, "a", "c");
+  expect(r.kind === "split" && r.children).toEqual([
+    leaf("c"),
+    grp("b", ["a", "b"]),
+  ]);
+});
+
+test("swap 同一叶子或目标不在树里：原样返回", () => {
+  const t = split(leaf("a"), "a", "h", "b");
+  expect(swap(t, "a", "a")).toBe(t);
+  expect(swap(t, "a", "zz")).toBe(t);
+  const g = grp("b", ["a", "b"]);
+  expect(swap(g, "a", "b")).toBe(g);
 });

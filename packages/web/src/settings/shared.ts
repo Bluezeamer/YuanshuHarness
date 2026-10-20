@@ -47,8 +47,8 @@ export function describe(
 }
 
 export const field =
-  "border border-line bg-bg px-3 py-2 text-ink disabled:opacity-60";
+  "rounded-md border border-line bg-bg px-3 py-2 text-ink disabled:opacity-60";
 export const actionBtn =
-  "border border-ink px-4 py-2 font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink";
+  "rounded-md border border-line bg-panel px-4 py-2 font-medium transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-deep disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-line disabled:hover:bg-panel disabled:hover:text-ink";
 export const dangerBtn =
-  "border border-acc px-4 py-2 font-semibold text-acc transition-colors hover:bg-acc hover:text-bg disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md border border-danger px-4 py-2 font-medium text-danger transition-colors hover:bg-danger hover:text-bg disabled:cursor-not-allowed disabled:opacity-50";

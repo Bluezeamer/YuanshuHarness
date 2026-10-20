@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { SessionInfo } from "../api";
 import type { SessionHub } from "../sessions/hub";
 import {
@@ -12,19 +11,26 @@ import {
   movePane,
   moveToTab,
   newId,
+  openPane,
   renamePane,
   renameWindow,
   selectPaneTab,
   selectWindow,
+  setPaneBinding,
   setPaneConfig,
   setTree,
+  swapPanes,
+  toggleBinding,
   windowOf,
 } from "./doc";
 import { type DropTarget, dropTarget } from "./drag";
+import { resolveBound } from "./env";
 import { CloseIcon, SplitDownIcon, SplitRightIcon } from "./icons";
 import { PaneLayer } from "./PaneLayer";
 import { type ChatConfig, defaultRegistry, EnvContext } from "./panes";
+import { applyPreset, PRESETS } from "./presets";
 import { SavedLayouts } from "./SavedLayouts";
+import { SessionRail } from "./SessionRail";
 import {
   layout,
   neighbor,
@@ -33,6 +39,7 @@ import {
   tabGroupOf,
   visibleIds,
 } from "./tree";
+import { useActiveSession } from "./useActiveSession";
 import { useWorkbench } from "./useWorkbench";
 
 const btn =
@@ -46,14 +53,11 @@ export function Workbench({
   hub,
   sessions,
   onUnauthorized,
-  tabsHost,
   newSession,
 }: {
   hub: SessionHub;
   sessions: SessionInfo[];
   onUnauthorized: () => void;
-  // 顶栏里放 window 标签的位置；没有时标签行留在工作台内。
-  tabsHost?: HTMLElement | null;
   newSession?: (done: (sessionId: string) => void) => void;
 }) {
   const registry = useMemo(defaultRegistry, []);
@@ -77,18 +81,23 @@ export function Workbench({
       el?.querySelector<HTMLElement>("textarea,input:not([type=hidden])") ?? el
     )?.focus();
   }, [focusReq]);
+  const [activeSessionId, selectSession] = useActiveSession(sessions);
   const env = useMemo(
-    () => ({ hub, sessions, newSession }),
-    [hub, sessions, newSession],
+    () => ({ hub, sessions, activeSessionId, newSession }),
+    [hub, sessions, activeSessionId, newSession],
   );
 
   const active = doc.windows.find((w) => w.id === doc.activeWindowId);
   const inActive = visibleIds(active?.tree ?? null);
   const focused =
     focus && inActive.includes(focus) ? focus : (inActive[0] ?? null);
-  const sessionOf = (paneId: string | null) => {
-    const e = paneId ? doc.panes[paneId] : undefined;
-    return e?.type === "chat" ? (e.config as ChatConfig).sessionId : null;
+  const sessionOf = (paneId: string) => {
+    const e = doc.panes[paneId];
+    if (e?.type !== "chat") return null;
+    return (
+      resolveBound(e.binding ?? { mode: "follow" }, activeSessionId)
+        .sessionId ?? (e.config as ChatConfig).sessionId
+    );
   };
 
   // R24：pane 总数达到软上限时提示，不阻止。
@@ -175,6 +184,16 @@ export function Workbench({
           ) ?? []),
         ],
         latest.current.doc.activeWindowId,
+        // 同类型且 tabbed 才能并入 tab 组，否则落中心 / 标题栏就是交换。
+        (paneId) => {
+          const panes = latest.current.doc.panes;
+          const type = panes[pending.paneId]?.type;
+          return (
+            !!type &&
+            type === panes[paneId]?.type &&
+            registry.get(type)?.tabbed === true
+          );
+        },
       );
       setDragTarget(target);
     };
@@ -185,6 +204,7 @@ export function Workbench({
       if (!started || !t) return;
       if (t.kind === "window") update((d) => movePane(d, id, t.windowId));
       else if (t.kind === "tab") update((d) => moveToTab(d, id, t.paneId));
+      else if (t.kind === "swap") update((d) => swapPanes(d, id, t.paneId));
       else
         update((d) => {
           const w = windowOf(d, t.paneId);
@@ -212,7 +232,7 @@ export function Workbench({
       window.removeEventListener("pointercancel", onCancel);
       window.removeEventListener("keydown", onKey);
     };
-  }, [pending, update]);
+  }, [pending, update, registry]);
 
   const dragHandle = (paneId: string): React.HTMLAttributes<HTMLElement> => ({
     onPointerDown: (e) => {
@@ -247,57 +267,76 @@ export function Workbench({
     addChat(w.id, { target: paneId, dir });
   };
 
-  const menu = (paneId: string) => (
-    <span className="flex items-center gap-1">
-      <button
-        type="button"
-        className={iconBtn}
-        title="向右分割"
-        aria-label="向右分割"
-        onClick={() => split(paneId, "h")}
-      >
-        <SplitRightIcon />
-      </button>
-      <button
-        type="button"
-        className={iconBtn}
-        title="向下分割"
-        aria-label="向下分割"
-        onClick={() => split(paneId, "v")}
-      >
-        <SplitDownIcon />
-      </button>
-      {doc.windows.length > 1 && (
-        <select
-          aria-label="移动到其他 window"
-          value=""
-          className="border border-line bg-bg text-xs"
-          onChange={(e) => {
-            const to = e.target.value;
-            if (to) update((d) => movePane(d, paneId, to));
-          }}
+  const menu = (paneId: string) => {
+    const entry = doc.panes[paneId];
+    const pinned = entry?.binding?.mode === "fixed";
+    return (
+      <span className="flex items-center gap-1">
+        {registry.get(entry?.type ?? "")?.follow !== "none" && (
+          <button
+            type="button"
+            aria-pressed={pinned}
+            title={
+              pinned ? "已钉住，点击改为跟随活动会话" : "跟随活动会话，点击钉住"
+            }
+            className={`border px-2 py-0.5 text-xs font-semibold ${pinned ? "border-line text-mute hover:text-ink" : "border-accent bg-accent-soft text-accent-deep"}`}
+            onClick={() =>
+              update((d) => toggleBinding(d, paneId, activeSessionId))
+            }
+          >
+            {pinned ? "钉住" : "跟随"}
+          </button>
+        )}
+        <button
+          type="button"
+          className={iconBtn}
+          title="向右分割"
+          aria-label="向右分割"
+          onClick={() => split(paneId, "h")}
         >
-          <option value="">移动到…</option>
-          {doc.windows
-            .filter((w) => !paneIds(w.tree).includes(paneId))
-            .map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-        </select>
-      )}
-      <button
-        type="button"
-        className={iconBtn}
-        title="关闭"
-        aria-label="关闭"
-        onClick={() => update((d) => closePane(d, paneId))}
-      >
-        <CloseIcon />
-      </button>
-    </span>
-  );
+          <SplitRightIcon />
+        </button>
+        <button
+          type="button"
+          className={iconBtn}
+          title="向下分割"
+          aria-label="向下分割"
+          onClick={() => split(paneId, "v")}
+        >
+          <SplitDownIcon />
+        </button>
+        {doc.windows.length > 1 && (
+          <select
+            aria-label="移动到其他 window"
+            value=""
+            className="border border-line bg-bg text-xs"
+            onChange={(e) => {
+              const to = e.target.value;
+              if (to) update((d) => movePane(d, paneId, to));
+            }}
+          >
+            <option value="">移动到…</option>
+            {doc.windows
+              .filter((w) => !paneIds(w.tree).includes(paneId))
+              .map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+          </select>
+        )}
+        <button
+          type="button"
+          className={iconBtn}
+          title="关闭"
+          aria-label="关闭"
+          onClick={() => update((d) => closePane(d, paneId))}
+        >
+          <CloseIcon />
+        </button>
+      </span>
+    );
+  };
 
   const tablist = (
     <div
@@ -358,91 +397,173 @@ export function Workbench({
     </div>
   );
 
+  const [notice, setNotice] = useState<string | null>(null);
+  // 打开路由：已开则切换 / 加入同类 tab 组 / 分屏（见 openPane）。
+  const open = (type: string) => {
+    const r = openPane(
+      doc,
+      { type, host: null, anchor: focused ?? undefined },
+      registry,
+      (e) => (e.binding?.mode === "fixed" ? e.binding.host : null),
+    );
+    if (r.paneId === null) {
+      setNotice(r.reason === "full" ? "同一组 tab 已满，先关掉不用的" : null);
+      return;
+    }
+    setNotice(null);
+    warnIfCrowded();
+    update(() => r.doc);
+    goto(r.paneId);
+  };
+  const groups = [...new Set(registry.list().map((t) => t.group))];
+  const select = "border border-line bg-bg px-1.5 py-0.5 text-xs font-semibold";
+
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-4 border-b border-line bg-panel px-3 py-1.5 text-xs">
+      <label className="flex items-center gap-2 text-mute">
+        布局预设
+        <select
+          className={select}
+          value=""
+          onChange={(e) => {
+            const key = e.target.value;
+            if (!key) return;
+            setFocus(null);
+            update((d) => applyPreset(d, key, registry, activeSessionId));
+          }}
+        >
+          <option value="">应用预设…</option>
+          {Object.entries(PRESETS).map(([key, p]) => (
+            <option key={key} value={key}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-mute">
+        打开面板
+        <select
+          className={select}
+          value=""
+          onChange={(e) => e.target.value && open(e.target.value)}
+        >
+          <option value="">选择类型…</option>
+          {groups.map((g) => (
+            <optgroup key={g} label={g}>
+              {registry
+                .list()
+                .filter((t) => t.group === g)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.displayName}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+
   return (
-    <div className="enter relative flex h-full min-h-0 flex-col">
-      {tabsHost ? (
-        createPortal(tablist, tabsHost)
-      ) : (
+    <div className="enter relative flex h-full min-h-0 flex-col min-[900px]:flex-row">
+      <SessionRail
+        sessions={sessions}
+        activeId={activeSessionId}
+        onSelect={selectSession}
+      />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="border-b border-line bg-panel px-3">{tablist}</div>
-      )}
-      <main className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
-        {wb.save.kind === "readonly" && (
-          <p role="alert" className="p-2 text-sm text-acc">
-            布局来自更新的版本，只读展示，不会保存
-          </p>
-        )}
-        {wb.save.kind === "failed" && (
-          <p role="alert" className="p-2 text-sm text-acc">
-            布局保存失败，本地改动已保留
-          </p>
-        )}
-        {wb.save.kind === "conflict" && (
-          <p role="alert" className="flex gap-3 p-2 text-sm text-acc">
-            布局已在别处修改
-            <button type="button" className={btn} onClick={wb.adoptServer}>
-              采用服务器版本
-            </button>
-            <button type="button" className={btn} onClick={wb.keepLocal}>
-              以本地覆盖
-            </button>
-          </p>
-        )}
-        {crowded && (
-          <p role="status" className="p-2 text-sm text-mute">
-            pane 已有 {Object.keys(doc.panes).length}{" "}
-            个，都会常驻内存，可以关掉不用的
-          </p>
-        )}
-        {wb.repaired && (
-          <p className="p-2 text-sm text-mute">布局比例异常，已按等分修复</p>
-        )}
-        {active && !active.tree && (
-          <div className="flex items-center gap-3 p-7 text-mute">
-            空 window
-            <button
-              type="button"
-              className={btn}
-              onClick={() => addChat(active.id)}
-            >
-              新建 pane
-            </button>
-          </div>
-        )}
-        <EnvContext.Provider value={env}>
-          <PaneLayer
-            doc={doc}
-            registry={registry}
-            focusedPaneId={focused}
-            onFocus={setFocus}
-            onConfig={(id, c, v) => update((d) => setPaneConfig(d, id, c, v))}
-            subtitle={(id) => {
-              const sid = sessionOf(id);
-              const s = sid ? sessions.find((x) => x.id === sid) : undefined;
-              return s ? (s.name ?? "未命名会话") : null;
-            }}
-            menu={menu}
-            dragHandle={dragHandle}
-            onSelectTab={(id) => {
-              update((d) => selectPaneTab(d, id));
-              goto(id);
-            }}
-            onCloseTab={(id) => update((d) => closePane(d, id))}
-            onRename={(id) => {
-              const cur = doc.panes[id]?.name ?? "";
-              const name = window.prompt("pane 名称（留空恢复默认）", cur);
-              if (name !== null) update((d) => renamePane(d, id, name));
-            }}
-            onResize={(windowId, path, index, delta) =>
-              update((d) => {
-                const w = d.windows.find((x) => x.id === windowId);
-                if (!w?.tree) return d;
-                const next = resize(w.tree, path, index, delta);
-                return next === w.tree ? d : setTree(d, windowId, next);
-              })
-            }
-          />
-        </EnvContext.Provider>
-      </main>
+        {toolbar}
+        <main className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
+          {notice && (
+            <p role="status" className="p-2 text-sm text-mute">
+              {notice}
+            </p>
+          )}
+          {wb.save.kind === "readonly" && (
+            <p role="alert" className="p-2 text-sm text-danger">
+              布局来自更新的版本，只读展示，不会保存
+            </p>
+          )}
+          {wb.save.kind === "failed" && (
+            <p role="alert" className="p-2 text-sm text-danger">
+              布局保存失败，本地改动已保留
+            </p>
+          )}
+          {wb.save.kind === "conflict" && (
+            <p role="alert" className="flex gap-3 p-2 text-sm text-danger">
+              布局已在别处修改
+              <button type="button" className={btn} onClick={wb.adoptServer}>
+                采用服务器版本
+              </button>
+              <button type="button" className={btn} onClick={wb.keepLocal}>
+                以本地覆盖
+              </button>
+            </p>
+          )}
+          {crowded && (
+            <p role="status" className="p-2 text-sm text-mute">
+              pane 已有 {Object.keys(doc.panes).length}{" "}
+              个，都会常驻内存，可以关掉不用的
+            </p>
+          )}
+          {wb.repaired && (
+            <p className="p-2 text-sm text-mute">布局比例异常，已按等分修复</p>
+          )}
+          {active && !active.tree && (
+            <div className="flex items-center gap-3 p-7 text-mute">
+              空 window
+              <button
+                type="button"
+                className={btn}
+                onClick={() => addChat(active.id)}
+              >
+                新建 pane
+              </button>
+            </div>
+          )}
+          <EnvContext.Provider value={env}>
+            <PaneLayer
+              doc={doc}
+              registry={registry}
+              focusedPaneId={focused}
+              onFocus={setFocus}
+              onConfig={(id, c, v, b) =>
+                update((d) => {
+                  const n = setPaneConfig(d, id, c, v);
+                  return b ? setPaneBinding(n, id, b) : n;
+                })
+              }
+              subtitle={(id) => {
+                const sid = sessionOf(id);
+                const s = sid ? sessions.find((x) => x.id === sid) : undefined;
+                return s ? (s.name ?? "未命名会话") : null;
+              }}
+              menu={menu}
+              dragHandle={dragHandle}
+              onSelectTab={(id) => {
+                update((d) => selectPaneTab(d, id));
+                goto(id);
+              }}
+              onCloseTab={(id) => update((d) => closePane(d, id))}
+              onRename={(id) => {
+                const cur = doc.panes[id]?.name ?? "";
+                const name = window.prompt("pane 名称（留空恢复默认）", cur);
+                if (name !== null) update((d) => renamePane(d, id, name));
+              }}
+              onResize={(windowId, path, index, delta) =>
+                update((d) => {
+                  const w = d.windows.find((x) => x.id === windowId);
+                  if (!w?.tree) return d;
+                  const next = resize(w.tree, path, index, delta);
+                  return next === w.tree ? d : setTree(d, windowId, next);
+                })
+              }
+            />
+          </EnvContext.Provider>
+        </main>
+      </div>
       {dragging && (
         // 盖住整个页面，iframe 类 pane 不会在拖动时吞掉 pointer 事件。
         <div aria-hidden="true" className="fixed inset-0 z-30 cursor-grabbing">
@@ -450,7 +571,7 @@ export function Workbench({
             <div
               data-drop-preview={dragTarget.kind}
               style={dragTarget.preview}
-              className="pointer-events-none fixed border-2 border-live bg-live/20"
+              className="pointer-events-none fixed border-2 border-accent bg-accent/15"
             />
           )}
           {ghost && (

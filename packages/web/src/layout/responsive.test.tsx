@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
-import { FakeWS, installApi } from "../fakes";
+import { FakeWS, installApi, msgs, snapshot } from "../fakes";
 import { Shell } from "../Shell";
 
 const sessions = [
@@ -59,62 +59,59 @@ const mount = async () => {
   render(<Shell sessions={sessions} onUnauthorized={() => {}} />);
   await act(async () => {});
 };
-const list = () => screen.queryByRole("complementary", { name: "会话列表" });
 const nav = () => screen.queryByRole("navigation", { name: "输入导航" });
 const body = () => document.querySelector("[data-chat-body]") as HTMLElement;
 
-test("R14 按 chat pane 自己的宽度：两侧固定；跨阈值默认折叠，再变宽又固定", async () => {
+test("R14 按 chat pane 自己的宽度：≥400 固定，窄于 400 折叠，再变宽又固定", async () => {
   await mount();
   fire(1000);
-  expect(list()).toBeTruthy();
   expect(nav()).toBeTruthy();
-  fire(800);
-  expect(list()).toBeTruthy();
+  fire(400);
+  expect(nav()).toBeTruthy();
+  fire(399);
   expect(nav()).toBeNull();
-  fire(500);
-  expect(list()).toBeNull();
   fire(1000);
-  expect(list()).toBeTruthy();
   expect(nav()).toBeTruthy();
 });
 
 test("R14 折叠后展开是悬浮：不占位，不挤压会话区", async () => {
   await mount();
-  fire(500);
+  fire(300);
   const before = body().children.length;
-  fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
-  expect(list()).toBeTruthy();
-  expect(list()?.className).toContain("absolute");
-  expect(list()?.className).toContain("inset-y-0");
   fireEvent.click(screen.getByRole("button", { name: "展开输入导航" }));
   expect(nav()?.className).toContain("absolute");
-  expect(body().children.length).toBe(before + 2);
+  expect(nav()?.className).toContain("inset-y-0");
+  expect(body().children.length).toBe(before + 1);
+  fireEvent.click(screen.getByRole("button", { name: "收起输入导航" }));
+  expect(nav()).toBeNull();
 });
 
 test("R14 手动设置后宽度变化不覆盖，刷新后仍记得", async () => {
   await mount();
   fire(1000);
-  fireEvent.click(screen.getByRole("button", { name: "折叠会话列表" }));
-  expect(list()).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "折叠输入导航" }));
+  expect(nav()).toBeNull();
   fire(1100);
-  expect(list()).toBeNull();
+  expect(nav()).toBeNull();
 
   cleanup();
   await mount();
   fire(1100);
-  expect(list()).toBeNull();
+  expect(nav()).toBeNull();
 
-  fire(500);
-  fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
-  fireEvent.click(screen.getByRole("button", { name: "固定会话列表" }));
-  fire(500);
-  expect(list()).toBeTruthy();
+  fire(300);
+  fireEvent.click(screen.getByRole("button", { name: "展开输入导航" }));
+  fireEvent.click(screen.getByRole("button", { name: "固定输入导航" }));
+  fire(300);
+  expect(nav()).toBeTruthy();
 });
 
-test("R14 悬浮展开时选择会话后自动收起", async () => {
+test("R14 悬浮展开时点击导航项后自动收起", async () => {
   await mount();
-  fire(500);
-  fireEvent.click(screen.getByRole("button", { name: "展开会话列表" }));
   fireEvent.click(screen.getByRole("button", { name: /甲/ }));
-  expect(list()).toBeNull();
+  act(() => FakeWS.last.serve(snapshot(1, msgs(0, 3))));
+  fire(300);
+  fireEvent.click(screen.getByRole("button", { name: "展开输入导航" }));
+  fireEvent.click(screen.getByRole("button", { name: "m2" }));
+  expect(nav()).toBeNull();
 });

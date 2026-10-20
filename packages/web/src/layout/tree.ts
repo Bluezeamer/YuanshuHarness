@@ -1,6 +1,7 @@
 import type { Rect, TreeNode } from "./types";
 
-export const MIN_RATIO = 0.05;
+// 对齐 mock 的 sash 夹取 0.12–0.88。
+export const MIN_RATIO = 0.12;
 
 const leaf = (paneId: string): TreeNode => ({ kind: "leaf", paneId });
 
@@ -135,6 +136,26 @@ export function split(
     ...t,
     children: t.children.map((c) => split(c, target, dir, newId, before)),
   };
+}
+
+// 交换 a、b 所在的两个叶子（含各自的 tab 组）；同一叶子或有一方不在树里则原样返回。
+export function swap(t: TreeNode, a: string, b: string): TreeNode {
+  const find = (n: TreeNode, id: string): Leaf | null => {
+    if (n.kind === "leaf") return idsOf(n).includes(id) ? n : null;
+    for (const c of n.children) {
+      const hit = find(c, id);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const la = find(t, a);
+  const lb = find(t, b);
+  if (!la || !lb || la === lb) return t;
+  const go = (n: TreeNode): TreeNode => {
+    if (n.kind === "leaf") return n === la ? lb : n === lb ? la : n;
+    return { ...n, children: n.children.map(go) };
+  };
+  return go(t);
 }
 
 // 关闭 pane：兄弟占满空出的位置；只剩一个孩子的分割节点折叠成该孩子。

@@ -4,7 +4,6 @@ import {
   fireEvent,
   render,
   screen,
-  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
@@ -24,6 +23,7 @@ const sessions = [s("s1", "甲"), s("s2", "乙")];
 beforeEach(() => {
   FakeWS.all = [];
   sessionStorage.clear();
+  localStorage.clear();
   saveToken("tok");
   vi.stubGlobal("WebSocket", FakeWS);
 });
@@ -44,13 +44,15 @@ const wait = (ms: number) =>
     await vi.advanceTimersByTimeAsync(ms);
   });
 
-test("R17 改动防抖后保存；刷新（重新挂载）后恢复会话绑定", async () => {
+test("R17 改动防抖后保存；刷新（重新挂载）后恢复钉住的会话", async () => {
   vi.useFakeTimers();
   const api = await mount();
   fireEvent.click(screen.getByRole("button", { name: /乙/ }));
+  fireEvent.click(screen.getByRole("button", { name: "跟随" }));
   expect(api.puts).toHaveLength(0);
   await wait(SAVE_DELAY_MS + 10);
   expect(api.puts).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: /甲/ }));
 
   cleanup();
   render(<Shell sessions={sessions} onUnauthorized={() => {}} />);
@@ -316,15 +318,14 @@ test("R17 保存失败（5xx 或网络）：提示且本地改动保留，下次
   }
 });
 
-test("R10 会话列表属于 chat pane：非 chat pane 没有列表", async () => {
+test("输入导航属于 chat pane：非 chat pane 没有", async () => {
   await mountDoc({
     version: 1,
     activeWindowId: "w1",
     windows: [{ id: "w1", name: "a", tree: { kind: "leaf", paneId: "f" } }],
     panes: { f: { type: "file_preview", configVersion: 1, config: {} } },
   });
-  expect(screen.queryByRole("complementary", { name: "会话列表" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /乙/ })).toBeNull();
+  expect(screen.queryByRole("navigation", { name: "输入导航" })).toBeNull();
 });
 
 test("R6 菜单：向下分割、移动到其他 window", async () => {
@@ -449,7 +450,7 @@ test("R6 分割后焦点落在新 pane 内", async () => {
   expect(document.activeElement?.closest("[data-pane-id]")).toBe(f);
 });
 
-test("R10 每个 chat pane 自带会话列表：选择只改本 pane 的绑定", async () => {
+test("rail 切会话：跟随的 chat pane 跟着走，钉住的不动", async () => {
   await mountDoc({
     version: 1,
     activeWindowId: "w1",
@@ -468,11 +469,17 @@ test("R10 每个 chat pane 自带会话列表：选择只改本 pane 的绑定",
         },
       },
     ],
-    panes: { c1: chat("s1"), c2: chat("s1") },
+    panes: {
+      c1: {
+        ...chat("s1"),
+        binding: { mode: "fixed", sessionId: "s1", host: null },
+      },
+      c2: chat(null),
+    },
   });
   const pane = (id: string) =>
     document.querySelector(`[data-pane-id='${id}']`) as HTMLElement;
-  fireEvent.click(within(pane("c2")).getByRole("button", { name: /乙/ }));
+  fireEvent.click(screen.getByRole("button", { name: /乙/ }));
   expect(pane("c2").querySelector("h1")?.textContent).toBe("乙");
   expect(pane("c1").querySelector("h1")?.textContent).toBe("甲");
 });

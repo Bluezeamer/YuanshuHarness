@@ -98,7 +98,7 @@ export function DirPicker({
       {view.state === "loading" && <p className="m-0 text-mute">加载目录…</p>}
       {view.state === "failed" && (
         <div className="flex flex-col items-start gap-2">
-          <p role="alert" className="m-0 font-semibold text-acc">
+          <p role="alert" className="m-0 font-semibold text-danger">
             {view.msg}
           </p>
           <button
@@ -171,7 +171,7 @@ export function DirPicker({
           <p role="status" className="m-0 text-xs">
             当前目录：
             <span
-              className={`font-semibold ${usable ? "text-ok" : "text-acc"}`}
+              className={`font-semibold ${usable ? "text-ok-ink" : "text-danger"}`}
             >
               {avail}
             </span>

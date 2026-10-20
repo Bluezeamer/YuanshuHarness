@@ -25,6 +25,7 @@ let admin: ReturnType<typeof installAdmin>;
 beforeEach(() => {
   FakeWS.all = [];
   sessionStorage.clear();
+  history.replaceState(null, "", "/");
   saveToken("tok");
   vi.stubGlobal("WebSocket", FakeWS);
   installApi([]);
@@ -42,7 +43,7 @@ afterEach(() => {
 
 const openSettings = async () => {
   render(<Shell sessions={[]} onUnauthorized={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("link", { name: "设置" }));
   await screen.findByLabelText("名称");
 };
 const patches = () => admin.calls.filter((c) => c.method === "PATCH");
@@ -164,10 +165,7 @@ test("查看并删除已记住的规则", async () => {
 
 const openNew = async () => {
   render(<Shell sessions={[]} onUnauthorized={() => {}} />);
-  // 顶栏按钮排在 DOM 最前；pane 会话列表里还有同名入口。
-  fireEvent.click(
-    screen.getAllByRole("button", { name: "新建会话" })[0] as HTMLElement,
-  );
+  fireEvent.click(screen.getByRole("button", { name: "新建会话" }));
   await screen.findByRole("dialog", { name: "新建会话" });
   await screen.findByRole("list", { name: "子目录" });
 };
@@ -262,7 +260,7 @@ test("会话审核策略：保存、清除（空串）", async () => {
   ];
   admin = installAdmin();
   render(<Shell sessions={[]} onUnauthorized={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("link", { name: "设置" }));
   fireEvent.click(screen.getByRole("tab", { name: "审核策略" }));
   const box = await screen.findByLabelText("审核策略");
   expect(screen.getByText(/拿不准时会交给你决定/)).toBeTruthy();

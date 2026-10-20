@@ -65,7 +65,7 @@ function Rules({ ws, onUnauthorized }: { ws: string; onUnauthorized: Unauth }) {
       <h3 className="m-0 text-sm font-bold">已记住的规则</h3>
       {rules === "loading" && <p className="m-0 text-mute">加载中…</p>}
       {rules === "failed" && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           规则加载失败
         </p>
       )}
@@ -96,7 +96,7 @@ function Rules({ ws, onUnauthorized }: { ws: string; onUnauthorized: Unauth }) {
         </ul>
       )}
       {error && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {error}
         </p>
       )}
@@ -203,7 +203,7 @@ function Editor({
         {tier === "full" && (
           <p
             role="note"
-            className="m-0 border border-acc px-3 py-2 text-sm font-semibold text-acc"
+            className="m-0 border border-danger px-3 py-2 text-sm font-semibold text-danger"
           >
             {FULL_RISK}
           </p>
@@ -214,9 +214,9 @@ function Editor({
         <div
           role="alertdialog"
           aria-label="确认设为完全允许"
-          className="flex flex-col gap-3 border border-acc p-3"
+          className="flex flex-col gap-3 border border-danger p-3"
         >
-          <p className="m-0 font-semibold text-acc">
+          <p className="m-0 font-semibold text-danger">
             确认把「{ws.name}」设为完全允许？{FULL_RISK}
           </p>
           <div className="flex gap-3">
@@ -240,11 +240,11 @@ function Editor({
       )}
 
       {error && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {error}
         </p>
       )}
-      {saved && !changed && <p className="m-0 text-ok">已保存</p>}
+      {saved && !changed && <p className="m-0 text-ok-ink">已保存</p>}
 
       <div className="flex flex-wrap gap-3">
         <button
@@ -342,7 +342,7 @@ function AddForm({
         />
       </div>
       {error && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {error}
         </p>
       )}
@@ -386,7 +386,7 @@ export function WorkspacesPanel({
   if (list === "failed")
     return (
       <div className="flex flex-col items-start gap-3 p-6">
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           工作区加载失败
         </p>
         <button type="button" onClick={() => void load()} className={actionBtn}>

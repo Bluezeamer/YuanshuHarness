@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { listSessions, loadToken, type SessionInfo } from "./api";
 import { Workbench } from "./layout/Workbench";
+import {
+  CapabilitiesPage,
+  NotFoundPage,
+  PreviewPage,
+  SessionPage,
+} from "./pages";
+import { Link, navigate, useRoute } from "./router";
 import { SessionHub } from "./sessions/hub";
 import { NewSession } from "./settings/NewSession";
 import { Settings } from "./settings/Settings";
+
+const NAV = [
+  { to: "/", label: "工作区", name: "workspace" },
+  { to: "/capabilities", label: "能力集", name: "capabilities" },
+  { to: "/settings", label: "设置", name: "settings" },
+  { to: "/preview", label: "内置预览", name: "preview" },
+] as const;
 
 export function Shell({
   sessions: initialSessions,
@@ -13,8 +27,8 @@ export function Shell({
   onUnauthorized: () => void;
 }) {
   const [sessions, setSessions] = useState(initialSessions);
-  const [panel, setPanel] = useState<"settings" | "new" | null>(null);
-  const [tabsHost, setTabsHost] = useState<HTMLDivElement | null>(null);
+  const route = useRoute();
+  const [panel, setPanel] = useState<"new" | null>(null);
   const [hub] = useState(() => new SessionHub());
   useEffect(() => {
     hub.onUnauthorized = onUnauthorized;
@@ -38,10 +52,21 @@ export function Shell({
     <div className="grid h-full grid-rows-[auto_1fr]">
       <header className="flex items-stretch gap-8 border-b border-ink bg-panel px-6">
         <div className="flex items-center gap-2.5 text-[17px] font-bold tracking-wider">
-          <i className="size-3 bg-acc" />
+          <i className="size-3 bg-accent-deep" />
           元枢
         </div>
-        <div ref={setTabsHost} className="flex items-stretch" />
+        <nav aria-label="主导航" className="flex items-stretch gap-1">
+          {NAV.map((n) => (
+            <Link
+              key={n.to}
+              to={n.to}
+              aria-current={route.name === n.name ? "page" : undefined}
+              className={`self-center rounded-md px-3 py-1.5 text-xs font-semibold ${route.name === n.name ? "bg-accent-soft text-accent-deep" : "text-mute hover:text-ink"}`}
+            >
+              {n.label}
+            </Link>
+          ))}
+        </nav>
         <div className="ml-auto flex items-center gap-3 font-medium">
           <button
             type="button"
@@ -53,13 +78,6 @@ export function Shell({
           >
             新建会话
           </button>
-          <button
-            type="button"
-            className={btn}
-            onClick={() => setPanel("settings")}
-          >
-            设置
-          </button>
           <i className="size-2 rounded-full bg-ok" />
           Server 在线
         </div>
@@ -69,15 +87,20 @@ export function Shell({
           hub={hub}
           sessions={sessions}
           onUnauthorized={onUnauthorized}
-          tabsHost={tabsHost}
           newSession={newSession}
         />
-        {panel === "settings" && (
+        {route.name === "settings" && (
           <Settings
-            onClose={() => setPanel(null)}
+            onClose={() => navigate("/")}
             onUnauthorized={onUnauthorized}
           />
         )}
+        {route.name === "capabilities" && <CapabilitiesPage />}
+        {route.name === "preview" && <PreviewPage />}
+        {route.name === "session" && (
+          <SessionPage id={route.id} sessions={sessions} />
+        )}
+        {route.name === "notfound" && <NotFoundPage />}
         {panel === "new" && (
           <NewSession
             onUnauthorized={onUnauthorized}

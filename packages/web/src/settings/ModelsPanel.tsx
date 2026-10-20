@@ -321,7 +321,7 @@ function AddForm({
       {msg && (
         <p
           role={msg.ok ? "status" : "alert"}
-          className={`m-0 font-semibold ${msg.ok ? "text-ok" : "text-acc"}`}
+          className={`m-0 font-semibold ${msg.ok ? "text-ok-ink" : "text-danger"}`}
         >
           {msg.text}
         </p>
@@ -396,7 +396,7 @@ export function ModelsPanel({
     <div className="flex flex-col gap-5">
       {models === "loading" && <p className="text-mute">加载中…</p>}
       {models === "failed" && (
-        <p role="alert" className="font-semibold text-acc">
+        <p role="alert" className="font-semibold text-danger">
           模型列表加载失败
         </p>
       )}
@@ -416,7 +416,7 @@ export function ModelsPanel({
                 <div className="font-semibold">
                   {m.name}
                   {m.isDefault && (
-                    <span className="ml-2 text-xs text-ok">默认</span>
+                    <span className="ml-2 text-xs text-ok-ink">默认</span>
                   )}
                 </div>
                 <div className="truncate text-xs text-mute">
@@ -449,7 +449,7 @@ export function ModelsPanel({
         </ul>
       )}
       {error && (
-        <p role="alert" className="m-0 font-semibold text-acc">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {error}
         </p>
       )}

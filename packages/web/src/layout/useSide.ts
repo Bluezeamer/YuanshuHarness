@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-export const LEFT_MIN_WIDTH = 640;
-export const RIGHT_MIN_WIDTH = 900;
+// 输入导航的固定 / 悬浮分界（对齐 mock navForm 的 400px）。
+export const NAV_MIN_WIDTH = 400;
 
 const key = (side: string) => `yuanshu.side.${side}`;
 const read = (side: string): boolean | null => {

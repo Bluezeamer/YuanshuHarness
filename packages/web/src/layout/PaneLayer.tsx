@@ -1,9 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Registry } from "./registry";
 import { dividers, layout, tabGroups } from "./tree";
-import type { LayoutDoc, Rect } from "./types";
+import type { LayoutDoc, PaneBinding, Rect } from "./types";
 
 const UNIT: Rect = { x: 0, y: 0, w: 1, h: 1 };
+const FOLLOW: PaneBinding = { mode: "follow" };
 // tab 栏高度；tab 组里的 pane 在它下面。
 const TAB_H = 30;
 
@@ -34,7 +35,12 @@ export function PaneLayer({
   registry: Registry;
   focusedPaneId: string | null;
   onFocus(paneId: string): void;
-  onConfig(paneId: string, config: unknown, configVersion?: number): void;
+  onConfig(
+    paneId: string,
+    config: unknown,
+    configVersion?: number,
+    binding?: PaneBinding,
+  ): void;
   subtitle?(paneId: string): string | null;
   menu?(paneId: string): React.ReactNode;
   dragHandle?(paneId: string): React.HTMLAttributes<HTMLElement>;
@@ -145,7 +151,7 @@ export function PaneLayer({
                 : `${r.h * 100}%`,
               visibility: active && place && shown ? "visible" : "hidden",
             }}
-            className={`flex min-h-0 min-w-0 flex-col border bg-bg ${focused ? "border-ink outline outline-2 -outline-offset-2 outline-live" : "border-line"}`}
+            className={`flex min-h-0 min-w-0 flex-col border bg-bg ${focused ? "border-ink outline outline-2 -outline-offset-2 outline-accent" : "border-line"}`}
           >
             {/* biome-ignore lint/a11y/noStaticElementInteractions: 双击改名是鼠标快捷方式 */}
             <header
@@ -170,8 +176,9 @@ export function PaneLayer({
                   paneId={id}
                   config={resolved.config as never}
                   focused={focused}
-                  onUpdateConfig={(c: never, v?: number) =>
-                    onConfig(id, c, v ?? resolved.configVersion)
+                  binding={entry.binding ?? FOLLOW}
+                  onUpdateConfig={(c: never, v?: number, b?: PaneBinding) =>
+                    onConfig(id, c, v ?? resolved.configVersion, b)
                   }
                 />
               ) : (
@@ -289,7 +296,7 @@ export function PaneLayer({
                     }),
                 touchAction: "none",
               }}
-              className="z-10 bg-transparent hover:bg-live/40 focus-visible:bg-live/60"
+              className="z-10 bg-transparent hover:bg-accent/40 focus-visible:bg-accent/60"
               onKeyDown={(e) => {
                 const back = vertical ? "ArrowLeft" : "ArrowUp";
                 const fwd = vertical ? "ArrowRight" : "ArrowDown";

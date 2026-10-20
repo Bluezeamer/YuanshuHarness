@@ -9,6 +9,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { saveToken } from "../api";
 import { FakeWS, installApi } from "../fakes";
 import { Shell } from "../Shell";
+import { addPane, defaultDoc } from "./doc";
+import { dropZone } from "./drag";
+import { defaultRegistry } from "./panes";
+import type { PaneEntry } from "./types";
 
 beforeEach(() => {
   FakeWS.all = [];
@@ -60,6 +64,25 @@ async function twoPanes() {
   fireEvent.click(screen.getByRole("button", { name: "向右分割" }));
   const regions = screen.getAllByRole("region");
   const ids = regions.map((r) => r.getAttribute("data-pane-id") as string);
+  return { regions, ids };
+}
+
+// 直接下发一份两个同类型 pane 的布局文档，用来测试 chat 之外的类型。
+async function twoPanesOf(types: [string, string]) {
+  const api = installApi([]);
+  const r = defaultRegistry();
+  let d = defaultDoc();
+  const w = d.activeWindowId;
+  d = addPane(d, w, "pa", r.newEntry(types[0]) as PaneEntry);
+  d = addPane(d, w, "pb", r.newEntry(types[1]) as PaneEntry, {
+    target: "pa",
+    dir: "h",
+  });
+  api.workbench = { revision: 1, document: d };
+  render(<Shell sessions={[]} onUnauthorized={() => {}} />);
+  await act(async () => {});
+  const regions = screen.getAllByRole("region");
+  const ids = regions.map((x) => x.getAttribute("data-pane-id") as string);
   return { regions, ids };
 }
 
@@ -230,7 +253,7 @@ function chromeGeometry(left: string, right: string) {
 }
 
 test("R9a 拖出 tab：落到整组的右边缘即平铺成两个 pane", async () => {
-  const { regions, ids } = await twoPanes();
+  const { regions, ids } = await twoPanesOf(["terminal", "terminal"]);
   const [a, b] = ids as [string, string];
   chromeGeometry(a, b);
   // 把 b 的标题栏拖到 a 的标题栏上：并入 tab 组。
@@ -257,4 +280,59 @@ test("R9a 拖出 tab：落到整组的右边缘即平铺成两个 pane", async (
     layer.querySelector(`[data-pane-id="${id}"]`) as HTMLElement;
   expect(el(a).style.width).toBe("50%");
   expect(el(b).style.width).toBe("50%");
+});
+
+test("dropZone 与 mock 同几何：中心 30%，四向各 35%", () => {
+  expect(dropZone(50, 50, 100, 100)).toBe("center");
+  expect(dropZone(64, 36, 100, 100)).toBe("center");
+  expect(dropZone(10, 50, 100, 100)).toBe("left");
+  expect(dropZone(90, 50, 100, 100)).toBe("right");
+  expect(dropZone(50, 10, 100, 100)).toBe("top");
+  expect(dropZone(50, 90, 100, 100)).toBe("bottom");
+  // 角落取偏离中心更远的轴。
+  expect(dropZone(5, 20, 100, 100)).toBe("left");
+  expect(dropZone(20, 5, 100, 100)).toBe("top");
+});
+
+test("面板头落到不可合并的 pane 中心：两个面板互换位置，不重挂载", async () => {
+  const { regions, ids } = await twoPanes();
+  const [a, b] = ids as [string, string];
+  fakeGeometry({ left: a, right: b });
+  const layer = document.querySelector("[data-pane-layer]") as HTMLElement;
+  const el = (id: string) =>
+    layer.querySelector(`[data-pane-id="${id}"]`) as HTMLElement;
+  const left = (id: string) => parseFloat(el(id).style.left);
+  const node = el(b);
+  expect(left(a)).toBeLessThan(left(b));
+  fireEvent.pointerDown(header(regions[1] as HTMLElement), {
+    clientX: 700,
+    clientY: 60,
+    button: 0,
+  });
+  move(250, 250);
+  expect(
+    (document.querySelector("[data-drop-preview]") as HTMLElement).dataset
+      .dropPreview,
+  ).toBe("swap");
+  up();
+  expect(left(b)).toBeLessThan(left(a));
+  expect(el(b)).toBe(node);
+});
+
+test("不同类型的 pane 落到中心：交换而不是并入 tab", async () => {
+  const { regions, ids } = await twoPanesOf(["terminal", "pdf"]);
+  const [a, b] = ids as [string, string];
+  fakeGeometry({ left: a, right: b });
+  fireEvent.pointerDown(header(regions[1] as HTMLElement), {
+    clientX: 700,
+    clientY: 60,
+    button: 0,
+  });
+  move(250, 250);
+  expect(
+    (document.querySelector("[data-drop-preview]") as HTMLElement).dataset
+      .dropPreview,
+  ).toBe("swap");
+  up();
+  expect(document.querySelector("[data-tabstrip]")).toBeNull();
 });

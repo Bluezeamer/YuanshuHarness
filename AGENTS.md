@@ -19,7 +19,8 @@ YuanshuHarness（元枢）：基于 Pi SDK 的常驻 Agent Server。愿景见 [d
 
 ## WebUI 风格
 
-- 写或改 `packages/web` 的任何界面、样式、动效、弹窗，先用 `yuanshu-webui-style` 技能；风格取向是改良版瑞士国际主义，视觉参考见该技能的 `assets/reference.html`。
+- 写或改 `packages/web` 的任何界面、样式、动效、弹窗，先用 `yuanshu-webui-style` 技能；风格取向是奶油纸 + 珊瑚陶土（瑞士式网格排版，系统字体与 mono 双轨），视觉参考见该技能的 `assets/reference.html`，工作区原型见 `tmp/mock-proto`。
+- 色彩分工刻意：绿 = “活着”（状态语义），珊瑚 = “焦点/你”（选择语义），不要混用；色值只走 `styles.css` 的变量，组件里不写死。
 
 ## 协作文件里的敏感信息
 

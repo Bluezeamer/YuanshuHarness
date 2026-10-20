@@ -1,3 +1,4 @@
+import type { Registry } from "./registry";
 import {
   addTab,
   containsPane,
@@ -6,9 +7,16 @@ import {
   repair,
   selectTab,
   split,
+  swap,
   tabGroupOf,
 } from "./tree";
-import type { LayoutDoc, LayoutWindow, PaneEntry, TreeNode } from "./types";
+import type {
+  LayoutDoc,
+  LayoutWindow,
+  PaneBinding,
+  PaneEntry,
+  TreeNode,
+} from "./types";
 
 // 2：叶子可带 tabs（R9a）。1 的文档没有 tabs，原样可读，读入时升到 2。
 export const DOC_VERSION = 2;
@@ -62,6 +70,112 @@ export function closeWindow(d: LayoutDoc, id: string): LayoutDoc {
       ? (windows[Math.min(i, windows.length - 1)] as LayoutWindow).id
       : d.activeWindowId;
   return { ...d, windows, panes, activeWindowId };
+}
+
+export function setPaneBinding(
+  d: LayoutDoc,
+  paneId: string,
+  binding: PaneBinding,
+): LayoutDoc {
+  const e = d.panes[paneId];
+  if (!e) return d;
+  return {
+    ...d,
+    panes: { ...d.panes, [paneId]: { ...e, binding } },
+  };
+}
+
+// 跟随 <-> 钉住：钉住时记下当时的活动会话，之后切会话它不动。
+export function toggleBinding(
+  d: LayoutDoc,
+  paneId: string,
+  activeSessionId: string | null,
+): LayoutDoc {
+  const e = d.panes[paneId];
+  if (!e) return d;
+  return setPaneBinding(
+    d,
+    paneId,
+    e.binding?.mode === "fixed"
+      ? { mode: "follow" }
+      : { mode: "fixed", sessionId: activeSessionId, host: null },
+  );
+}
+
+// mock 的 tab 条上限，超过就让用户先关几个。
+export const MAX_TABS = 8;
+
+export interface OpenRequest {
+  type: string;
+  // 内容所在主机；follow 面板视为随会话走，fixed 到别的主机的面板不接收。
+  host: string | null;
+  // 新建实例时覆盖默认配置（文件路径、URL 等）。
+  config?: unknown;
+  // 命中已有实例则只切换过去，不新建 tab。
+  same?: (e: PaneEntry) => boolean;
+  // 无同类面板时在它旁边分屏；缺省接在最后一个 pane 后。
+  anchor?: string;
+}
+
+export type OpenResult =
+  | { doc: LayoutDoc; paneId: string }
+  | { doc: LayoutDoc; paneId: null; reason: "full" | "unknown-type" };
+
+// 打开路由（对齐 mock openContent）：已开则切换 / 未开则加入同类面板的 tab 组 / 没有同类面板则分屏。
+export function openPane(
+  d: LayoutDoc,
+  req: OpenRequest,
+  registry: Pick<Registry, "newEntry" | "get">,
+  hostOf: (e: PaneEntry) => string | null,
+): OpenResult {
+  const w = d.windows.find((x) => x.id === d.activeWindowId);
+  const def = registry.get(req.type);
+  if (!w || !def) return { doc: d, paneId: null, reason: "unknown-type" };
+  const same = paneIds(w.tree).flatMap((id) => {
+    const e = d.panes[id];
+    return e?.type === req.type ? [{ id, e }] : [];
+  });
+  const hit = req.same && same.find((c) => req.same?.(c.e));
+  if (hit) return { doc: selectPaneTab(d, hit.id), paneId: hit.id };
+
+  let best: { id: string; e: PaneEntry; score: number } | null = null;
+  for (const c of same) {
+    const pinned = c.e.binding?.mode === "fixed";
+    const h = hostOf(c.e);
+    if (pinned && req.host !== null && h !== req.host) continue;
+    const score = (h === req.host ? 2 : 0) + (pinned ? 0 : 1);
+    if (!best || score > best.score) best = { ...c, score };
+  }
+
+  if (best) {
+    const target = selectPaneTab(d, best.id);
+    if (!def.tabbed) return { doc: target, paneId: best.id };
+    const group = w.tree ? tabGroupOf(w.tree, best.id) : null;
+    if ((group?.length ?? 1) >= MAX_TABS)
+      return { doc: d, paneId: null, reason: "full" };
+    const entry = registry.newEntry(req.type);
+    if (!entry) return { doc: d, paneId: null, reason: "unknown-type" };
+    const id = newId("p");
+    const fresh: PaneEntry = {
+      ...entry,
+      ...(req.config !== undefined ? { config: req.config } : {}),
+      ...(best.e.binding ? { binding: best.e.binding } : {}),
+    };
+    const withTab = mapWindow(
+      { ...d, panes: { ...d.panes, [id]: fresh } },
+      w.id,
+      (x) => ({ ...x, tree: x.tree ? addTab(x.tree, best.id, id) : x.tree }),
+    );
+    return { doc: withTab, paneId: id };
+  }
+
+  const entry = registry.newEntry(req.type);
+  if (!entry) return { doc: d, paneId: null, reason: "unknown-type" };
+  const id = newId("p");
+  const fresh: PaneEntry =
+    req.config !== undefined ? { ...entry, config: req.config } : entry;
+  const at = req.anchor ? { target: req.anchor, dir: "h" as const } : undefined;
+  return { doc: addPane(d, w.id, id, fresh, at), paneId: id };
 }
 
 export const renameWindow = (
@@ -149,6 +263,16 @@ export function moveToTab(
   return mapWindow(detached, to.id, (w) => ({
     ...w,
     tree: w.tree ? addTab(w.tree, target, paneId) : w.tree,
+  }));
+}
+
+// 面板头落到另一个面板中心：两个叶子互换位置，panes 表不动，实例不重挂载。
+export function swapPanes(d: LayoutDoc, a: string, b: string): LayoutDoc {
+  const w = windowOf(d, a);
+  if (!w?.tree || windowOf(d, b) !== w) return d;
+  return mapWindow(d, w.id, (x) => ({
+    ...x,
+    tree: x.tree ? swap(x.tree, a, b) : x.tree,
   }));
 }
 

@@ -99,7 +99,7 @@ export function PromptDialog({
 
   const titleId = `prompt-title-${prompt.promptId}`;
   const cell =
-    "px-4 py-3 font-semibold transition-colors hover:bg-ink hover:text-bg disabled:cursor-wait disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-ink";
+    "px-4 py-3 font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-ink";
 
   return (
     <div className="absolute inset-0 z-30 grid place-items-center bg-bg/60 p-4 backdrop-blur-[3px]">
@@ -109,10 +109,10 @@ export function PromptDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={trap}
-        className="enter w-[min(460px,92vw)] border border-ink bg-panel"
+        className="enter w-[min(460px,92vw)] overflow-hidden rounded-lg border border-line bg-panel shadow-pop"
       >
-        <div className="flex items-baseline justify-between gap-3 border-b border-ink px-4 py-2 text-xs">
-          <span className="font-semibold text-acc">
+        <div className="flex items-baseline justify-between gap-3 border-b border-line2 px-4 py-2 text-xs">
+          <span className="font-semibold text-danger">
             {approval ? "待审批" : "待回答"}
             {more > 0 && `（另有 ${more} 项）`}
           </span>
@@ -129,7 +129,7 @@ export function PromptDialog({
               <code className="font-mono text-xs font-semibold">
                 {prompt.detail.tool}
               </code>
-              <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-all border border-line bg-bg px-3 py-2 font-mono text-xs">
+              <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md border border-line bg-bg px-3 py-2 font-mono text-xs">
                 {prompt.detail.summary}
               </pre>
             </div>
@@ -141,13 +141,13 @@ export function PromptDialog({
             <Countdown expiresAt={prompt.expiresAt} />
           )}
           {error && (
-            <p role="alert" className="m-0 text-sm font-semibold text-acc">
+            <p role="alert" className="m-0 text-sm font-semibold text-danger">
               {error}
             </p>
           )}
         </div>
         {isInput ? (
-          <form onSubmit={submit} className="border-t border-ink">
+          <form onSubmit={submit} className="border-t border-line2">
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -166,14 +166,14 @@ export function PromptDialog({
             <button
               type="submit"
               disabled={busy || !text.trim()}
-              className={`${cell} w-full border-t border-line disabled:hover:bg-transparent`}
+              className={`${cell} w-full border-t border-line hover:bg-accent-soft hover:text-accent-deep disabled:hover:bg-transparent`}
             >
               提交
             </button>
           </form>
         ) : (
           <div
-            className={`grid border-t border-ink ${approval ? "grid-flow-col auto-cols-fr divide-x divide-ink" : "divide-y divide-line"}`}
+            className={`grid border-t border-line2 ${approval ? "grid-flow-col auto-cols-fr divide-x divide-line2" : "divide-y divide-line2"}`}
           >
             {prompt.options.map((o) => (
               <button
@@ -182,7 +182,7 @@ export function PromptDialog({
                 disabled={busy}
                 data-deny={o.id === "deny" ? "" : undefined}
                 onClick={() => onAnswer({ optionId: o.id })}
-                className={`${cell} ${o.id === "deny" ? "text-acc" : ""} ${approval ? "" : "text-left"}`}
+                className={`${cell} ${o.id === "deny" ? "text-danger hover:bg-danger-soft" : "hover:bg-accent-soft hover:text-accent-deep"} ${approval ? "" : "text-left"}`}
               >
                 {o.label}
               </button>

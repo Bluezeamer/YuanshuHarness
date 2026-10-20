@@ -30,7 +30,7 @@ function TickBar({
       <i
         // biome-ignore lint/suspicious/noArrayIndexKey: 刻度条按位置绘制，没有稳定 id
         key={i}
-        className={`flex-1 transition-all duration-[400ms] ${isLast && gap ? "h-4 bg-[repeating-linear-gradient(135deg,var(--acc)_0_2px,transparent_2px_4px)]" : isLast ? `h-4 ${running ? "dot-run bg-live" : "bg-ink"}` : "h-2 bg-ink/40"}`}
+        className={`flex-1 transition-all duration-[400ms] ${isLast && gap ? "h-4 bg-[repeating-linear-gradient(135deg,var(--danger)_0_2px,transparent_2px_4px)]" : isLast ? `h-4 ${running ? "dot-run bg-ok" : "bg-ink"}` : "h-2 bg-ink/40"}`}
       />
     );
   });
@@ -102,13 +102,13 @@ function ToolBlock({
 }) {
   const [expanded, setExpanded] = useState(open);
   const done = t.result !== undefined;
-  const cls = done ? (t.isError ? "text-acc" : "text-ok") : "text-live";
+  const cls = done ? (t.isError ? "text-danger" : "text-ok-ink") : "text-mute";
   const status = done ? (t.isError ? "失败" : "完成") : "运行中";
   return (
     <details
       open={expanded}
       onToggle={(e) => setExpanded(e.currentTarget.open)}
-      className={`group relative overflow-hidden border border-line bg-panel ${!done ? "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:w-[30%] after:animate-[slide_1.4s_var(--ease)_infinite] after:bg-live" : ""}`}
+      className={`group relative overflow-hidden border border-line bg-panel ${!done ? "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:w-[30%] after:animate-[slide_1.4s_var(--ease)_infinite] after:bg-ok" : ""}`}
     >
       <summary className="flex cursor-pointer items-center justify-between border-b border-line bg-ink/[0.04] px-3 py-1.5 text-xs transition-colors group-open:bg-ink/[0.06] hover:bg-ink/[0.08]">
         <div className="flex items-center gap-2">
@@ -184,7 +184,7 @@ function Message({
             <RichText text={text} />
             {partial && (
               <span
-                className="caret ml-1 inline-block h-[1.05em] w-[7px] align-text-bottom bg-live animate-[blink_1s_steps(2)_infinite]"
+                className="caret ml-1 inline-block h-[1.05em] w-[7px] align-text-bottom bg-ok animate-[blink_1s_steps(2)_infinite]"
                 role="img"
                 aria-label="正在输入"
               />
@@ -236,7 +236,7 @@ function Message({
           </div>
         )}
         {isQueued && (
-          <small className="text-xs font-semibold text-live animate-[blink_1.4s_steps(2)_infinite]">
+          <small className="text-xs font-semibold text-accent-deep animate-[blink_1.4s_steps(2)_infinite]">
             当前步骤结束后送达
           </small>
         )}
@@ -252,7 +252,7 @@ function SyncBar({ closed }: { closed: boolean }) {
   return (
     <div
       role="alert"
-      className="animate-[wipe_0.6s_var(--ease)] border-b border-ink bg-panel px-7 py-2 text-sm font-medium text-acc"
+      className="animate-[wipe_0.6s_var(--ease)] border-b border-ink bg-panel px-7 py-2 text-sm font-medium text-danger"
     >
       {closed ? "连接已断开，点击「重新连接」后以新快照恢复" : "正在重连…"}
     </div>
@@ -421,7 +421,7 @@ export function Conversation({
             <button
               type="button"
               onClick={onReconnect}
-              className="text-xs font-semibold text-live hover:underline"
+              className="text-xs font-semibold text-accent-deep hover:underline"
             >
               重新连接
             </button>
@@ -436,7 +436,7 @@ export function Conversation({
           style={{ overflowAnchor: "none" }}
         >
           {historyFailed && (
-            <p className="text-sm text-acc">历史加载失败，只显示当前窗口</p>
+            <p className="text-sm text-danger">历史加载失败，只显示当前窗口</p>
           )}
           {hasEarlier && (
             <div className="flex items-baseline gap-3">
@@ -449,7 +449,7 @@ export function Conversation({
                 {loadingEarlier ? "加载中…" : "加载更早"}
               </button>
               {earlierFailed && (
-                <span className="text-xs text-acc">
+                <span className="text-xs text-danger">
                   更早的消息加载失败，请重试
                 </span>
               )}
@@ -478,7 +478,7 @@ export function Conversation({
           {partial !== null && <Message who="agent" text={partial} partial />}
           {tools.length > 0 && <Message who="agent" tools={tools} />}
           {queue.length > 0 && (
-            <p className="text-xs font-semibold text-live">
+            <p className="text-xs font-semibold text-accent-deep">
               排队 {queue.length}
             </p>
           )}
@@ -486,8 +486,8 @@ export function Conversation({
             // biome-ignore lint/suspicious/noArrayIndexKey: 排队文本可重复，没有稳定 id
             <Message key={`q-${i}`} who="queued" text={q} />
           ))}
-          {error && <p className="text-sm text-acc">{error}</p>}
-          {notice && <p className="text-sm text-acc">{notice}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
+          {notice && <p className="text-sm text-danger">{notice}</p>}
         </div>
         <form
           onSubmit={handleSend}
@@ -515,7 +515,7 @@ export function Conversation({
               onClick={onStop}
               disabled={stopPending || !effective}
               aria-label="停止运行"
-              className="flex items-center gap-2 animate-[wipe_0.5s_var(--ease)] border-l border-line bg-acc px-7 font-semibold text-bg transition-colors hover:bg-acc-press disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex items-center gap-2 animate-[wipe_0.5s_var(--ease)] border-l border-line bg-danger px-7 font-semibold text-bg transition-colors hover:bg-danger/85 disabled:cursor-not-allowed disabled:opacity-70"
             >
               停止
             </button>

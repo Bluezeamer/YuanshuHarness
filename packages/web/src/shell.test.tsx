@@ -19,7 +19,7 @@ test("R6 按给定顺序渲染，空名显示未命名会话", () => {
     <Shell sessions={[s("1", "乙"), s("2", null)]} onUnauthorized={noop} />,
   );
   const items = screen.getAllByRole("listitem").map((li) => li.textContent);
-  expect(items).toEqual(["乙", "未命名会话"]);
+  expect(items).toEqual(["01乙", "02未命名会话"]);
 });
 
 test("R6 空列表显示提示", () => {

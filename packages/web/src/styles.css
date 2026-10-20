@@ -1,21 +1,48 @@
 @import "tailwindcss";
 
-/* 风格变量的唯一定义处；换整套风格时用 [data-theme] 覆盖这里。 */
+/* 风格变量的唯一定义处；换整套风格时用 [data-theme] 覆盖这里。
+   奶油纸 + 珊瑚陶土（对齐 tmp/mock-proto 的 :root）。
+   绿 = "活着"（状态语义）；珊瑚 = "焦点/你"（选择语义），分工刻意，勿混用。
+   与 mock 的命名对照：panel=surface、ink=fg、mute=muted、line=rule、line2=border。 */
 :root {
-  --bg: #f7f6f2;
-  --panel: #fcfbf8;
-  --ink: #16161a;
-  --mute: #585851;
-  --line: rgba(22, 22, 26, 0.14);
-  --line2: rgba(22, 22, 26, 0.07);
-  --acc: #c4331b;
-  --live: #1f4fd8;
-  --ok: #1d6b45;
-  --acc-press: #8f2410;
+  --bg: oklch(97% 0.012 85);
+  --panel: oklch(99.5% 0.004 85);
+  --ink: oklch(28% 0.02 70);
+  --mute: oklch(52% 0.02 75);
+  --line: oklch(86% 0.016 80);
+  --line2: oklch(91% 0.012 80);
+  --accent: oklch(57% 0.17 32);
+  /* 文字与实心按钮底用 deep：accent 本色压在 bg 上不足 4.5:1 */
+  --accent-deep: oklch(48% 0.16 32);
+  --accent-soft: color-mix(in oklch, var(--accent) 10%, var(--panel));
+  --ok: oklch(60% 0.15 155);
+  --ok-ink: oklch(48% 0.12 155);
+  --ok-soft: color-mix(in oklch, var(--ok) 12%, var(--panel));
+  --warn: oklch(76% 0.13 75);
+  --warn-ink: oklch(45% 0.1 75);
+  --warn-soft: color-mix(in oklch, var(--warn) 16%, var(--panel));
+  /* 比 mock 的 58% 略深，让它同时能做文字色与实心底（对比度 ≥ 4.5:1） */
+  --danger: oklch(54% 0.19 25);
+  --danger-soft: color-mix(in oklch, var(--danger) 10%, var(--panel));
+  --info: oklch(62% 0.07 205);
+  --info-soft: color-mix(in oklch, var(--info) 12%, var(--panel));
+  /* 终端 / 代码面：深底浅字，不随页面底色走 */
+  --code-bg: oklch(22% 0.012 70);
+  --code-fg: oklch(92% 0.01 80);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --font-sans: Inter, system-ui, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --font-mono:
-    "Cascadia Code", "Cascadia Mono", ui-monospace, Consolas, monospace;
+    "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-1:
+    0 1px 2px color-mix(in oklch, var(--ink) 6%, transparent),
+    0 2px 10px color-mix(in oklch, var(--ink) 5%, transparent);
+  --shadow-2:
+    0 4px 14px color-mix(in oklch, var(--ink) 10%, transparent),
+    0 14px 40px color-mix(in oklch, var(--ink) 14%, transparent);
 }
 
 @theme inline {
@@ -25,12 +52,27 @@
   --color-mute: var(--mute);
   --color-line: var(--line);
   --color-line2: var(--line2);
-  --color-acc: var(--acc);
-  --color-live: var(--live);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
-  --color-acc-press: var(--acc-press);
+  --color-ok-ink: var(--ok-ink);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-code-bg: var(--code-bg);
+  --color-code-fg: var(--code-fg);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --shadow-card: var(--shadow-1);
+  --shadow-pop: var(--shadow-2);
 }
 
 html,
@@ -48,14 +90,16 @@ body {
 }
 
 ::selection {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--accent-deep);
+  color: var(--panel);
 }
 
 button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--live);
-  outline-offset: -2px;
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @keyframes blink {

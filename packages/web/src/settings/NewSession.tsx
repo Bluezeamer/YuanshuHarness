@@ -157,7 +157,7 @@ export function NewSession({
       >
         <h2 className="m-0 text-base font-bold">新建会话</h2>
         {list === "failed" && (
-          <p role="alert" className="m-0 font-semibold text-acc">
+          <p role="alert" className="m-0 font-semibold text-danger">
             已登记工作区加载失败，仍可直接选择目录
           </p>
         )}
@@ -236,7 +236,7 @@ export function NewSession({
             {tier === "full" && (
               <p
                 role="note"
-                className="m-0 border border-acc px-3 py-2 text-sm font-semibold text-acc"
+                className="m-0 border border-danger px-3 py-2 text-sm font-semibold text-danger"
               >
                 {FULL_RISK}
               </p>
@@ -244,12 +244,12 @@ export function NewSession({
           </fieldset>
         )}
         {blocked && (
-          <p className="m-0 text-sm font-semibold text-acc">
+          <p className="m-0 text-sm font-semibold text-danger">
             该目录不可读写，不能创建会话，请换一个目录
           </p>
         )}
         {error && (
-          <p role="alert" className="m-0 font-semibold text-acc">
+          <p role="alert" className="m-0 font-semibold text-danger">
             {error}
           </p>
         )}

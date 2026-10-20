@@ -39,7 +39,7 @@ export function MermaidBlock({ code }: { code: string }) {
 
   if (error) {
     return (
-      <pre className="overflow-auto border border-acc/30 bg-acc/5 p-3 text-xs text-acc">
+      <pre className="overflow-auto border border-danger/30 bg-danger-soft p-3 text-xs text-danger">
         Mermaid 渲染失败: {error}
       </pre>
     );

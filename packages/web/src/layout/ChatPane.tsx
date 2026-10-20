@@ -1,9 +1,9 @@
 import { useCallback, useContext, useState } from "react";
 import { type Anchor, ConversationView } from "../ChatView";
-import { EnvContext } from "./env";
-import { ListIcon, NavIcon } from "./icons";
+import { EnvContext, useBound } from "./env";
+import { NavIcon } from "./icons";
 import type { PaneProps } from "./types";
-import { LEFT_MIN_WIDTH, RIGHT_MIN_WIDTH, useSide, useWidth } from "./useSide";
+import { NAV_MIN_WIDTH, useSide, useWidth } from "./useSide";
 
 export interface ChatConfig {
   sessionId: string | null;
@@ -16,23 +16,18 @@ const btn =
 const iconBtn =
   "grid size-6 place-items-center border border-line text-xs hover:bg-ink hover:text-bg";
 
-function StatusDot({ running }: { running: boolean }) {
-  return (
-    <span
-      role="img"
-      aria-label={running ? "运行中" : "空闲"}
-      className={`size-2 rounded-full ${running ? "dot-run bg-live" : "bg-ok"}`}
-    />
-  );
-}
-
-// R10、R13、R14：会话列表与输入导航属于 chat pane 自己，宽度也按这个 pane 判断。
-export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
+// 会话列表在 rail，pane 内只有输入导航（四态：固定 / 悬浮 × 开 / 关），宽度按这个 pane 判断。
+export function ChatPane({
+  config,
+  binding,
+  onUpdateConfig,
+}: PaneProps<ChatConfig>) {
   const env = useContext(EnvContext);
+  // follow 时是活动会话，fixed 时是钉住的会话；都没有时退回旧文档里记的 sessionId。
+  const sessionId = useBound(binding).sessionId ?? config.sessionId;
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const width = useWidth(root);
-  const left = useSide("left", LEFT_MIN_WIDTH, width);
-  const right = useSide("right", RIGHT_MIN_WIDTH, width);
+  const nav = useSide("nav", NAV_MIN_WIDTH, width);
   const [anchors, setAnchors] = useState<Anchor[]>([]);
   const onAnchors = useCallback((a: Anchor[]) => {
     setAnchors((prev) =>
@@ -44,20 +39,25 @@ export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
   }, []);
   if (!env) return null;
 
-  const session = config.sessionId
-    ? env.sessions.find((s) => s.id === config.sessionId)
+  const session = sessionId
+    ? env.sessions.find((s) => s.id === sessionId)
     : undefined;
   const shownAnchors = session ? anchors : [];
 
-  const choose = (sessionId: string) => {
-    left.close();
-    onUpdateConfig({ sessionId });
+  // 在 pane 里自己选会话，等于把这个 pane 钉在该会话上。
+  const choose = (id: string) => {
+    onUpdateConfig({ sessionId: id }, undefined, {
+      mode: "fixed",
+      sessionId: id,
+      host: null,
+    });
   };
   const jump = (id: string) => {
     const el = [...(root?.querySelectorAll("[data-anchor]") ?? [])].find(
       (n) => n.getAttribute("data-anchor") === id,
     );
     el?.scrollIntoView?.({ block: "start" });
+    nav.close();
   };
 
   return (
@@ -66,113 +66,30 @@ export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
       data-chat-pane
       className="relative flex h-full min-h-0 flex-col"
     >
-      {(!left.pinned || !right.pinned) && (
-        <div className="flex items-center justify-between border-b border-line2 px-2 py-1">
-          {!left.pinned ? (
-            <button
-              type="button"
-              className={iconBtn}
-              title={left.open ? "收起会话列表" : "展开会话列表"}
-              aria-label={left.open ? "收起会话列表" : "展开会话列表"}
-              aria-expanded={left.open}
-              onClick={left.toggleOpen}
-            >
-              <ListIcon />
-            </button>
-          ) : (
-            <span />
-          )}
-          {!right.pinned && (
-            <button
-              type="button"
-              className={iconBtn}
-              title={right.open ? "收起输入导航" : "展开输入导航"}
-              aria-label={right.open ? "收起输入导航" : "展开输入导航"}
-              aria-expanded={right.open}
-              onClick={right.toggleOpen}
-            >
-              <NavIcon />
-            </button>
-          )}
+      {!nav.pinned && (
+        <div className="flex items-center justify-end border-b border-line2 px-2 py-1">
+          <button
+            type="button"
+            className={iconBtn}
+            title={nav.open ? "收起输入导航" : "展开输入导航"}
+            aria-label={nav.open ? "收起输入导航" : "展开输入导航"}
+            aria-expanded={nav.open}
+            onClick={nav.toggleOpen}
+          >
+            <NavIcon />
+          </button>
         </div>
       )}
       <div className="relative flex min-h-0 flex-1" data-chat-body>
-        {(left.pinned || left.open) && (
-          <aside
-            aria-label="会话列表"
-            className={`min-h-0 w-[220px] shrink-0 overflow-auto border-r border-line bg-panel ${
-              left.open ? "absolute inset-y-0 left-0 z-20" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-line2 p-1">
-              {env.newSession ? (
-                <button
-                  type="button"
-                  className={btn}
-                  onClick={() =>
-                    env.newSession?.((sessionId) => {
-                      left.close();
-                      onUpdateConfig({ sessionId });
-                    })
-                  }
-                >
-                  新建会话
-                </button>
-              ) : (
-                <span />
-              )}
-              {left.open ? (
-                <button type="button" className={btn} onClick={left.pin}>
-                  固定会话列表
-                </button>
-              ) : (
-                <button type="button" className={btn} onClick={left.collapse}>
-                  折叠会话列表
-                </button>
-              )}
-            </div>
-            {env.sessions.length === 0 ? (
-              <p className="p-4 text-mute">还没有会话</p>
-            ) : (
-              <ul className="m-0 list-none p-0">
-                {env.sessions.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      aria-current={
-                        s.id === config.sessionId ? "true" : undefined
-                      }
-                      onClick={() => choose(s.id)}
-                      className={`grid w-full grid-cols-[8px_1fr] items-center gap-3 border-b border-line2 px-4 py-3 text-left hover:bg-ink/5 ${
-                        s.id === config.sessionId
-                          ? "bg-ink/5 shadow-[inset_3px_0_0_var(--ink)]"
-                          : ""
-                      }`}
-                    >
-                      <StatusDot running={s.running} />
-                      <span className="truncate font-semibold">
-                        {s.name ?? "未命名会话"}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </aside>
-        )}
         <div className="min-h-0 min-w-0 flex-1">
-          {!config.sessionId ? (
+          {!sessionId ? (
             <div className="flex items-center gap-3 p-7 text-mute">
               选择会话
               {env.newSession && (
                 <button
                   type="button"
                   className={btn}
-                  onClick={() =>
-                    env.newSession?.((sessionId) =>
-                      onUpdateConfig({ sessionId }),
-                    )
-                  }
+                  onClick={() => env.newSession?.((id) => choose(id))}
                 >
                   在此新建会话
                 </button>
@@ -188,20 +105,20 @@ export function ChatPane({ config, onUpdateConfig }: PaneProps<ChatConfig>) {
             />
           )}
         </div>
-        {(right.pinned || right.open) && (
+        {(nav.pinned || nav.open) && (
           <nav
             aria-label="输入导航"
             className={`min-h-0 w-[200px] shrink-0 overflow-auto border-l border-line bg-panel ${
-              right.open ? "absolute inset-y-0 right-0 z-20" : ""
+              nav.open ? "absolute inset-y-0 right-0 z-20" : ""
             }`}
           >
             <div className="flex justify-end border-b border-line2 p-1">
-              {right.open ? (
-                <button type="button" className={btn} onClick={right.pin}>
+              {nav.open ? (
+                <button type="button" className={btn} onClick={nav.pin}>
                   固定输入导航
                 </button>
               ) : (
-                <button type="button" className={btn} onClick={right.collapse}>
+                <button type="button" className={btn} onClick={nav.collapse}>
                   折叠输入导航
                 </button>
               )}

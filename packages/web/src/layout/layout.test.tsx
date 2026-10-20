@@ -15,7 +15,7 @@ import {
 import { PaneLayer } from "./PaneLayer";
 import { Registry } from "./registry";
 import { paneIds, resize, split } from "./tree";
-import type { LayoutDoc, PaneProps } from "./types";
+import type { LayoutDoc, PaneBinding, PaneProps } from "./types";
 
 afterEach(cleanup);
 
@@ -30,6 +30,10 @@ function Probe({ paneId }: PaneProps<{ n: number }>) {
 const registry = new Registry().register({
   id: "probe",
   displayName: "探针",
+  group: "主机" as const,
+  code: "PB",
+  tabbed: false,
+  follow: "host" as const,
   component: Probe,
   defaultConfig: () => ({ n: 0 }),
   configVersion: 2,
@@ -108,6 +112,7 @@ test("R3 变异检验：把 pane 放进按 window 分组的容器会触发重挂
   const moved = addWindow(d);
   const w2 = moved.activeWindowId;
   const after = movePane(moved, "a", w2);
+  const FOLLOW: PaneBinding = { mode: "follow" };
   const grouped = (doc: LayoutDoc) => (
     <div>
       {doc.windows.map((w) => (
@@ -118,6 +123,7 @@ test("R3 变异检验：把 pane 放进按 window 分组的容器会触发重挂
               paneId={id}
               config={{ n: 0 }}
               focused={false}
+              binding={FOLLOW}
               onUpdateConfig={() => {}}
             />
           ))}
@@ -200,6 +206,10 @@ test("R8 新增类型只改注册表，布局代码不动", () => {
   const r = new Registry().register({
     id: "extra",
     displayName: "额外",
+    group: "协作" as const,
+    code: "EX",
+    tabbed: false,
+    follow: "none" as const,
     component: () => <p>额外内容</p>,
     defaultConfig: () => ({}),
     configVersion: 1,

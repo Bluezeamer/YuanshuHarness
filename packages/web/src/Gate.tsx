@@ -91,9 +91,9 @@ export function Gate({
 
   return (
     <main className="enter grid h-full place-items-center">
-      <div className="w-[min(420px,92vw)] border border-ink bg-panel">
-        <div className="flex items-center gap-2.5 border-b border-ink px-5 py-3 text-[17px] font-bold">
-          <i className="size-3 bg-acc" />
+      <div className="w-[min(420px,92vw)] overflow-hidden rounded-lg border border-line bg-panel shadow-card">
+        <div className="flex items-center gap-2.5 border-b border-line2 px-5 py-3 text-[17px] font-bold">
+          <i className="size-3 rounded-sm bg-accent-deep" />
           元枢
         </div>
         {needToken ? (
@@ -107,30 +107,30 @@ export function Gate({
               autoComplete="off"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="border border-line bg-bg px-3 py-2 font-mono"
+              className="rounded-md border border-line bg-bg px-3 py-2 font-mono"
             />
             {text && (
-              <p role="alert" className="font-semibold text-acc">
+              <p role="alert" className="font-semibold text-danger">
                 {text}
               </p>
             )}
             <button
               type="submit"
-              className="border border-ink px-4 py-2 font-semibold hover:bg-ink hover:text-bg"
+              className="rounded-md border border-accent-deep bg-accent-deep px-4 py-2 font-semibold text-panel hover:bg-accent-deep/85"
             >
               进入
             </button>
           </form>
         ) : (
           <div className="flex flex-col gap-3 p-5">
-            <p role="alert" className="font-semibold text-acc">
+            <p role="alert" className="font-semibold text-danger">
               {text}
             </p>
             {failure.kind === "network" && (
               <button
                 type="button"
                 onClick={() => void probe(loadToken(), false)}
-                className="border border-ink px-4 py-2 font-semibold hover:bg-ink hover:text-bg"
+                className="rounded-md border border-accent-deep bg-accent-deep px-4 py-2 font-semibold text-panel hover:bg-accent-deep/85"
               >
                 重试
               </button>
