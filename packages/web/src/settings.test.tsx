@@ -301,3 +301,135 @@ test("新建会话：选了 agent 定义时带上 agentId", async () => {
     agentId: "a2",
   });
 });
+
+const SECRET = "test-secret-aaaa";
+const openVars = async () => {
+  render(<Shell sessions={[]} onUnauthorized={() => {}} />);
+  fireEvent.click(screen.getByRole("link", { name: "设置" }));
+  fireEvent.click(screen.getByRole("tab", { name: "隐私变量" }));
+  await screen.findByRole("form", { name: "登记变量" });
+};
+const fillVar = (name: string, value: string) => {
+  fireEvent.change(screen.getByLabelText("变量名（命令里写成 @变量名）"), {
+    target: { value: name },
+  });
+  fireEvent.change(screen.getByLabelText(/^值（只写入/), {
+    target: { value },
+  });
+};
+const varCalls = (method: string) =>
+  admin.calls.filter(
+    (c) => c.method === method && c.path.startsWith("/api/v1/variables"),
+  );
+
+test("隐私变量：登记后列表只显示元数据，值不回显", async () => {
+  await openVars();
+  fillVar("tok", SECRET);
+  fireEvent.change(screen.getByLabelText(/^用途说明/), {
+    target: { value: "GitLab 令牌" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await screen.findByText("@tok");
+  expect(varCalls("POST")[0]?.body).toEqual({
+    name: "tok",
+    purpose: "GitLab 令牌",
+    scopeKind: "any",
+    scopeTarget: null,
+    tier: "rules",
+    value: SECRET,
+  });
+  expect(document.body.textContent).not.toContain(SECRET);
+  expect((screen.getByLabelText(/^值（只写入/) as HTMLInputElement).value).toBe(
+    "",
+  );
+});
+
+test("隐私变量：值太短提示不会被遮罩；少于 4 个字符不能保存", async () => {
+  await openVars();
+  fillVar("pw", "abc");
+  expect(
+    (screen.getByRole("button", { name: "保存" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  fillVar("pw", "abcd");
+  expect(screen.getByRole("note").textContent).toContain("不会被遮罩");
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await screen.findByText(/值过短，输出回显不会被遮罩/);
+});
+
+test("隐私变量：域名范围必填域名，并以小写提交", async () => {
+  await openVars();
+  fillVar("tok", SECRET);
+  fireEvent.change(screen.getByLabelText("适用范围"), {
+    target: { value: "domain" },
+  });
+  const save = screen.getByRole("button", { name: "保存" });
+  expect((save as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("域名（含其子域名）"), {
+    target: { value: " GitLab.Example.com " },
+  });
+  fireEvent.click(save);
+  await screen.findByText(/域名 gitlab\.example\.com/);
+  expect(varCalls("POST")[0]?.body).toMatchObject({
+    scopeKind: "domain",
+    scopeTarget: "gitlab.example.com",
+  });
+});
+
+test("隐私变量：编辑时留空保留原值，填写才带 value", async () => {
+  admin.variables = [
+    {
+      id: "v1",
+      name: "tok",
+      purpose: "",
+      scopeKind: "any",
+      scopeTarget: null,
+      tier: "rules",
+      maskable: true,
+      createdAt: "t",
+    },
+  ];
+  await openVars();
+  fireEvent.click(await screen.findByRole("button", { name: "编辑 @tok" }));
+  fireEvent.change(screen.getByLabelText("授权档位"), {
+    target: { value: "auto" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(varCalls("PATCH")).toHaveLength(1));
+  expect(varCalls("PATCH")[0]?.body).toEqual({
+    name: "tok",
+    purpose: "",
+    scopeKind: "any",
+    scopeTarget: null,
+    tier: "auto",
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "编辑 @tok" }));
+  fireEvent.change(screen.getByLabelText(/^新值/), {
+    target: { value: SECRET },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(varCalls("PATCH")).toHaveLength(2));
+  expect(varCalls("PATCH")[1]?.body).toMatchObject({ value: SECRET });
+});
+
+test("隐私变量：重名给出提示；删除后从列表消失", async () => {
+  admin.variables = [
+    {
+      id: "v1",
+      name: "tok",
+      purpose: "",
+      scopeKind: "any",
+      scopeTarget: null,
+      tier: "rules",
+      maskable: true,
+      createdAt: "t",
+    },
+  ];
+  await openVars();
+  fillVar("tok", SECRET);
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await screen.findByText("变量名已存在");
+  fireEvent.click(screen.getByRole("button", { name: "删除 @tok" }));
+  await waitFor(() => expect(screen.queryByText("@tok")).toBeNull());
+  expect(varCalls("DELETE")).toHaveLength(1);
+});

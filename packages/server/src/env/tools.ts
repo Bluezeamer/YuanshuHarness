@@ -6,6 +6,7 @@ import {
   createEditToolDefinition,
   createFindToolDefinition,
   createGrepToolDefinition,
+  createLocalBashOperations,
   createLsToolDefinition,
   createReadToolDefinition,
   createWriteToolDefinition,
@@ -16,6 +17,8 @@ import {
   truncateHead,
   truncateLine,
 } from "@earendil-works/pi-coding-agent";
+import { Masker, maskBashOperations } from "../permission/masking.js";
+import { ENV_PREFIX, substitute } from "../permission/placeholders.js";
 import { shq } from "./ssh.js";
 import type { ExecEnv } from "./types.js";
 
@@ -62,10 +65,15 @@ async function remoteParams(env: ExecEnv, params: unknown): Promise<unknown> {
 
 export function sshBashOperations(env: ExecEnv): BashOperations {
   return {
-    // 不转发 SDK 传来的 env：那是 Server 本机的环境变量，不能带去远程。
+    // SDK 传来的 env 是 Server 本机的环境变量，不能带去远程；只转发隐私变量的那几个。
     exec: async (command, cwd, o) => {
+      const vars = Object.entries(o.env ?? {}).filter(
+        (e): e is [string, string] =>
+          e[0].startsWith(ENV_PREFIX) && typeof e[1] === "string",
+      );
       const r = await env.exec(command, cwd, {
         onData: o.onData,
+        ...(vars.length ? { env: Object.fromEntries(vars) } : {}),
         ...(o.signal ? { signal: o.signal } : {}),
         ...(o.timeout ? { timeout: o.timeout } : {}),
       });
@@ -292,11 +300,20 @@ type AnyDef = ReturnType<typeof createReadToolDefinition> & {
  * 注册 7 个同名工具。每次调用取会话当前 workspace 的环境：
  * 本机不传 operations，行为与 SDK 原样一致；ssh 经环境原语走远程。
  */
-export function routedToolsExtension(where: () => Where): ExtensionFactory {
+export function routedToolsExtension(
+  where: () => Where,
+  // 隐私变量的真值（名字 → 值）；bash 启动进程前才替换占位符，见 ADR-0051。
+  variables?: () => ReadonlyMap<string, string>,
+): ExtensionFactory {
   return (pi) => {
     const route = (
-      make: (cwd: string, options?: { operations: never }) => unknown,
+      make: (cwd: string, options?: object) => unknown,
       remote: (env: ExecEnv) => unknown,
+      prepare?: (
+        params: unknown,
+      ) => Promise<{ params: unknown; env: Record<string, string> } | null>,
+      // 包一层 operations（本机时入参为 undefined）；bash 用它做流式输出遮罩。
+      wrap?: (ops: unknown) => unknown,
     ) => {
       const proto = make(process.cwd()) as AnyDef;
       pi.registerTool({
@@ -314,12 +331,25 @@ export function routedToolsExtension(where: () => Where): ExtensionFactory {
             cwd: { value: cwd, enumerable: true },
           });
           const local = env.kind === "local";
-          const def = (
-            local ? make(cwd) : make(cwd, { operations: remote(env) as never })
-          ) as { execute: (...a: unknown[]) => Promise<unknown> };
+          const sub = await prepare?.(params);
+          const base = local ? undefined : remote(env);
+          const ops = wrap?.(base) ?? base;
+          const def = make(cwd, {
+            ...(ops ? { operations: ops } : {}),
+            // 只对这一次调用生效：值进这条命令的进程环境，不进会话环境。
+            ...(sub?.env && Object.keys(sub.env).length
+              ? {
+                  spawnHook: (c: { env: NodeJS.ProcessEnv }) => ({
+                    ...c,
+                    env: { ...c.env, ...sub.env },
+                  }),
+                }
+              : {}),
+          }) as { execute: (...a: unknown[]) => Promise<unknown> };
+          const input = sub?.params ?? params;
           return def.execute(
             id,
-            local ? params : await remoteParams(env, params),
+            local ? input : await remoteParams(env, input),
             signal,
             onUpdate,
             c,
@@ -343,7 +373,30 @@ export function routedToolsExtension(where: () => Where): ExtensionFactory {
       writeFile: (p: string, c: string) => env.writeFile(p, c),
       access: (p: string) => accessible(env, p),
     }));
-    route(createBashToolDefinition as never, (env) => sshBashOperations(env));
+    route(
+      createBashToolDefinition as never,
+      (env) => sshBashOperations(env),
+      async (params) => {
+        const p = params as { command?: unknown };
+        const values = variables?.();
+        if (!values?.size || typeof p?.command !== "string") return null;
+        const r = await substitute(p.command, values);
+        return { params: { ...p, command: r.command }, env: r.env };
+      },
+      // 输出里的真值换回占位符（ADR-0053）；每次调用取最新清单。
+      (ops) => {
+        const masker = new Masker(
+          [...(variables?.() ?? [])].map(([name, value]) => ({ name, value })),
+        );
+        return masker.empty
+          ? undefined
+          : maskBashOperations(
+              (ops as BashOperations | undefined) ??
+                createLocalBashOperations(),
+              masker,
+            );
+      },
+    );
     route(createLsToolDefinition as never, (env) => ({
       exists: async (p: string) => (await env.stat(p)) !== null,
       stat: async (p: string) => {

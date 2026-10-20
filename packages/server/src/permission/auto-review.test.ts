@@ -188,10 +188,11 @@ describe("工具输出进审核上下文", () => {
 });
 
 describe("R4 硬边界不交审核", () => {
-  test("敏感路径与 sudo 不调用审核方，直接弹窗", async () => {
+  // root shell 不依赖宿主机的 sudoers 探测，结果是确定的。
+  test("root shell 不调用审核方，直接弹窗", async () => {
     const rv = reviewer(ALLOW);
     const x = await setup(rv);
-    CALLS.push({ tool: "bash", args: { command: "sudo ls" } });
+    CALLS.push({ tool: "bash", args: { command: "sudo -i" } });
     x.entry.send("go");
     await waitFor(() => prompts(x.c).length > 0, "prompt.requested");
     expect(rv.seen).toHaveLength(0);

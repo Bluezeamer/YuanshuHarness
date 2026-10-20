@@ -19,6 +19,7 @@ import { modelsApi } from "./api/models.js";
 import { promptApi } from "./api/prompt.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
 import { terminalsApi } from "./api/terminals.js";
+import { variablesApi } from "./api/variables.js";
 import { workbenchApi } from "./api/workbench.js";
 import { workspacesApi } from "./api/workspaces.js";
 import { createAuthHook, type RateLimitOptions } from "./auth.js";
@@ -247,6 +248,7 @@ export function createServer(
           prompts: new PromptService(blocks, conventions),
           envHub: hub,
           environments,
+          secrets,
           factory:
             options.sessionFactory ??
             options.makeSessionFactory?.({ models, secrets, agentDir }) ??
@@ -294,6 +296,7 @@ export function createServer(
             workspaces,
             pool,
           });
+          scope.register(variablesApi, { secrets });
           scope.register(fsApi);
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { ModelsPanel } from "./ModelsPanel";
 import { ReviewPanel } from "./ReviewPanel";
+import { VariablesPanel } from "./VariablesPanel";
 import { WorkspacesPanel } from "./WorkspacesPanel";
 
 const TABS = [
   { id: "ws", label: "工作区" },
   { id: "models", label: "模型" },
   { id: "review", label: "审核策略" },
+  { id: "vars", label: "隐私变量" },
 ] as const;
 
 // 盖在工作台上的管理页（工作台保持挂载，pane 状态不丢）。Esc 或「关闭」退出。
@@ -53,6 +55,8 @@ export function Settings({
           <WorkspacesPanel onUnauthorized={onUnauthorized} />
         ) : tab === "models" ? (
           <ModelsPanel onUnauthorized={onUnauthorized} />
+        ) : tab === "vars" ? (
+          <VariablesPanel onUnauthorized={onUnauthorized} />
         ) : (
           <ReviewPanel onUnauthorized={onUnauthorized} />
         )}

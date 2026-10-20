@@ -145,6 +145,14 @@ export const MIGRATIONS: Migration[] = [
        ALTER TABLE sessions ADD COLUMN agent_id TEXT;
        ALTER TABLE sessions ADD COLUMN mode TEXT`,
     ),
+  // 隐私变量（ADR-0050）：与凭据同表，kind='variable'；其余列只对变量有意义。
+  (db) =>
+    db.exec(
+      `ALTER TABLE secrets ADD COLUMN purpose TEXT;
+       ALTER TABLE secrets ADD COLUMN scope_kind TEXT NOT NULL DEFAULT 'any';
+       ALTER TABLE secrets ADD COLUMN scope_target TEXT;
+       ALTER TABLE secrets ADD COLUMN tier TEXT NOT NULL DEFAULT 'rules'`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

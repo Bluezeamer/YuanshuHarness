@@ -465,3 +465,59 @@ export const testModel = (token: string | null, input: ModelInput) =>
       return b;
     },
   );
+
+export type VariableScope = "any" | "domain" | "sudo";
+
+// 隐私变量的元数据；值只写入，接口永不返回。
+export interface VariableInfo {
+  id: string;
+  name: string;
+  purpose: string;
+  scopeKind: VariableScope;
+  scopeTarget: string | null;
+  tier: Tier;
+  // false：值太短，输出回显不会被遮罩。
+  maskable: boolean;
+  createdAt: string;
+}
+
+export interface VariableInput {
+  name: string;
+  purpose: string;
+  scopeKind: VariableScope;
+  scopeTarget: string | null;
+  tier: Tier;
+  value: string;
+}
+
+export const listVariables = (token: string | null) =>
+  call(
+    "GET",
+    "/api/v1/variables",
+    token,
+    undefined,
+    (b: { variables: VariableInfo[] }) => {
+      if (!Array.isArray(b.variables)) throw new Error("shape");
+      return b.variables;
+    },
+  );
+
+export const createVariable = (token: string | null, input: VariableInput) =>
+  call("POST", "/api/v1/variables", token, input, (b: VariableInfo) => b);
+
+// 不带 value 则保留原值。
+export const patchVariable = (
+  token: string | null,
+  id: string,
+  body: Partial<VariableInput>,
+) =>
+  call(
+    "PATCH",
+    `/api/v1/variables/${enc(id)}`,
+    token,
+    body,
+    (b: VariableInfo) => b,
+  );
+
+export const deleteVariable = (token: string | null, id: string) =>
+  call("DELETE", `/api/v1/variables/${enc(id)}`, token, undefined, () => {});

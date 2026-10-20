@@ -11,6 +11,7 @@ import { routedToolsExtension } from "../env/tools.js";
 import type { ExecEnv } from "../env/types.js";
 import { uuidv7 } from "../id.js";
 import { permissionExtension } from "../permission/extension.js";
+import { maskingExtension } from "../permission/masking-extension.js";
 import { isMode, type Mode, modeExtension } from "../permission/mode.js";
 import {
   type Evidence,
@@ -18,6 +19,7 @@ import {
   type ReviewerFactory,
   runReview,
 } from "../permission/review.js";
+import { SudoProbe } from "../permission/sudo.js";
 import type { Assembled } from "../prompt/assemble.js";
 import type { PromptService } from "../prompt/service.js";
 import type { Agent, AgentStore } from "../store/agents.js";
@@ -30,6 +32,7 @@ import {
   readToolOutputs,
 } from "../store/history.js";
 import type { RuleStore } from "../store/rules.js";
+import type { SecretStore } from "../store/secrets.js";
 import {
   findSessionFile,
   type IndexRow,
@@ -58,6 +61,7 @@ import {
 } from "./events.js";
 import { type PromptResult, type PromptSpec, PromptTable } from "./prompts.js";
 import { askUserExtension } from "./tools.js";
+import { variableNoticeExtension } from "./variable-notice.js";
 import {
   switchNotice,
   type WorkspaceView,
@@ -601,6 +605,8 @@ export interface PoolDeps {
   environments?: EnvironmentStore;
   // 执行审计；缺省时不记录。
   audit?: AuditLog;
+  // 隐私变量库；缺省时不注入清单、不做替换与遮罩。
+  secrets?: SecretStore;
 }
 
 const NAME_MAX = 200;
@@ -613,6 +619,9 @@ export class SessionPool {
   // 创建中预占的会话数（按 workspace）：工厂完成前删除 workspace 要拒绝。
   private readonly pending = new Map<string, number>();
   private disposed = false;
+
+  // sudo 探测缓存按环境共享给所有会话。
+  private readonly sudoProbe = new SudoProbe();
 
   constructor(private readonly deps: PoolDeps) {}
 
@@ -705,7 +714,18 @@ export class SessionPool {
       // 模式是上限，排在权限扩展之前。
       modeExtension(mode),
       askUserExtension(ask),
-      routedToolsExtension(where),
+      routedToolsExtension(where, () => {
+        const vars = this.deps.secrets?.variableValues() ?? [];
+        return new Map(vars.map((v) => [v.name, v.value]));
+      }),
+      ...(this.deps.secrets
+        ? [
+            variableNoticeExtension({
+              list: () => this.deps.secrets?.listVariables() ?? [],
+            }),
+            maskingExtension(() => this.deps.secrets?.variableValues() ?? []),
+          ]
+        : []),
       workspaceExtension({
         list: () => this.workspaceViews(current().id),
         switchTo: (target) => this.switchWorkspace(id, target),
@@ -742,6 +762,11 @@ export class SessionPool {
             sessionId: id,
             environmentId: current().environmentId,
           }),
+        variables: () => this.deps.secrets?.listVariables() ?? [],
+        sudo: {
+          probe: (cwd, args) => this.sudoProbe.probe(where().env, cwd, args),
+          invalidate: () => this.sudoProbe.invalidate(where().env.id),
+        },
         ...(reviewerFactory
           ? {
               review: (call) => {

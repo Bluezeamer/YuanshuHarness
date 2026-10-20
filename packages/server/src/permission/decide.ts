@@ -35,6 +35,8 @@ export type Action =
       rememberable: boolean;
       /** 含 sudo（不交审核模型）。 */
       sudo: boolean;
+      /** 直接开 root shell（su、sudo -s、sudo bash）：任何档位都人工审批、不可记住（ADR-0007）。 */
+      rootShell?: boolean;
     };
 
 export interface Ctx {
@@ -70,7 +72,6 @@ function covered(ctx: Ctx, access: Access, t: string): boolean {
 }
 
 export function decide(action: Action, ctx: Ctx): Decision {
-  if (ctx.tier === "full") return { verdict: "allow" };
   const ask = (
     remember: RememberRule | null,
     reviewable: boolean,
@@ -79,6 +80,8 @@ export function decide(action: Action, ctx: Ctx): Decision {
     remember,
     reviewable,
   });
+  if (action.kind === "command" && action.rootShell) return ask(null, false);
+  if (ctx.tier === "full") return { verdict: "allow" };
 
   if (action.kind === "path") {
     if (

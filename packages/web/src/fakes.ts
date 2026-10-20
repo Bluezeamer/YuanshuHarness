@@ -204,6 +204,7 @@ export interface Admin {
     createdAt: string;
   }[];
   rules: Record<string, object[]>;
+  variables: Record<string, unknown>[];
   // 下一次对应请求返回的状态码（一次性）。
   fail: Record<string, number>;
   calls: { method: string; path: string; body: unknown }[];
@@ -212,11 +213,18 @@ export interface Admin {
 // 在 installApi 之上叠加 workspace / 规则 / 会话写入的假实现。
 export function installAdmin(): Admin {
   const base = globalThis.fetch;
-  const admin: Admin = { workspaces: [], rules: {}, fail: {}, calls: [] };
+  const admin: Admin = {
+    workspaces: [],
+    rules: {},
+    variables: [],
+    fail: {},
+    calls: [],
+  };
   vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const isAdmin =
       input.startsWith("/api/v1/workspaces") ||
+      input.startsWith("/api/v1/variables") ||
       (input === "/api/v1/sessions" && method === "POST") ||
       (input.startsWith("/api/v1/sessions/") && method === "PATCH");
     if (!isAdmin) return base(input, init);
@@ -244,6 +252,34 @@ export function installAdmin(): Admin {
       };
       admin.workspaces.push(w);
       return json(201, w);
+    }
+    if (input.startsWith("/api/v1/variables")) {
+      if (input === "/api/v1/variables") {
+        if (method === "GET") return json(200, { variables: admin.variables });
+        if (admin.variables.some((x) => x.name === body.name))
+          return json(409, {});
+        // 与 Server 一致：响应里不含 value，只给 maskable。
+        const { value, ...meta } = body;
+        const v = {
+          ...meta,
+          id: `v${admin.variables.length + 1}`,
+          maskable: String(value).length >= 8,
+          createdAt: "t",
+        };
+        admin.variables.push(v);
+        return json(201, v);
+      }
+      const id = input.split("/").pop();
+      const v = admin.variables.find((x) => x.id === id);
+      if (!v) return json(404, {});
+      if (method === "PATCH") {
+        const { value, ...meta } = body;
+        Object.assign(v, meta);
+        if (value !== undefined) v.maskable = String(value).length >= 8;
+        return json(200, v);
+      }
+      admin.variables = admin.variables.filter((x) => x.id !== id);
+      return new Response(null, { status: 204 });
     }
     const m = /^\/api\/v1\/workspaces\/([^/]+)(?:\/rules(?:\/([^/]+))?)?$/.exec(
       input,

@@ -36,9 +36,15 @@ interface Tool {
   ) => Promise<{ content: { type: string; text?: string }[] }>;
 }
 
-async function load(where: () => Where) {
+async function load(
+  where: () => Where,
+  variables?: () => ReadonlyMap<string, string>,
+) {
   const tools = new Map<string, Tool>();
-  await routedToolsExtension(where)({
+  await routedToolsExtension(
+    where,
+    variables,
+  )({
     registerTool: (t: Tool) => tools.set(t.name, t),
   } as never);
   return async (name: string, params: unknown) => {
@@ -54,6 +60,30 @@ async function load(where: () => Where) {
     const r = await tool.execute("t", params, undefined, undefined, ctx);
     return r.content.map((c) => c.text ?? "").join("");
   };
+}
+
+// 含引号、$、空格、通配符、换行：值不进命令文本，所以都不应破坏命令。
+const VALUE = `s3cr3t-"q'$x y*\nz`;
+// 逐个读本机所有进程的命令行（不依赖 ps）。
+const SCAN_PROCS =
+  "for f in /proc/[0-9]*/cmdline; do tr '\\0' ' ' < $f; echo; done 2>/dev/null";
+
+// 输出会被遮罩，所以不直接回显真值：用字节数证明命令拿到了值，
+// 再数进程命令行里出现变量名与真值片段的行数（真值片段应为 0）；
+// 片段写成 [t] 是为了不匹配到探测命令自身。
+const PROBE = [
+  "printf %s @tok | wc -c",
+  `out=$(${SCAN_PROCS})`,
+  `printf %s "$out" | grep -c 'YUANSHU_VAR_to[k]'`,
+  `printf %s "$out" | grep -c 's3cr3[t]-'`,
+].join("; ");
+
+// 变量名出现在命令行只对本机成立：ssh 的命令文本不经远端 argv。
+function expectInjectedNotInArgv(out: string, nameInArgv: boolean) {
+  const [bytes, named, leaked] = out.trim().split("\n").map(Number);
+  expect(bytes).toBe(Buffer.byteLength(VALUE));
+  if (nameInArgv) expect(named).toBeGreaterThanOrEqual(1);
+  expect(leaked).toBe(0);
 }
 
 // 记录经过环境原语的调用：本机应为空（走 SDK 原样），ssh 必须有。
@@ -87,6 +117,42 @@ describe("本机环境的工具", () => {
     expect(await call("read", { path: "a.txt" })).toContain("hi");
     expect(await call("bash", { command: "pwd" })).toContain(dir);
     expect(s.calls).toEqual([]);
+  });
+
+  test("隐私变量：命令拿到真值，但值不在命令行里，也不留在后续调用的环境", async () => {
+    const call = await load(
+      () => ({ env: new LocalEnv(), cwd: dir }),
+      () => new Map([["tok", VALUE]]),
+    );
+    expectInjectedNotInArgv(await call("bash", { command: PROBE }), true);
+    expect(
+      await call("bash", { command: 'printf %s "${YUANSHU_VAR_tok-unset}"' }),
+    ).toBe("unset");
+  });
+
+  test("隐私变量：命令回显的真值在进入工具结果前换回占位符", async () => {
+    const call = await load(
+      () => ({ env: new LocalEnv(), cwd: dir }),
+      () => new Map([["tok", VALUE]]),
+    );
+    const out = await call("bash", { command: "printf 'a:%s:b' @tok" });
+    expect(out).toBe("a:@tok:b");
+    // 命令出错时的错误文本同样不含真值。
+    const failed = await call("bash", {
+      command: "printf '%s' @tok >&2; exit 3",
+    }).catch((e: Error) => e.message);
+    expect(failed).not.toContain(VALUE);
+    expect(failed).toContain("@tok");
+  });
+
+  test("未登记的 @xxx、邮箱、scope 包名原样不动", async () => {
+    const call = await load(
+      () => ({ env: new LocalEnv(), cwd: dir }),
+      () => new Map([["tok", VALUE]]),
+    );
+    expect(
+      await call("bash", { command: "echo a@tok.com @scope/pkg @nope" }),
+    ).toBe("a@tok.com @scope/pkg @nope\n");
   });
 });
 
@@ -182,6 +248,16 @@ describe.skipIf(!hasSshd)("ssh 环境的工具（真实 sshd）", () => {
     expect(await call("grep", { pattern: "absent-token-xyz" })).toContain(
       "No matches found",
     );
+  });
+
+  test("隐私变量：远端收到真值，远端任何进程的命令行里都没有", async () => {
+    const call = await load(
+      () => ({ env: ssh, cwd: work }),
+      () => new Map([["tok", VALUE]]),
+    );
+    expectInjectedNotInArgv(await call("bash", { command: PROBE }), false);
+    // 没有占位符时仍走原来的命令行路径。
+    expect(await call("bash", { command: "echo plain" })).toBe("plain\n");
   });
 
   test("按调用时的 workspace 路由：同一组工具先 ssh 后本机", async () => {

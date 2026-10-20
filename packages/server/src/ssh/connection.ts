@@ -271,6 +271,8 @@ export class SshConnection {
       onData: (d: Buffer) => void;
       signal?: AbortSignal;
       timeoutMs?: number;
+      /** 写入标准输入后立即关闭；给 `eval "$(cat)"` 这类远端命令行不含内容的用法。 */
+      stdin?: string;
     },
   ): Promise<{
     exitCode: number | null;
@@ -306,6 +308,7 @@ export class SshConnection {
         opts.signal?.addEventListener("abort", onAbort, { once: true });
         stream.on("data", opts.onData);
         stream.stderr.on("data", opts.onData);
+        if (opts.stdin !== undefined) stream.end(opts.stdin);
         stream.once(
           "close",
           (code: number | null | undefined, sig: string | null | undefined) => {

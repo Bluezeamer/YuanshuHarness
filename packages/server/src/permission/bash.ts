@@ -15,7 +15,7 @@ import { isInside, type PathEnv, pathOf, resolveTarget } from "./paths.js";
 const require = createRequire(import.meta.url);
 
 let parserReady: Promise<Parser> | undefined;
-function getParser(): Promise<Parser> {
+export function getParser(): Promise<Parser> {
   parserReady ??= (async () => {
     await Parser.init();
     const wasm = readFileSync(
@@ -123,6 +123,9 @@ export async function parseCommand(
 ): Promise<string[][] | null> {
   return (await parse(command))?.segs ?? null;
 }
+
+/** 同 parseCommand，另返回连接符：conns[i] 连接 segs[i] 与 segs[i+1]。 */
+export const parseWithConnectors = (command: string) => parse(command);
 
 const q = (w: string) =>
   /^[\w@%+=:,./-]+$/.test(w) ? w : `'${w.replaceAll("'", "'\\''")}'`;

@@ -132,13 +132,16 @@ export class SshEnv implements ExecEnv {
 
   async exec(command: string, cwd: string, opts: ExecOptions) {
     const conn = await this.c();
-    const exports = Object.entries(opts.env ?? {})
-      .map(([k, v]) => `export ${k}=${shq(v)};`)
-      .join(" ");
-    // 命令原样放进花括号组：换行保证末尾注释、heredoc、& 都不会吞掉右括号。
-    const script = `${exports} cd ${shq(cwd)} && {\n${command}\n}`;
-    const r = await conn.execStream(script, {
+    const env = opts.env ?? {};
+    const hasEnv = Object.keys(env).length > 0;
+    const script = `cd ${shq(cwd)} && {\n${command}\n}`;
+    // 有环境变量时喂 stdin（远端 ps 看不到），无则命令行直接拼（兼容现有测试与隐私变量前的场景）。
+    const exports = Object.entries(env)
+      .map(([k, v]) => `export ${k}=${shq(v)}`)
+      .join("\n");
+    const r = await conn.execStream(hasEnv ? 'eval "$(cat)"' : script, {
       onData: opts.onData,
+      ...(hasEnv ? { stdin: `${exports}\n${script}` } : {}),
       ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.timeout ? { timeoutMs: opts.timeout * 1000 } : {}),
     });
