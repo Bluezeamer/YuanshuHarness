@@ -25,6 +25,8 @@ export type Action =
       line: string;
       /** 命令里所有词，用于敏感词检测。 */
       words: string[];
+      /** 路径操作数解析符号链接后的真实路径：原词看不出 `public -> .env` 这类链接。 */
+      resolved: string[];
       /** 含无法分析的 shell 包装（bash -c 等）：只交人工、不可记住。 */
       opaque: boolean;
       /** 整条命令是出厂只读白名单的纯词连接。 */
@@ -101,8 +103,13 @@ export function decide(action: Action, ctx: Ctx): Decision {
     return ask({ kind: "path", access: action.access, value: first.dir }, true);
   }
 
-  // 命令：敏感词先于一切（含只读白名单与已记住规则）。
-  if (action.opaque || action.words.some(isSensitive)) return ask(null, false);
+  // 命令：敏感词与解析后的真实路径先于一切（含只读白名单与已记住规则）。
+  if (
+    action.opaque ||
+    action.words.some(isSensitive) ||
+    action.resolved.some(isSensitive)
+  )
+    return ask(null, false);
   if (action.readOnly) return { verdict: "allow" };
   if (
     action.normalized !== null &&

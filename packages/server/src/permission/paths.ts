@@ -12,9 +12,14 @@ export type PathEnv = Pick<
 export const pathOf = (env: Pick<ExecEnv, "kind">): path.PlatformPath =>
   env.kind === "ssh" ? path.posix : path;
 
+// SDK 工具会把这些空格改写成 U+0020，并把 `file://` 转成它指向的绝对路径；
+// 权限层不重复这套改写，直接当作无法可靠解析（不 fork SDK）。
+const SDK_REWRITTEN_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/;
+
 /**
  * 相对 cwd 解析并解析符号链接；尚不存在的路径取最近已存在祖先的真实路径再拼回尾部。
- * 悬空链接、循环链接、权限、连接失败等任何无法可靠解析的情况返回 null，调用方须按 cwd 外处理（不放行）。
+ * 悬空链接、循环链接、权限、连接失败、`file://` 前缀与 SDK 会改写的 Unicode 空格等
+ * 任何无法可靠解析的情况返回 null，调用方须按 cwd 外处理（不放行）。
  */
 export async function resolveTarget(
   raw: string,
@@ -23,7 +28,9 @@ export async function resolveTarget(
 ): Promise<string | null> {
   const pm = pathOf(env);
   try {
+    if (SDK_REWRITTEN_SPACES.test(raw)) return null;
     let p = raw.startsWith("@") ? raw.slice(1) : raw;
+    if (p.startsWith("file://")) return null;
     if (p === "~" || p.startsWith("~/"))
       p = pm.join(await env.homedir(), p.slice(1));
     let head = pm.resolve(cwd, p);

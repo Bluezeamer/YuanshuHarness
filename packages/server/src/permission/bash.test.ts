@@ -1,5 +1,11 @@
 // 只读白名单的表驱动补充测试：对照 Codex 清单补入的命令与被拒参数（见 bash.ts 顶部署名）。
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
@@ -254,6 +260,26 @@ describe("评审 R2：operandsInside 的路径操作数", () => {
     ["ls -la && cat ../x", false],
     ["cat a\nb", false],
   ])("%s -> %s", async (c, ok) => {
-    expect(await operandsInside(c, cwd, new LocalEnv())).toBe(ok);
+    expect((await operandsInside(c, cwd, new LocalEnv())).inside).toBe(ok);
+  });
+
+  // 评审 M1#1：resolved 是解析符号链接后的真实路径，选项内嵌的值能解析就收集
+  test("resolved：链接解析为真实路径，选项内嵌值也收集", async () => {
+    writeFileSync(path.join(cwd, ".env"), "X=1");
+    symlinkSync(path.join(cwd, ".env"), path.join(cwd, "public"));
+    const env = new LocalEnv();
+    const want = path.join(cwd, ".env");
+    for (const c of [
+      "cat public",
+      "grep -f public x",
+      "grep -fpublic x",
+      "grep --file=public x",
+      "dd if=public",
+    ])
+      expect((await operandsInside(c, cwd, env)).resolved, c).toContain(want);
+    // 出界时 resolved 仍收集
+    const out = await operandsInside("cat public ../x", cwd, env);
+    expect(out.inside).toBe(false);
+    expect(out.resolved).toContain(want);
   });
 });

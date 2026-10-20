@@ -213,3 +213,44 @@ describe("第三轮：无 glob 的 grep/find 与跟随链接的递归选项", ()
     expect(h.asked).toHaveLength(1);
   });
 });
+
+// 评审 M1#1：原词无害、真实路径敏感（cwd 里的链接指向 .env）
+describe("M1#1：符号链接指向敏感文件", () => {
+  const dir = path.join(root, "linkenv");
+  mkdirSync(dir);
+  writeFileSync(path.join(dir, ".env"), "SECRET=1");
+  writeFileSync(path.join(dir, "plain.txt"), "hi");
+  symlinkSync(path.join(dir, ".env"), path.join(dir, "public"));
+  symlinkSync(path.join(dir, "plain.txt"), path.join(dir, "pub2"));
+
+  test.each([
+    "cat public",
+    "head -n 1 public",
+    "grep -f public x",
+    "grep -fpublic x",
+    "grep --file=public x",
+    "dd if=public",
+  ])("%s：只读白名单也要人工审批，且不可记住", async (command) => {
+    const h = harness({ cwd: dir });
+    await h.call("bash", { command });
+    expect(h.ids()).toEqual([["allow", "deny"]]);
+  });
+
+  test("链接指向普通文件的同类命令照常放行", async () => {
+    const h = harness({ cwd: dir });
+    expect(await h.call("bash", { command: "cat pub2" })).toBeUndefined();
+    expect(h.asked).toHaveLength(0);
+  });
+
+  test("已记住的命令在链接改指敏感文件后不再放行", async () => {
+    const h = harness({
+      cwd: dir,
+      rules: () => ({ path: [], command: ["rm pub2"] }),
+    });
+    expect(await h.call("bash", { command: "rm pub2" })).toBeUndefined();
+    rmSync(path.join(dir, "pub2"));
+    symlinkSync(path.join(dir, ".env"), path.join(dir, "pub2"));
+    await h.call("bash", { command: "rm pub2" });
+    expect(h.ids()).toEqual([["allow", "deny"]]);
+  });
+});

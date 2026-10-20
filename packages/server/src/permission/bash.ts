@@ -394,46 +394,66 @@ export async function analyzeCommand(
 }
 
 /**
- * 补上选项附带的值，供敏感检查：`--file=.env` → `.env`；短选项 `-f.env`、`-nf.env` 无法可靠
+ * 单个词附带的选项值，供敏感检查：`--file=.env` → `.env`；短选项 `-f.env`、`-nf.env` 无法可靠
  * 判断选项在哪结束，取每个后缀；值里的 `,` `:` 分隔项也拆开。凡含 `=` 的词一律取等号后部分。
  */
-function withOptionValues(words: string[]): string[] {
+function optionValues(w: string): string[] {
   const extra: string[] = [];
-  for (const w of words) {
-    const eq = w.indexOf("=");
-    if (eq >= 0) extra.push(w.slice(eq + 1));
-    if (/^-[^-]/.test(w))
-      for (let i = 2; i < w.length; i++) extra.push(w.slice(i));
-  }
-  const split = extra.flatMap((x) => [x, ...x.split(/[,:]/)]);
-  return [...words, ...split.filter(Boolean)];
+  const eq = w.indexOf("=");
+  if (eq >= 0) extra.push(w.slice(eq + 1));
+  if (/^-[^-]/.test(w))
+    for (let i = 2; i < w.length; i++) extra.push(w.slice(i));
+  return extra.flatMap((x) => [x, ...x.split(/[,:]/)]).filter(Boolean);
+}
+
+const withOptionValues = (words: string[]): string[] => [
+  ...words,
+  ...words.flatMap(optionValues),
+];
+
+export interface Operands {
+  /** 路径操作数都在 cwd 内（只读白名单的前置条件）。 */
+  inside: boolean;
+  /** 所有路径操作数解析符号链接后的真实路径（含选项内嵌的值），供敏感检查。 */
+  resolved: string[];
 }
 
 /**
- * 只读命令的路径操作数是否都落在 cwd 内：每个非选项词按相对 cwd 解析（含符号链接），
- * 出界或无法解析即 false；含 `/` 的选项词（如 `--files0-from=/x`）无法拆出路径，同样 false。
+ * 命令的路径操作数：每个非选项词按相对 cwd 解析（含符号链接），出界或无法解析则 inside 为 false；
+ * 含 `/` 的选项词（如 `--files0-from=/x`）无法拆出路径，同样 inside 为 false。
  * 保守：`grep /etc x` 这类疑似路径的词也会因出界而不放行。
+ * resolved 不受 inside 影响，总是尽量收集：命令里的链接可能指向敏感文件（`cat public` → `.env`），
+ * 原词看不出来。`--opt=值`、`-f值`、`if=值` 里的值无法确定是不是路径，能解析就一并收集，解不出的不处理。
  */
 export async function operandsInside(
   command: string,
   cwd: string,
   env: PathEnv,
-): Promise<boolean> {
+): Promise<Operands> {
   const segs = await parseCommand(command);
-  if (!segs) return false;
+  if (!segs) return { inside: false, resolved: [] };
   const pm = pathOf(env);
+  let inside = true;
+  const resolved = new Set<string>();
+  const collect = async (w: string) => {
+    const p = await resolveTarget(w, cwd, env);
+    if (p !== null) resolved.add(p);
+    return p;
+  };
   for (const [, ...args] of segs) {
     for (const a of args) {
       // 递归并跟随符号链接的选项会越出 cwd
-      if (/^-[^-]*R/.test(a) || a === "--dereference-recursive") return false;
-      if (a === "-L" || a === "-follow" || a === "--dereference") return false;
+      if (/^-[^-]*R/.test(a) || a === "--dereference-recursive") inside = false;
+      if (a === "-L" || a === "-follow" || a === "--dereference")
+        inside = false;
+      for (const v of optionValues(a)) await collect(v);
       if (a.startsWith("-")) {
-        if (a.includes("/")) return false;
+        if (a.includes("/")) inside = false;
         continue;
       }
-      const p = await resolveTarget(a, cwd, env);
-      if (p === null || !isInside(cwd, p, pm)) return false;
+      const p = await collect(a);
+      if (p === null || !isInside(cwd, p, pm)) inside = false;
     }
   }
-  return true;
+  return { inside, resolved: [...resolved] };
 }
