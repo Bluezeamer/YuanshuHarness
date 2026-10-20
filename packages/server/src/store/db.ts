@@ -153,6 +153,37 @@ export const MIGRATIONS: Migration[] = [
        ALTER TABLE secrets ADD COLUMN scope_target TEXT;
        ALTER TABLE secrets ADD COLUMN tier TEXT NOT NULL DEFAULT 'rules'`,
     ),
+  // 能力库 skill（文件在数据目录，这里只存元数据）与 workspace 级能力分配。
+  (db) =>
+    db.exec(
+      `CREATE TABLE skills (
+         name TEXT PRIMARY KEY,
+         description TEXT NOT NULL,
+         scope TEXT NOT NULL,
+         source TEXT NOT NULL,
+         hash TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       );
+       CREATE TABLE workspace_capabilities (
+         workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+         kind TEXT NOT NULL,
+         name TEXT NOT NULL,
+         PRIMARY KEY (workspace_id, kind, name)
+       )`,
+    ),
+  // MCP 登记（ADR-0056）：连接配置与上次列出的工具缓存；密钥只存密码库 id。
+  (db) =>
+    db.exec(
+      `CREATE TABLE mcp_servers (
+         name TEXT PRIMARY KEY,
+         config TEXT NOT NULL,
+         tools TEXT,
+         tools_at TEXT,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       )`,
+    ),
 ];
 
 export const DB_FILE = "yuanshu.db";

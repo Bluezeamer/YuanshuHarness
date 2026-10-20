@@ -4,6 +4,7 @@ import {
   getAgentDir,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { mergeSkills } from "../skills/runtime.js";
 import { buildRuntime, type ModelStore } from "../store/models.js";
 import type { SecretStore } from "../store/secrets.js";
 import type { SessionFactory } from "./pool.js";
@@ -18,7 +19,7 @@ export function createSessionFactory(deps?: {
   secrets: SecretStore;
   agentDir: string;
 }): SessionFactory {
-  return async ({ id, sessionDir, cwd, file, extensions, agent }) => {
+  return async ({ id, sessionDir, cwd, file, extensions, agent, skills }) => {
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir: getAgentDir(),
@@ -33,6 +34,9 @@ export function createSessionFactory(deps?: {
             },
           }
         : {}),
+      // 有库内 skill 时按会话重排提示词里的 skill；缺省不动 pi 的自动发现（ADR-0055）。
+      skillsOverride: (base) =>
+        skills ? { ...base, skills: mergeSkills(base.skills, skills) } : base,
     });
     await resourceLoader.reload();
     const sessionManager = file

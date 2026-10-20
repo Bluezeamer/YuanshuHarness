@@ -15,9 +15,11 @@ import { auditApi } from "./api/audit.js";
 import { environmentsApi } from "./api/environments.js";
 import { filesApi } from "./api/files.js";
 import { fsApi } from "./api/fs.js";
+import { mcpApi } from "./api/mcp.js";
 import { modelsApi } from "./api/models.js";
 import { promptApi } from "./api/prompt.js";
 import { DEFAULTS, sessionsApi } from "./api/sessions.js";
+import { skillsApi } from "./api/skills.js";
 import { terminalsApi } from "./api/terminals.js";
 import { variablesApi } from "./api/variables.js";
 import { workbenchApi } from "./api/workbench.js";
@@ -26,20 +28,25 @@ import { createAuthHook, type RateLimitOptions } from "./auth.js";
 import type { Config } from "./config.js";
 import { prepareDataDir } from "./data-dir.js";
 import { EnvHub } from "./env/hub.js";
+import { McpRuntime } from "./mcp/runtime.js";
 import type { ReviewerFactory } from "./permission/review.js";
 import { GlobalConventions } from "./prompt/conventions.js";
 import { SEED_AGENTS, SEED_BLOCKS } from "./prompt/seeds.js";
 import { PromptService } from "./prompt/service.js";
 import { type SessionFactory, SessionPool } from "./session/pool.js";
+import { SkillRuntime } from "./skills/runtime.js";
 import { AgentStore } from "./store/agents.js";
 import { AuditLog } from "./store/audit.js";
 import { BlockStore } from "./store/blocks.js";
+import { CapabilityStore } from "./store/capabilities.js";
 import { type Db, openDatabase } from "./store/db.js";
 import { EnvironmentStore } from "./store/environments.js";
+import { McpStore } from "./store/mcp.js";
 import { ModelStore } from "./store/models.js";
 import { RuleStore } from "./store/rules.js";
 import { loadMasterKey, SecretStore } from "./store/secrets.js";
 import { SessionStore } from "./store/sessions.js";
+import { SkillStore } from "./store/skills.js";
 import { WorkbenchStore } from "./store/workbench.js";
 import { WorkspaceStore } from "./store/workspaces.js";
 import { TerminalManager, type TerminalOptions } from "./terminal/manager.js";
@@ -172,6 +179,7 @@ export function createServer(
 
   let db: Db | null = null;
   let envHub: EnvHub | null = null;
+  let mcpRuntime: McpRuntime | null = null;
   app.register(fastifyWebsocket, {
     options: {
       maxPayload: DEFAULTS.maxPayloadBytes,
@@ -242,6 +250,15 @@ export function createServer(
         blocks.seed(SEED_BLOCKS);
         agents.seed(SEED_AGENTS);
         const conventions = new GlobalConventions(config.dataDir);
+        const skills = new SkillStore(
+          db as Db,
+          path.join(config.dataDir, "skills"),
+        );
+        const capabilities = new CapabilityStore(db as Db);
+        const skillRuntime = new SkillRuntime({ skills, capabilities });
+        const mcpStore = new McpStore(db as Db);
+        const mcp = new McpRuntime({ mcp: mcpStore, secrets, capabilities });
+        mcpRuntime = mcp;
         const pool = new SessionPool({
           audit,
           agents,
@@ -249,6 +266,8 @@ export function createServer(
           envHub: hub,
           environments,
           secrets,
+          skills: skillRuntime,
+          mcp,
           factory:
             options.sessionFactory ??
             options.makeSessionFactory?.({ models, secrets, agentDir }) ??
@@ -298,11 +317,29 @@ export function createServer(
           });
           scope.register(variablesApi, { secrets });
           scope.register(fsApi);
+          // 能力库（ADR-0055、ADR-0056）：skill 与 MCP 的集中管理。
+          scope.register(skillsApi, {
+            skills,
+            capabilities,
+            workspaces,
+            environments,
+            hub,
+            runtime: skillRuntime,
+          });
+          scope.register(mcpApi, {
+            mcp: mcpStore,
+            secrets,
+            capabilities,
+            workspaces,
+            runtime: mcp,
+          });
           scope.register(workbenchApi, { store: new WorkbenchStore(db as Db) });
         });
       } catch (err) {
         envHub?.close();
         envHub = null;
+        void mcpRuntime?.close();
+        mcpRuntime = null;
         db.close();
         db = null;
         throw err;
@@ -319,6 +356,8 @@ export function createServer(
       } catch (err) {
         envHub?.close();
         envHub = null;
+        void mcpRuntime?.close();
+        mcpRuntime = null;
         db.close();
         db = null;
         throw new Error(
@@ -330,6 +369,8 @@ export function createServer(
     },
     async stop() {
       await app.close();
+      await mcpRuntime?.close();
+      mcpRuntime = null;
       envHub?.close();
       envHub = null;
       db?.close();

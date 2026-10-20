@@ -10,6 +10,8 @@ import { LocalEnv } from "../env/local.js";
 import { routedToolsExtension } from "../env/tools.js";
 import type { ExecEnv } from "../env/types.js";
 import { uuidv7 } from "../id.js";
+import type { McpRuntime } from "../mcp/runtime.js";
+import { type McpToolDef, mcpExtension } from "../mcp/tools.js";
 import { permissionExtension } from "../permission/extension.js";
 import { maskingExtension } from "../permission/masking-extension.js";
 import { isMode, type Mode, modeExtension } from "../permission/mode.js";
@@ -22,6 +24,11 @@ import {
 import { SudoProbe } from "../permission/sudo.js";
 import type { Assembled } from "../prompt/assemble.js";
 import type { PromptService } from "../prompt/service.js";
+import {
+  type SessionSkill,
+  type SkillRuntime,
+  skillNotice,
+} from "../skills/runtime.js";
 import type { Agent, AgentStore } from "../store/agents.js";
 import type { AuditInput, AuditLog } from "../store/audit.js";
 import { type EnvironmentStore, LOCAL_ENV_ID } from "../store/environments.js";
@@ -92,6 +99,8 @@ export interface FactoryOptions {
   extensions: ExtensionFactory[];
   // 缺省（测试里的假工厂）时不做 agent 装配。
   agent?: FactoryAgent;
+  // 本会话应生效的 skill（已同步到 workspace 的环境），工厂注入提示词（ADR-0055）。
+  skills?: SessionSkill[];
 }
 export type SessionFactory = (opts: FactoryOptions) => Promise<AgentSession>;
 
@@ -177,6 +186,8 @@ export class SessionEntry {
   workspaceId: string;
   // 切换 workspace 后待在下一轮末尾追加的通知。
   workspaceNotice: string | null = null;
+  // 提示词与通知里已列出的 skill 目录，切换时只补没列过的。
+  readonly listedSkills = new Set<string>();
   reviewPolicy: string | null;
   readonly agentId: string | null;
   // 创建时由 agent 的默认模式定下，会话内固定。
@@ -607,6 +618,10 @@ export interface PoolDeps {
   audit?: AuditLog;
   // 隐私变量库；缺省时不注入清单、不做替换与遮罩。
   secrets?: SecretStore;
+  // skill 同步与注入；缺省时会话不带库里的 skill。
+  skills?: SkillRuntime;
+  // MCP 工具注入；缺省时会话不带 MCP 工具。
+  mcp?: McpRuntime;
 }
 
 const NAME_MAX = 200;
@@ -687,6 +702,36 @@ export class SessionPool {
     return view;
   }
 
+  // 同步会话要用的 skill；不抛出，失败体现在 SkillRuntime 的 report 里。
+  private async prepareSkills(
+    id: string,
+    ws: Workspace,
+  ): Promise<SessionSkill[] | undefined> {
+    const env = this.envOf(ws);
+    if (!this.deps.skills || !env) return undefined;
+    return (await this.deps.skills.prepare(id, ws, env)).skills;
+  }
+
+  // 会话要用的 MCP 工具（agent 引用 + workspace 分配）；连不上的 server 只是没有工具。
+  private prepareMcp(id: string, ws: Workspace): Promise<McpToolDef[]> {
+    return this.deps.mcp?.prepare(id, ws.id) ?? Promise.resolve([]);
+  }
+
+  // 切换后该环境新增的 skill 与同步问题，拼在切换通知后面。
+  private async switchSkillNotice(entry: SessionEntry): Promise<string> {
+    const ws = this.deps.workspaces.get(entry.workspaceId);
+    const env = ws && this.envOf(ws);
+    if (!this.deps.skills || !ws || !env) return "";
+    const { report, skills } = await this.deps.skills.prepare(
+      entry.id,
+      ws,
+      env,
+    );
+    const text = skillNotice(report.items, entry.listedSkills);
+    for (const s of skills) entry.listedSkills.add(s.baseDir);
+    return text === "" ? "" : `\n${text}`;
+  }
+
   get canCreate(): boolean {
     return this.deps.factory !== null;
   }
@@ -696,6 +741,7 @@ export class SessionPool {
     id: string,
     ws: Workspace,
     mode: Mode,
+    mcpTools: McpToolDef[] = [],
   ): ExtensionFactory[] {
     const ask = (spec: PromptSpec) =>
       this.entries.get(id)?.ask(spec) ??
@@ -726,14 +772,22 @@ export class SessionPool {
             maskingExtension(() => this.deps.secrets?.variableValues() ?? []),
           ]
         : []),
+      ...(this.deps.mcp && mcpTools.length > 0
+        ? [
+            mcpExtension(mcpTools, (...a) =>
+              (this.deps.mcp as McpRuntime).call(...a),
+            ),
+          ]
+        : []),
       workspaceExtension({
         list: () => this.workspaceViews(current().id),
         switchTo: (target) => this.switchWorkspace(id, target),
-        takeNotice: () => {
+        takeNotice: async () => {
           const entry = this.entries.get(id);
           const n = entry?.workspaceNotice ?? null;
-          if (entry) entry.workspaceNotice = null;
-          return n;
+          if (!entry || n === null) return null;
+          entry.workspaceNotice = null;
+          return n + (await this.switchSkillNotice(entry));
         },
       }),
       permissionExtension({
@@ -980,15 +1034,19 @@ export class SessionPool {
     const n = this.pending.get(ws.id) ?? 0;
     this.pending.set(ws.id, n + 1);
     let session: Awaited<ReturnType<typeof factory>>;
+    let skills: SessionSkill[] | undefined;
     try {
+      skills = await this.prepareSkills(id, ws);
+      const mcpTools = await this.prepareMcp(id, ws);
       session = await factory({
         id,
         sessionDir: this.deps.sessionDir,
         cwd: ws.path,
-        extensions: this.extensions(id, ws, mode),
+        extensions: this.extensions(id, ws, mode, mcpTools),
         ...(agent
           ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
           : {}),
+        ...(skills ? { skills } : {}),
       });
     } finally {
       const n = this.pending.get(ws.id) ?? 0;
@@ -1012,6 +1070,7 @@ export class SessionPool {
       promptText,
       ...this.entryOptions(),
     });
+    for (const s of skills ?? []) entry.listedSkills.add(s.baseDir);
     this.entries.set(id, entry);
     return entry.info;
   }
@@ -1071,16 +1130,19 @@ export class SessionPool {
         ? (await this.assemblePrompt(agent.promptBlocks, ws, mode)).text
         : null);
     let session: AgentSession;
+    const skills = await this.prepareSkills(id, ws);
+    const mcpTools = await this.prepareMcp(id, ws);
     try {
       session = await factory({
         id,
         sessionDir,
         file,
         cwd: ws.path,
-        extensions: this.extensions(id, ws, mode),
+        extensions: this.extensions(id, ws, mode, mcpTools),
         ...(agent
           ? { agent: this.factoryAgent(id, agent, promptText ?? "") }
           : {}),
+        ...(skills ? { skills } : {}),
       });
     } catch (err) {
       throw new PoolError("load_failed", reason(err));
@@ -1103,6 +1165,7 @@ export class SessionPool {
       interrupted,
       ...this.entryOptions(),
     });
+    for (const s of skills ?? []) entry.listedSkills.add(s.baseDir);
     this.entries.set(id, entry);
     return entry;
   }

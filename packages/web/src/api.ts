@@ -521,3 +521,243 @@ export const patchVariable = (
 
 export const deleteVariable = (token: string | null, id: string) =>
   call("DELETE", `/api/v1/variables/${enc(id)}`, token, undefined, () => {});
+
+// ---- 能力库：skill / MCP（ADR-0055、ADR-0056）----
+
+export interface EnvironmentInfo {
+  id: string;
+  name: string;
+  kind: "local" | "ssh";
+}
+
+export interface SecretInfo {
+  id: string;
+  name: string;
+  kind: string;
+}
+
+export const listEnvironments = (token: string | null) =>
+  call(
+    "GET",
+    "/api/v1/environments",
+    token,
+    undefined,
+    (b: { environments: EnvironmentInfo[] }) => {
+      if (!Array.isArray(b.environments)) throw new Error("shape");
+      return b.environments;
+    },
+  );
+
+export const listSecrets = (token: string | null) =>
+  call(
+    "GET",
+    "/api/v1/secrets",
+    token,
+    undefined,
+    (b: { secrets: SecretInfo[] }) => {
+      if (!Array.isArray(b.secrets)) throw new Error("shape");
+      return b.secrets;
+    },
+  );
+
+export type SkillScope = "global" | "project";
+
+export interface SkillInfo {
+  name: string;
+  description: string;
+  scope: SkillScope;
+  source: string;
+  updatedAt: string;
+}
+
+export interface EnvSkillInfo {
+  name: string;
+  description: string;
+  dir: string;
+  managed: boolean;
+  inLibrary: boolean;
+}
+
+export type SyncStatus =
+  | "added"
+  | "updated"
+  | "unchanged"
+  | "conflict"
+  | "failed";
+
+export interface SyncItem {
+  name: string;
+  scope: SkillScope;
+  status: SyncStatus;
+  message?: string;
+}
+
+export interface SyncReport {
+  workspaceId: string;
+  at: string;
+  items: SyncItem[];
+}
+
+export const listSkills = (token: string | null) =>
+  call(
+    "GET",
+    "/api/v1/skills",
+    token,
+    undefined,
+    (b: { skills: SkillInfo[] }) => {
+      if (!Array.isArray(b.skills)) throw new Error("shape");
+      return b.skills;
+    },
+  );
+
+export const setSkillScope = (
+  token: string | null,
+  name: string,
+  scope: SkillScope,
+) =>
+  call(
+    "PATCH",
+    `/api/v1/skills/${enc(name)}`,
+    token,
+    { scope },
+    (b: SkillInfo) => b,
+  );
+
+export const deleteSkill = (token: string | null, name: string) =>
+  call("DELETE", `/api/v1/skills/${enc(name)}`, token, undefined, () => {});
+
+export const scanEnvSkills = (
+  token: string | null,
+  environmentId: string,
+  workspaceId?: string,
+) =>
+  call(
+    "GET",
+    `/api/v1/environments/${enc(environmentId)}/skills${workspaceId ? `?workspaceId=${enc(workspaceId)}` : ""}`,
+    token,
+    undefined,
+    (b: { skills: EnvSkillInfo[] }) => {
+      if (!Array.isArray(b.skills)) throw new Error("shape");
+      return b.skills;
+    },
+  );
+
+export const importEnvSkill = (
+  token: string | null,
+  body: {
+    environmentId: string;
+    dir: string;
+    scope: SkillScope;
+    workspaceId?: string;
+  },
+) => call("POST", "/api/v1/skills/import", token, body, (b: SkillInfo) => b);
+
+export const getWorkspaceNames = (
+  token: string | null,
+  workspaceId: string,
+  kind: "skills" | "mcp",
+) =>
+  call(
+    "GET",
+    `/api/v1/workspaces/${enc(workspaceId)}/${kind}`,
+    token,
+    undefined,
+    (b: { names: string[] }) => {
+      if (!Array.isArray(b.names)) throw new Error("shape");
+      return b.names;
+    },
+  );
+
+export const setWorkspaceNames = (
+  token: string | null,
+  workspaceId: string,
+  kind: "skills" | "mcp",
+  names: string[],
+) =>
+  call(
+    "PUT",
+    `/api/v1/workspaces/${enc(workspaceId)}/${kind}`,
+    token,
+    { names },
+    (b: { names: string[] }) => b.names,
+  );
+
+export const getSkillSync = (token: string | null, workspaceId: string) =>
+  call(
+    "GET",
+    `/api/v1/workspaces/${enc(workspaceId)}/skills/sync`,
+    token,
+    undefined,
+    (b: { report: SyncReport | null }) => b.report,
+  );
+
+export const runSkillSync = (token: string | null, workspaceId: string) =>
+  call(
+    "POST",
+    `/api/v1/workspaces/${enc(workspaceId)}/skills/sync`,
+    token,
+    undefined,
+    (b: { report: SyncReport }) => b.report,
+  );
+
+export interface McpEntryInfo {
+  key: string;
+  value?: string;
+  secretId?: string;
+  prefix?: string;
+}
+
+export type McpConfigInfo =
+  | { transport: "stdio"; command: string; args: string[]; env: McpEntryInfo[] }
+  | { transport: "http"; url: string; headers: McpEntryInfo[] };
+
+export interface McpServerInfo {
+  name: string;
+  config: McpConfigInfo;
+  tools: { name: string; description: string }[] | null;
+  toolsAt: string | null;
+  status: { state: "ok" | "error"; error?: string; at: string } | null;
+}
+
+export const listMcp = (token: string | null) =>
+  call(
+    "GET",
+    "/api/v1/mcp",
+    token,
+    undefined,
+    (b: { servers: McpServerInfo[] }) => {
+      if (!Array.isArray(b.servers)) throw new Error("shape");
+      return b.servers;
+    },
+  );
+
+export const createMcp = (
+  token: string | null,
+  body: { name: string; config: McpConfigInfo },
+) => call("POST", "/api/v1/mcp", token, body, (b: McpServerInfo) => b);
+
+export const updateMcp = (
+  token: string | null,
+  name: string,
+  config: McpConfigInfo,
+) =>
+  call(
+    "PUT",
+    `/api/v1/mcp/${enc(name)}`,
+    token,
+    { config },
+    (b: McpServerInfo) => b,
+  );
+
+export const deleteMcp = (token: string | null, name: string) =>
+  call("DELETE", `/api/v1/mcp/${enc(name)}`, token, undefined, () => {});
+
+// 连不上时服务端返回 502，这里落在 server 失败类里，原因在服务端状态中。
+export const refreshMcp = (token: string | null, name: string) =>
+  call(
+    "POST",
+    `/api/v1/mcp/${enc(name)}/refresh`,
+    token,
+    {},
+    (b: McpServerInfo) => b,
+  );

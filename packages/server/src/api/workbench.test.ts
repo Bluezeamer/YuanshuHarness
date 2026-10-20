@@ -257,7 +257,7 @@ describe("数据目录迁移（R19）", () => {
 
     const db = new Database(path.join(dataDir, DB_FILE));
     db.exec(
-      "DROP TABLE audit_log; DROP TABLE prompt_blocks; DROP TABLE agents; DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workbench; DROP TABLE saved_layouts; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id; ALTER TABLE sessions DROP COLUMN prompt_text; ALTER TABLE sessions DROP COLUMN agent_id; ALTER TABLE sessions DROP COLUMN mode",
+      "DROP TABLE mcp_servers; DROP TABLE workspace_capabilities; DROP TABLE skills; DROP TABLE audit_log; DROP TABLE prompt_blocks; DROP TABLE agents; DROP TABLE environments; DROP TABLE secrets; DROP TABLE permission_rules; DROP TABLE workbench; DROP TABLE saved_layouts; DROP TABLE workspaces; DROP TABLE meta; ALTER TABLE sessions DROP COLUMN review_policy; ALTER TABLE sessions DROP COLUMN workspace_id; ALTER TABLE sessions DROP COLUMN prompt_text; ALTER TABLE sessions DROP COLUMN agent_id; ALTER TABLE sessions DROP COLUMN mode",
     );
     db.exec(
       "CREATE TABLE legacy_marker (v TEXT); INSERT INTO legacy_marker VALUES ('keep')",

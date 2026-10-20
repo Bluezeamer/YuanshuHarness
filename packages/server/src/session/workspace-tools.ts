@@ -14,7 +14,7 @@ export interface WorkspaceToolsApi {
   // 按 id 或名称切换；失败抛 Error，信息直接给模型看。
   switchTo(target: string): WorkspaceView;
   // 取走待发的切换通知；没有返回 null。
-  takeNotice(): string | null;
+  takeNotice(): string | null | Promise<string | null>;
 }
 
 const text = (t: string) => ({
@@ -66,8 +66,8 @@ export function workspaceExtension(api: WorkspaceToolsApi): ExtensionFactory {
         );
       },
     });
-    pi.on("before_agent_start", () => {
-      const content = api.takeNotice();
+    pi.on("before_agent_start", async () => {
+      const content = await api.takeNotice();
       return content
         ? {
             message: {
