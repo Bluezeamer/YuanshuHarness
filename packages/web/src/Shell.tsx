@@ -95,7 +95,9 @@ export function Shell({
             onUnauthorized={onUnauthorized}
           />
         )}
-        {route.name === "capabilities" && <CapabilitiesPage />}
+        {route.name === "capabilities" && (
+          <CapabilitiesPage onUnauthorized={onUnauthorized} />
+        )}
         {route.name === "preview" && <PreviewPage />}
         {route.name === "session" && (
           <SessionPage id={route.id} sessions={sessions} />

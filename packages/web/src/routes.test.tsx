@@ -52,7 +52,12 @@ test("点击导航：路由变化，页面容器出现，回到工作区后消�
   fireEvent.click(screen.getByRole("link", { name: "能力集" }));
   expect(location.pathname).toBe("/capabilities");
   expect(screen.getByRole("region", { name: "能力集" })).toBeTruthy();
-  expect(screen.getByText("待接入")).toBeTruthy();
+  expect(
+    screen
+      .getAllByRole("tab")
+      .map((t) => t.textContent)
+      .slice(-4),
+  ).toEqual(["Agent", "提示词块", "Skill", "MCP"]);
   expect(
     screen.getByRole("link", { name: "能力集" }).getAttribute("aria-current"),
   ).toBe("page");

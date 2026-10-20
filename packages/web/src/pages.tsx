@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { SessionInfo } from "./api";
+import { CapabilitiesContent } from "./capabilities/CapabilitiesContent";
 import { Link } from "./router";
 
 // 整页容器：盖在（保持挂载的）工作台上。能力集 / 内置预览 / 会话详情的真实内容由后续里程碑填进 children。
@@ -37,7 +38,15 @@ function Page({
   );
 }
 
-export const CapabilitiesPage = () => <Page title="能力集" />;
+export const CapabilitiesPage = ({
+  onUnauthorized,
+}: {
+  onUnauthorized(): void;
+}) => (
+  <Page title="能力集">
+    <CapabilitiesContent onUnauthorized={onUnauthorized} />
+  </Page>
+);
 export const PreviewPage = () => <Page title="内置预览" />;
 
 export function SessionPage({
