@@ -50,24 +50,29 @@
 
 ## 当前状态
 
-M1 进行中，已提交：a694538（权限判定改走环境原语、async）、6c77148（工具按 workspace 环境路由、list/switch_workspace、pool 接线）、27d38a5（ExecEnv 流式读写 + `env/transfer.ts`）、15347a0（环境 status / connect / transfers 端点）、4a16593（routed tools 对本机与真实 sshd 的测试）、81bd5be（权限路径判定经 ssh 环境的测试）、d246776（web 测试严格类型修正）、1db1064（workspace 可登记到 ssh 环境，按 `(环境, 路径)` 唯一）。`scripts/check.sh` 在 1db1064 上 exit 0（含真实 sshd 用例）。
+M1 代码与测试完成（a694538…1db1064、731f9da），`scripts/check.sh` 在 1db1064 exit 0；真实模型 + 本机 sshd 的冒烟（`test/live/ssh-session.live.test.ts`）通过。M1 的 codex 评审在后台跑（输出 `tmp/codex/m1.last.md`），结果出来后写 `docs/reviews/m1.md` 再勾选 M1。
 
-M1 还缺：真实模型冒烟（对 ssh workspace 跑一次真实会话）；M1 末的 codex 评审；勾选 M1 与更新 ROADMAP 第 6 条。
+**波次 1 并行进行中**（各自独立 worktree，基于 731f9da；只有主 agent 合并）：
+- `.worktrees/term-files` 分支 task/term-files：M2 服务端——审计、文件管理 API、终端（ADR 号段 0035–0039）
+- `.worktrees/web-layout` 分支 task/web-layout：M2 WebUI 骨架——视觉 token 迁移、mock 布局模型、pane 注册、rail/总览、顶栏（0040–0044）
+- `.worktrees/agent-defs` 分支 task/agent-defs：M3——模型向导 compat、提示词块与组装、agent 定义、build/plan 模式、capabilities 页骨架（0045–0049）
+- `.worktrees/private-vars` 分支 task/private-vars：M4——隐私变量、占位符替换、回显遮罩、sudo（0050–0054）
+- `.worktrees/skills-mcp` 分支 task/skills-mcp：M5——skill 库与同步、MCP 登记与注入（0055–0059）
 
-未跟踪的 `packages/server/src/session/workspaces.ts` 与已提交的 `workspace-tools.ts` 注册同名工具（`list_workspaces` / `switch_workspace`），但接口不同（前者 `deps.list/get/current/setCurrent` + 参数 `workspace_id`，后者 `WorkspaceToolsApi` + 参数 `workspace`），且前者无人 import；`pool.ts` 用的是后者。来源不明（会话中被标记为用户或 linter 改过，且是有意的）：不删、不提交，等用户确认去留。
+合并预期冲突点：`store/db.ts` MIGRATIONS 末尾、`server.ts` 注册块、`session/pool.ts`、web 的 `App`/路由。subagent 回报后逐个 squash 合并到 feat/usable-v1，跑 check.sh，再开下一波。
 
 ## 下一步
 
-M1 收尾，按顺序：
-1. （已完成）环境状态与传输端点。
-2. （已完成）权限路径判定的 ssh 用例（`permission/paths.ssh.test.ts`：链接逃逸、悬空/循环、`~` 展开、敏感文件扫描）与工具路由用例。
-3. （已完成）`scripts/check.sh` 全绿；workspace 可登记到 ssh 环境。
-4. 真实模型冒烟（`packages/server/test/live/`，对本机 sshd 的 ssh workspace 跑真实会话，密钥只读不打印）。
-5. codex 评审（权限绕过、数据损坏、密钥泄露），结果写 `docs/reviews/m1.md`；再勾选 M1、更新 ROADMAP 第 6 条。
+1. 等 5 个 subagent 回报；逐个核对提交（trust but verify：看 diff、跑测试）再 squash 合并，解决冲突，每次合并后跑相关测试，全部合完跑 `scripts/check.sh`。
+2. 合并后接线（subagent 刻意留给主 agent 的）：topnav 挂 `CapabilitiesPage`（含 `SkillsPanel`/`McpPanel`）、agent 级 skill/MCP 分配 ↔ agent 定义、pane 注册表填入终端/文件/预览/PDF/审计的真实组件、审计钩子接服务端。
+3. 波次 2：M2 的 WebUI pane 内容（终端、文件管理、文件/PDF/网页预览、审计、划选提问、跨主机拖拽传输）；M6 subagent（依赖 M3 的 agent 定义与 M4 的 interactive 判定参数）；M7 设置页逐 tab 对齐。
+4. 波次 3：M8、M9（hook/输出脱敏/凭证网关）、M10、M11；M12 收口。
+5. 评审节点：M1（已启动）、M4、M6、M9、M12 结束时委派 codex（read-only，后台，`< /dev/null`，`-o` 落最终回复），处理列写进 `docs/reviews/<里程碑>.md`。
 
 ## 决策与偏差
 
 - M0：未提交的 7 个文件含两件事（工具实时输出、pane 内新建会话入口），拆成两个提交；后者让 `settings.test.tsx` 里 5 个用例因同名按钮失败，改为取顶栏第一个按钮。提交落在 `feat/usable-v1` 上，没有动 `feat/permission-prompts`。
+- 未跟踪的 `session/workspaces.ts`（与 `workspace-tools.ts` 同名工具、无人 import 的旧稿）已移到 `tmp/stale/session-workspaces.ts.bak`，未删除，可恢复。
 - 基线 lint：`biome check .` 在 error 级别干净；`client.test.ts`、`models.test.ts` 的 useTemplate / noExplicitAny 是历史 warning/info，不属本任务，不动。
 
 ## 技术备忘
