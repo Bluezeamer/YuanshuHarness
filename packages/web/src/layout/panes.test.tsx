@@ -6,7 +6,10 @@ import { Registry } from "./registry";
 afterEach(cleanup);
 
 const registry = defaultRegistry();
-const pendingIds = PANE_META.filter((m) => m.id !== "chat").map((m) => m.id);
+const IMPLEMENTED_IDS = ["chat", "topology"];
+const pendingIds = PANE_META.filter((m) => !IMPLEMENTED_IDS.includes(m.id)).map(
+  (m) => m.id,
+);
 
 test("注册表覆盖 mock 的 8 个视图类型，元数据完整", () => {
   expect(PANE_META.map((m) => m.id).sort()).toEqual(

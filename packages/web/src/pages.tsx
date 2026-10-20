@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
 import type { SessionInfo } from "./api";
+import { SessionDetail } from "./detail/SessionDetail";
 import { Link } from "./router";
+import type { SessionHub } from "./sessions/hub";
 
-// 整页容器：盖在（保持挂载的）工作台上。能力集 / 内置预览 / 会话详情的真实内容由后续里程碑填进 children。
+// 整页容器：盖在（保持挂载的）工作台上。能力集 / 内置预览的真实内容由后续里程碑填进 children；wide 给三栏的会话详情用。
 function Page({
   title,
   back,
+  wide,
   children,
 }: {
   title: string;
   back?: boolean;
+  wide?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -17,7 +21,9 @@ function Page({
       aria-label={title}
       className="enter absolute inset-0 z-40 overflow-auto bg-bg"
     >
-      <div className="mx-auto flex max-w-[1000px] flex-col gap-5 px-6 py-6">
+      <div
+        className={`mx-auto flex flex-col gap-5 px-6 py-6 ${wide ? "max-w-[1600px]" : "max-w-[1000px]"}`}
+      >
         {back && (
           <Link
             to="/"
@@ -43,14 +49,20 @@ export const PreviewPage = () => <Page title="内置预览" />;
 export function SessionPage({
   id,
   sessions,
+  hub,
 }: {
   id: string;
   sessions: SessionInfo[];
+  hub: SessionHub;
 }) {
   const s = sessions.find((x) => x.id === id);
   return (
-    <Page title={s ? (s.name ?? "未命名会话") : "会话不存在"} back>
-      {s ? undefined : <p className="m-0 text-mute">没有 id 为 {id} 的会话</p>}
+    <Page title={s ? (s.name ?? "未命名会话") : "会话不存在"} back wide={!!s}>
+      {s ? (
+        <SessionDetail hub={hub} session={s} />
+      ) : (
+        <p className="m-0 text-mute">没有 id 为 {id} 的会话</p>
+      )}
     </Page>
   );
 }
