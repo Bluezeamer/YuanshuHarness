@@ -184,6 +184,8 @@ export const MIGRATIONS: Migration[] = [
          updated_at TEXT NOT NULL
        )`,
     ),
+  // 主机密钥（M1#3，accept-new）：首次连接记录指纹，再连时严格匹配。
+  (db) => db.exec("ALTER TABLE environments ADD COLUMN host_key TEXT"),
 ];
 
 export const DB_FILE = "yuanshu.db";

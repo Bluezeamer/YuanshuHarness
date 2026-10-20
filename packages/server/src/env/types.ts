@@ -8,6 +8,15 @@ export interface FileStat {
   isSymlink: boolean;
   size: number;
   mtimeMs: number;
+  /** 完整 st_mode（含文件类型位）；权限位取 `mode & 0o7777`。 */
+  mode: number;
+}
+
+export interface WriteOptions {
+  /** 新建文件的权限位（如 0o600）。 */
+  mode?: number;
+  /** 排他创建：目标已存在则失败，不截断。 */
+  exclusive?: boolean;
 }
 
 export interface DirEntry {
@@ -39,7 +48,8 @@ export interface ExecEnv {
   readlink(p: string): Promise<string | null>;
   readFile(p: string): Promise<Buffer>;
   writeFile(p: string, data: Buffer | string): Promise<void>;
-  mkdirp(p: string): Promise<void>;
+  /** 递归创建；已存在不报错。给了 mode 时只设置 p 本身（由本次调用新建时），中间目录用默认。 */
+  mkdirp(p: string, mode?: number): Promise<void>;
   /** POSIX 语义：目标是已存在的文件时原子替换；目标是非空目录则失败。 */
   rename(from: string, to: string): Promise<void>;
   /** 不跟随符号链接；目录须 recursive，否则只删空目录。不存在抛错。 */
@@ -49,7 +59,11 @@ export interface ExecEnv {
     p: string,
     range?: { start: number; end: number },
   ): Promise<Readable>;
-  writeStream(p: string): Promise<Writable>;
+  /**
+   * 返回时文件已打开：exclusive（O_EXCL）时目标已存在会在此抛错，调用方据此知道文件是自己建的。
+   * mode 为新建文件的权限位，不受 umask 收窄。
+   */
+  writeStream(p: string, opts?: WriteOptions): Promise<Writable>;
   /** 命令原样执行；stdout 与 stderr 合并交给 onData。被信号终止报 128+n。 */
   exec(
     command: string,
@@ -63,4 +77,6 @@ export interface EnvStatus {
   id: string;
   state: "local" | "connected" | "disconnected" | "error";
   error?: string;
+  /** ssh 环境已记录的主机密钥指纹；未连过为 null。 */
+  hostKey?: string | null;
 }

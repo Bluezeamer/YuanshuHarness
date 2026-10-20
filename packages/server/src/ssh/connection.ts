@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
+import { once } from "node:events";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { Client, type ClientChannel, type SFTPWrapper, type Stats } from "ssh2";
-import type { DirEntry, FileStat } from "../env/types.js";
+import type { DirEntry, FileStat, WriteOptions } from "../env/types.js";
 import type { SecretStore } from "../store/secrets.js";
 
 const toFileStat = (st: Stats): FileStat => ({
@@ -10,7 +12,26 @@ const toFileStat = (st: Stats): FileStat => ({
   isSymlink: st.isSymbolicLink(),
   size: st.size,
   mtimeMs: st.mtime * 1000,
+  mode: st.mode,
 });
+
+/** 主机密钥指纹的存取（accept-new：无记录时接受并写入，有记录时必须一致）。 */
+export interface HostKeyStore {
+  get(): string | null;
+  save(fingerprint: string): void;
+}
+
+/** 仅进程内记忆；测试与未接入持久化的场景用，保证同一连接对象至少不会换密钥。 */
+export const memoryHostKeys = (): HostKeyStore => {
+  let fp: string | null = null;
+  return { get: () => fp, save: (v) => (fp = v) };
+};
+
+/** SSH 线格式公钥 → `算法:sha256 hex`（线格式以长度前缀的算法名开头）。 */
+export function hostKeyFingerprint(key: Buffer): string {
+  const algo = key.subarray(4, 4 + key.readUInt32BE(0)).toString("ascii");
+  return `${algo}:${createHash("sha256").update(key).digest("hex")}`;
+}
 
 export interface SshConfig {
   host: string;
@@ -34,6 +55,7 @@ export class SshConnection {
   constructor(
     private readonly config: SshConfig,
     private readonly secrets: SecretStore,
+    private readonly hostKeys: HostKeyStore = memoryHostKeys(),
   ) {}
 
   async connect(): Promise<void> {
@@ -47,15 +69,30 @@ export class SshConnection {
       else auth.password = value;
     }
     const client = new Client();
+    let mismatch: string | null = null;
     await new Promise<void>((ok, fail) => {
       client
         .once("ready", ok)
-        .once("error", fail)
+        // 校验失败时 ssh2 只报笼统的握手错误，换成能看出原因和指纹的提示
+        .once("error", (err: Error) =>
+          fail(mismatch ? new Error(mismatch) : err),
+        )
         .connect({
           host: this.config.host,
           port: this.config.port,
           username: this.config.username,
           ...auth,
+          hostVerifier: (key: Buffer) => {
+            const seen = hostKeyFingerprint(key);
+            const known = this.hostKeys.get();
+            if (known === null) {
+              this.hostKeys.save(seen);
+              return true;
+            }
+            if (known === seen) return true;
+            mismatch = `主机密钥与记录不符（记录 ${known}，实际 ${seen}）。若服务器确已更换密钥，请清除该环境的主机密钥后重连`;
+            return false;
+          },
           readyTimeout: 15000,
           keepaliveInterval: 20000,
         });
@@ -221,8 +258,17 @@ export class SshConnection {
     await walk(remotePath);
   }
 
-  async writeStream(remotePath: string): Promise<Writable> {
-    return (await this.sftp()).createWriteStream(remotePath);
+  // ssh2 的写流在 open 后会 fchmod 到 mode（缺省 0o666），所以 mode 是精确设置而非被 umask 收窄。
+  async writeStream(
+    remotePath: string,
+    opts: WriteOptions = {},
+  ): Promise<Writable> {
+    const stream = (await this.sftp()).createWriteStream(remotePath, {
+      flags: opts.exclusive ? "wx" : "w",
+      ...(opts.mode === undefined ? {} : { mode: opts.mode }),
+    });
+    await once(stream, "open");
+    return stream;
   }
 
   async readdir(remotePath: string): Promise<string[]> {
@@ -246,17 +292,21 @@ export class SshConnection {
     return new Promise((ok) => s.stat(remotePath, (e) => ok(!e)));
   }
 
-  // 递归创建目录，已存在不报错。
-  async mkdirp(remotePath: string): Promise<void> {
+  // 递归创建目录，已存在不报错。mode 只设置最后一级（由本次新建时）；mkdir 受 umask 影响，所以再 chmod。
+  async mkdirp(remotePath: string, mode?: number): Promise<void> {
     const s = await this.sftp();
     const parts = remotePath.split("/").filter(Boolean);
     let cur = remotePath.startsWith("/") ? "" : ".";
-    for (const part of parts) {
+    for (const [i, part] of parts.entries()) {
       cur = `${cur}/${part}`;
       if (await this.exists(cur)) continue;
       await new Promise<void>((ok, fail) =>
         s.mkdir(cur, (e) => (e ? fail(e) : ok())),
       );
+      if (mode !== undefined && i === parts.length - 1)
+        await new Promise<void>((ok, fail) =>
+          s.chmod(cur, mode, (e) => (e ? fail(e) : ok())),
+        );
     }
   }
 
