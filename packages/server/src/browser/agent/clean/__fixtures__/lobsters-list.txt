@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - heading [level=1] [ref=e4]:
+        - 'link "Lobsters (Current traffic: 0%)" [ref=e5] [cursor=pointer]':
+          - /url: /
+          - generic [aria-hidden] [ref=e6]: Lobsters
+      - navigation "Menu" [ref=e7]:
+        - list [ref=e8]:
+          - listitem [ref=e9]:
+            - link "Active" [ref=e10] [cursor=pointer]:
+              - /url: /active
+          - listitem [ref=e11]:
+            - link "Recent" [ref=e12] [cursor=pointer]:
+              - /url: /recent
+          - listitem [ref=e13]:
+            - link "Comments" [ref=e14] [cursor=pointer]:
+              - /url: /comments
+          - listitem [ref=e15]:
+            - link "Search" [ref=e16] [cursor=pointer]:
+              - /url: /search
+          - listitem [ref=e17]:
+            - link "Login" [ref=e18] [cursor=pointer]:
+              - /url: /login
+  - main [ref=e19]:
+    - list [ref=e20]:
+      - listitem [ref=e21]:
+        - generic [ref=e22]:
+          - link "△ 85" [ref=e24] [cursor=pointer]:
+            - /url: /login
+          - generic [ref=e25]:
+            - heading [level=2] [ref=e26]:
+              - link "How Not to Build a Music Player" [ref=e27] [cursor=pointer]:
+                - /url: https://alichraghi.github.io/blog/how-not-to-build-a-music-player
+            - list "Tags" [ref=e28]:
+              - listitem [ref=e29]:
+                - link "Tag person" [ref=e30] [cursor=pointer]:
+                  - /url: /t/person
+                  - text: person
+              - listitem [ref=e31]:
+                - link "Tag zig" [ref=e32] [cursor=pointer]:
+                  - /url: /t/zig
+                  - text: zig
+            - link "alichraghi.github.io" [ref=e33] [cursor=pointer]:
+              - /url: /domains/alichraghi.github.io

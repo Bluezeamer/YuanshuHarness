@@ -1,0 +1,17 @@
+@layer components {
+  .st-bl-note {
+    margin: 8px 0 0;
+  }
+
+  .st-bl-ctl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .st-bl-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+}

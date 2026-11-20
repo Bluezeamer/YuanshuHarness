@@ -1,0 +1,391 @@
+/* 设置壳：导航靠底色分区，不画外框、顶栏与分隔线；页签条、主从页、保存条等标准版心。
+   约定见 ys-ui-design 的 X04–X06 与 visual-language §6。
+   --st-gutter 是页面留白：页签文字、左列表的行与搜索框、列表页内容的左缘都落在它上面。 */
+@layer components {
+  .st-app {
+    --st-gutter: 24px;
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    height: 100dvh;
+    background: var(--surface);
+  }
+
+  .st-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 8px;
+    overflow-y: auto;
+    background: var(--side);
+  }
+
+  .st-nav-h {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    margin-bottom: 8px;
+    color: var(--fg-2);
+  }
+
+  .st-nav ul {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .st-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 8px;
+    color: var(--fg);
+    text-decoration: none;
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .st-nav-item:hover {
+    background: var(--hover);
+  }
+
+  .st-nav-item[aria-current="page"] {
+    background: var(--active);
+  }
+
+  .st-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .st-placeholder {
+    display: grid;
+    flex: 1 1 auto;
+    place-items: center;
+  }
+
+  /* ---------- 页签条：线通栏，文字缩进到留白 ---------- */
+  .st-strip {
+    flex: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .st-strip .u-tabs {
+    padding-inline: var(--st-gutter);
+    border-bottom: 0;
+  }
+
+  /* ---------- 页签条以下：每一栏自己滚 ---------- */
+  .st-page,
+  .st-pane {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .st-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* 列表页：内容左缘 = 留白 */
+  .st-col {
+    padding: 16px var(--st-gutter) 48px;
+  }
+
+  /* 主从页：左列表宽 = 240 + 2 × 留白，搜索框与页签文字同 x */
+  .st-split {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: calc(240px + 2 * var(--st-gutter)) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .st-detail {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* 单栏设置 / 详情内容：最宽 720 居中（供应商详情那一列） */
+  .st-form {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 48px 48px;
+    animation: st-in var(--dur) var(--ease);
+  }
+
+  @keyframes st-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  /* ---------- 页内左列表 ---------- */
+  .st-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 16px var(--st-gutter);
+    border-right: 1px solid var(--line);
+  }
+
+  .st-rail-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .st-rail-h-menu {
+    margin-left: auto;
+  }
+
+  .st-rail-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .st-rail-sec {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .st-rail-sec + .st-rail-sec {
+    margin-top: 8px;
+  }
+
+  .st-rail-grp .u-lrow-label {
+    color: var(--fg-2);
+  }
+
+  .st-chev {
+    flex: none;
+    color: var(--icon);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .st-chev[data-open] {
+    transform: rotate(90deg);
+  }
+
+  .st-rail-add {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .st-rail-none {
+    padding: 16px 8px;
+    text-align: center;
+  }
+
+  /* ---------- 卡片列表页：搜索 + 主操作，下面是卡片网格 ---------- */
+  .st-cg-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .st-cg-search {
+    width: 280px;
+  }
+
+  .st-cg {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  /* ---------- 详情头：图标块、名字与说明、状态、操作 ---------- */
+  .st-dh {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .st-dh-tile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--fg-2);
+  }
+
+  .st-dh-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .st-dh-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-dh-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  /* ---------- 区块小标题：下面一条线 ---------- */
+  .st-block {
+    margin-top: 32px;
+  }
+
+  .st-block .u-notice {
+    margin-top: 8px;
+  }
+
+  .st-block .u-row,
+  .st-block .u-field {
+    margin-top: 12px;
+  }
+
+  .st-block-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* 区块标题已经有下划线，紧接着的第一行设置不再画上边线 */
+  .st-block-h + .u-row {
+    border-top: 0;
+  }
+
+  /* ---------- 保存条：有修改才浮出，贴在滚动区底部 ---------- */
+  .st-save {
+    position: sticky;
+    bottom: 16px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    margin: 24px auto 0;
+    padding: 8px 8px 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--sh-pop);
+    animation: st-up var(--dur) var(--ease);
+  }
+
+  .st-save .t-aux {
+    margin-right: 8px;
+  }
+
+  @keyframes st-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  /* 小节：分隔线切分，不堆卡片 */
+  .st-sec {
+    padding: 12px 16px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .st-sec:last-child {
+    border-bottom: 0;
+  }
+
+  .st-sec-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+  }
+
+  .st-sec-t {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .st-sec-act {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .st-sec-note {
+    margin: 4px 0 8px;
+    color: var(--muted);
+  }
+
+  /* 窄窗口：主从页的列表在上、详情在下，列表限高自己滚 */
+  @media (max-width: 760px) {
+    .st-split {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 220px) minmax(0, 1fr);
+    }
+
+    .st-rail {
+      padding-top: 12px;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+
+  @media (max-width: 980px) {
+    .st-app {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .st-nav {
+      flex-direction: row;
+      align-items: center;
+      padding: 6px 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .st-nav-h {
+      margin-bottom: 0;
+    }
+
+    .st-nav ul {
+      flex-direction: row;
+    }
+
+    .st-nav-item {
+      white-space: nowrap;
+    }
+  }
+}

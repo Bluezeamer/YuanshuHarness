@@ -1,0 +1,298 @@
+/* 对话正文与文件预览共用的 mermaid 容器与错误提示骨架；具体外观由上下文类补充。 */
+
+.md-mermaid {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+}
+
+.md-mermaid.is-loading {
+  align-items: center;
+  min-height: 44px;
+}
+
+.md-mermaid > svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.md-mermaid-err {
+  margin: 6px 0;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* ── 围栏块卡片 ── */
+.md-block {
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.md-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.md-block-lang {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-block-acts {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* ── 代码块：行号 + 换行开关 ── */
+.md-code-body {
+  max-height: 400px;
+  padding: 8px 0;
+  overflow: auto;
+  tab-size: 2;
+}
+
+.md-code-line {
+  display: flex;
+  align-items: flex-start;
+  padding-right: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.md-code-body.is-nowrap {
+  overflow-x: auto;
+}
+
+.md-code-body.is-nowrap .md-code-line {
+  width: max-content;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.md-code-n {
+  position: sticky;
+  left: 0;
+  flex: none;
+  box-sizing: border-box;
+  width: 3.4em;
+  padding-right: 12px;
+  background: var(--surface);
+  color: var(--meta);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+}
+
+.md-code-t {
+  min-width: 0;
+}
+
+.md-code-t .hljs-keyword,
+.md-code-t .hljs-selector-tag,
+.md-code-t .hljs-literal {
+  color: var(--syntax-keyword);
+}
+
+.md-code-t .hljs-string,
+.md-code-t .hljs-regexp,
+.md-code-t .hljs-addition {
+  color: var(--syntax-string);
+}
+
+.md-code-t .hljs-number,
+.md-code-t .hljs-symbol,
+.md-code-t .hljs-bullet {
+  color: var(--syntax-number);
+}
+
+.md-code-t .hljs-comment,
+.md-code-t .hljs-quote,
+.md-code-t .hljs-meta {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.md-code-t .hljs-title,
+.md-code-t .hljs-name,
+.md-code-t .hljs-section {
+  color: var(--syntax-function);
+}
+
+.md-code-t .hljs-type,
+.md-code-t .hljs-built_in,
+.md-code-t .hljs-class .hljs-title {
+  color: var(--syntax-type);
+}
+
+.md-code-t .hljs-attr,
+.md-code-t .hljs-attribute,
+.md-code-t .hljs-variable,
+.md-code-t .hljs-template-variable,
+.md-code-t .hljs-params {
+  color: var(--syntax-attr);
+}
+
+/* ── mermaid 卡片与大画布 ── */
+.md-block-src {
+  margin: 0;
+  max-height: 320px;
+  padding: 8px 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.md-mermaid-inline {
+  min-height: 44px;
+}
+
+.md-mermaid-clamp {
+  position: relative;
+  max-height: 420px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.md-mermaid-clamp[data-clip]::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  content: "";
+  pointer-events: none;
+}
+
+.md-canvas-stage {
+  box-sizing: border-box;
+  height: min(70vh, 100%);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  cursor: grab;
+  touch-action: none;
+}
+
+.md-canvas-stage.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.md-canvas-stage > svg {
+  display: block;
+  margin: auto;
+}
+
+.md-canvas-src {
+  box-sizing: border-box;
+  margin: 0;
+  max-height: 70vh;
+  padding: 12px 16px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+}
+
+.md-canvas-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.md-canvas-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.md-canvas-zoom {
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ── 内嵌图片 ── */
+.md-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 6px 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  cursor: zoom-in;
+}
+
+.md-img img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.md-img-note {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+
+.md-img-note[data-state="fail"] {
+  color: var(--danger);
+}
+
+.ch-img-ref {
+  color: var(--muted);
+}
+
+/* 大画布：整卡竖向撑满，画布吃掉剩余高度、工具栏固定贴底 */
+.md-canvas-modal .u-mbody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.md-canvas-modal .md-canvas-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.md-canvas-modal .md-canvas-src {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+/* 工具组里 write/edit 的代码块与组融成一体 */
+.ch-row .md-block {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.ch-row .md-code-body {
+  max-height: 300px;
+}

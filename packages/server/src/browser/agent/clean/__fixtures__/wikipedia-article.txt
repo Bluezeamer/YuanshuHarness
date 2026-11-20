@@ -1,0 +1,56 @@
+- paragraph [ref=e429]:
+  - text: A large language model (LLM) is a
+  - link "machine learning model" [ref=e430] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Machine_learning#Models
+  - text: (typically a
+  - link "neural network" [ref=e431] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Neural_network_(machine_learning)
+  - text: ) trained on a vast amount of text for
+  - link "natural language processing" [ref=e432] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Natural_language_processing
+  - text: tasks, especially
+  - link "language generation" [ref=e433] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Language_generation
+  - text: . LLMs can typically generate, summarize, translate, and analyze text in many contexts.
+  - superscript [ref=e434]:
+    - link "[1]" [ref=e435] [cursor=pointer]:
+      - /url: "#cite_note-few-shot-learners-1"
+  - text: They are the basis for many modern
+  - link "chatbots" [ref=e436] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Chatbot
+  - text: ", such as"
+  - link "ChatGPT" [ref=e437] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/ChatGPT
+  - text: ","
+  - link "Claude" [ref=e438] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Claude_(AI)
+  - text: ","
+  - link "Vibe" [ref=e439] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Mistral_Vibe
+  - text: ","
+  - link "Gemini" [ref=e440] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Google_Gemini
+  - text: ","
+  - link "Grok" [ref=e441] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Grok_(chatbot)
+  - text: ","
+  - link "Qwen" [ref=e442] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Qwen
+  - text: and
+  - link "DeepSeek" [ref=e443] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/DeepSeek_(chatbot)
+  - text: .
+- paragraph [ref=e444]:
+  - text: LLMs are typically based on the
+  - link "transformer" [ref=e445] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Transformer_(deep_learning)
+  - text: neural network architecture.
+  - superscript [ref=e446]:
+    - link "[2]" [ref=e447] [cursor=pointer]:
+      - /url: "#cite_note-2"
+  - link "Generative pre-trained transformers" [ref=e448] [cursor=pointer]:
+    - /url: https://en.wikipedia.org/wiki/Generative_pre-trained_transformer
+  - text: (GPTs) are a type of LLM that is pre-trained to predict the next word.
+  - superscript [ref=e449]:
+    - link "[3]" [ref=e450] [cursor=pointer]:
+      - /url: "#cite_note-Wolfram-2023-3"

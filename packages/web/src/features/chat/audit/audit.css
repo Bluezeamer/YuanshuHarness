@@ -1,0 +1,151 @@
+/* 审计页：整体版式与左栏（调用序列）。右栏在 audit.detail.css。类名 au- 前缀。
+   容器窄时（组件按面板自己的宽度写 data-narrow，不用视口媒体查询）左栏改成上下堆叠在详情上方。 */
+@layer components {
+  .au {
+    /* 组成条四段：墨 = 稳定前缀，中灰 = 工具定义，浅灰 = 增长的历史，蓝 = 本轮新增 */
+    --au-system: var(--ink);
+    --au-tools: var(--fg-2);
+    --au-history: var(--icon);
+    --au-current: var(--accent);
+
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .au[data-narrow] {
+    flex-direction: column;
+  }
+
+  .au-state {
+    margin: 0;
+    padding: 16px;
+    color: var(--fg-3);
+  }
+
+  .au-state > p {
+    margin: 0 0 8px;
+  }
+
+  .au-full {
+    flex: 1;
+    align-self: flex-start;
+    margin: 16px;
+  }
+
+  /* 窄容器里 .au 是竖排：说明块要撑满宽度，不是缩在左上角 */
+  .au[data-narrow] .au-full {
+    align-self: stretch;
+  }
+
+  /* 分隔条：布局上是 1px 的线，热区向两侧各伸 3px，悬停才显蓝 */
+  .au-split.u-split {
+    z-index: 10;
+    flex: 0 0 1px;
+    background: var(--line);
+  }
+
+  .au-split.u-split::before {
+    content: "";
+    position: absolute;
+    inset: 0 -3px;
+  }
+
+  .au-split.u-split[data-orientation="vertical"]::after {
+    left: -1px;
+  }
+
+  /* ── 左栏 ── */
+  .au-rail {
+    display: flex;
+    flex: 0 1 var(--au-w, 248px);
+    flex-direction: column;
+    min-width: 216px;
+    max-width: calc(100% - 320px);
+    min-height: 0;
+    background: var(--side);
+  }
+
+  .au[data-narrow] .au-rail {
+    flex: 0 0 42%;
+    min-width: 0;
+    max-width: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .au-sum {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 8px 4px 16px;
+    color: var(--fg-3);
+  }
+
+  .au-sum-t {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .au-ctl {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 8px 8px;
+  }
+
+  .au-list {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px;
+    overflow-y: auto;
+  }
+
+  .au-turn {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .au-seq {
+    min-width: 16px;
+    color: var(--fg-3);
+  }
+
+  .au-none {
+    margin: 0;
+    padding: 16px 8px;
+    color: var(--fg-3);
+  }
+
+  .au-more {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  /* 压缩历史：贴在列表下面的一区，太长自己滚，不把调用序列挤没 */
+  .au-comp {
+    flex: none;
+    max-height: 40%;
+    padding: 4px 8px;
+    overflow-y: auto;
+    border-top: 1px solid var(--line);
+  }
+
+  .au-comp-body {
+    padding-left: 16px;
+  }
+
+  .au-comp-calls {
+    padding-left: 16px;
+  }
+}

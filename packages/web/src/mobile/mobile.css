@@ -1,0 +1,368 @@
+/* 手机端（/m/）：整页壳、顶栏、列表，以及底部抽屉在手机上的尺寸。类名一律 m- 前缀；颜色、圆角、动效只引用 ui/tokens.css，
+   触控目标取 --touch（48，高度刻度里没有这一档，所以走令牌）。 */
+
+@layer base {
+  /* 整页不滚、不下拉刷新：只有列表与对话流自己滚 */
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  /* 整页壳：100dvh 的 flex 布局，输入框留在文档流里；键盘高度只在浏览器不缩布局视口时才有（useKeyboardInset） */
+  .m-app {
+    position: relative;
+    height: 100dvh;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .m-layer {
+    position: absolute;
+    inset: 0 0 var(--m-kb, 0px) 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    animation: u-modal-in var(--dur) var(--ease);
+  }
+
+  .m-layer[hidden] {
+    display: none;
+  }
+
+  .m-page {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .m-top {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--touch);
+    padding: 0 4px 0 8px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .m-top > img {
+    flex: none;
+    margin-right: 4px;
+  }
+
+  .m-top-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-inline: 4px;
+  }
+
+  .m-top-end {
+    display: flex;
+    flex: none;
+    align-items: center;
+  }
+
+  .m-top .u-icon-btn,
+  .u-sheet-head .u-icon-btn {
+    min-width: var(--touch);
+    min-height: var(--touch);
+  }
+
+  .m-top .u-icon-btn svg,
+  .u-sheet-head .u-icon-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* 带状态点的图标按钮 */
+  .m-badged {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .m-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    pointer-events: none;
+  }
+
+  /* ---------- 列表 ---------- */
+  .m-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 8px 24px;
+  }
+
+  .m-sec {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+  }
+
+  /* 小标题与行里的文字同一个 x（行内左右各 8） */
+  .m-sec-h,
+  .m-ws-h {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  /* 工作区头：名字 + 右侧的工具入口（触控目标 48，所以头比小标题行高） */
+  .m-ws-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 4px;
+  }
+
+  .m-ws-head .m-ws-h {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .m-ws-head .u-icon-btn {
+    min-width: var(--touch);
+    min-height: var(--touch);
+    color: var(--fg-3);
+  }
+
+  /* 设置里的一块：说明 + 控件，竖着排，控件之间留 8 */
+  .m-block {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .m-block .u-btn {
+    min-height: var(--touch);
+  }
+
+  .m-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  /* 设置行里的小控件：视觉不变，点击区撑到 48（开关 36×20，分段按钮 28 高） */
+  .m-block .u-switch::before {
+    content: "";
+    position: absolute;
+    inset: -14px -6px;
+  }
+
+  /* 开关行：名字在左、开关在右排成一行（设置行在窄屏默认上下堆叠） */
+  .m-block .u-row.m-switch-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: var(--touch);
+  }
+
+  .m-block .u-seg > button {
+    min-height: calc(var(--touch) - 8px);
+  }
+
+  .m-ws-none,
+  .m-line {
+    padding: 4px 8px;
+  }
+
+  .m-block .m-line {
+    padding-inline: 0;
+  }
+
+  .m-ws-none {
+    color: var(--fg-3);
+  }
+
+  /* 行之间一条发丝线；没有圆角与悬停底色（触屏上没有悬停） */
+  .m-row.u-lrow[data-size] {
+    min-height: var(--touch);
+    border-radius: 0;
+  }
+
+  .m-row.u-lrow + .m-row.u-lrow {
+    border-top: 1px solid var(--line);
+  }
+
+  .m-row .u-lrow-main {
+    gap: 12px;
+    border-radius: 0;
+  }
+
+  .m-top .u-icon-btn {
+    color: var(--fg-2);
+  }
+
+  /* 提示（portal 到 body）：放在顶栏下面、撑满宽度，别盖住输入栏；按钮是 ≥ 48 的触控目标 */
+  .u-toasts {
+    top: calc(var(--touch) + 8px);
+    right: 8px;
+    bottom: auto;
+    left: 8px;
+    align-items: stretch;
+  }
+
+  .u-toast {
+    max-width: none;
+  }
+
+  .u-toast-act {
+    min-width: var(--touch);
+    min-height: var(--touch);
+    height: auto;
+  }
+
+  /* 菜单项与抽屉（portal 到 body，不在 .m-app 里）：触控目标 ≥ 48，抽屉让出键盘 */
+  .u-menu-item {
+    min-height: var(--touch);
+  }
+
+  .u-sheet-wrap {
+    bottom: var(--m-kb, 0px);
+  }
+
+  .u-sheet-head {
+    min-height: var(--touch);
+  }
+
+  /* 状态面板没有内容时整块都不渲染：给一句话，别留一个空抽屉 */
+  .m-status-sheet .u-sheet-body:empty::before {
+    content: "目前没有目标、计划或后台任务";
+    display: block;
+    padding: 16px 8px 24px;
+    color: var(--fg-3);
+  }
+}
+
+/* ---------- 对话页：对话视图原样复用 ----------
+   chat 的样式不在 @layer 里，要覆盖只能写在层外（层内的规则永远输给层外的）。 */
+.m-chat .ch-main {
+  --ch-gutter: 0px;
+}
+
+/* 输入栏与审批卡里的按钮与选择器：触控目标 ≥ 48，相邻间距 ≥ 8 */
+.m-chat .ch-composer .u-btn,
+.m-chat .ch-composer .u-icon-btn,
+.m-chat .ch-approve .u-btn {
+  min-height: var(--touch);
+}
+
+.m-chat .ch-composer .u-icon-btn,
+.m-chat .ch-approve .u-btn {
+  min-width: var(--touch);
+}
+
+/* ---------- 浏览器画面页 ---------- */
+@layer components {
+  .m-view-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .m-view-url {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .m-view-handoff {
+    flex: none;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--warn-text);
+  }
+
+  /* 查看器：只有这里接管触摸（平移与缩放自己算），别处照常滚动 */
+  .m-view {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface-3);
+    touch-action: none;
+    user-select: none;
+  }
+
+  .m-view-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: var(--surface);
+    transform-origin: 0 0;
+  }
+
+  .m-view-over {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--surface-3);
+  }
+
+  .m-view-note {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 100%;
+    color: var(--fg-2);
+  }
+
+  .m-view-thumb {
+    max-width: 100%;
+    max-height: 50dvh;
+    border: 1px solid var(--line);
+  }
+
+  .m-view-tools {
+    display: flex;
+    flex: none;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .m-view-tools .u-btn {
+    min-height: var(--touch);
+    min-width: var(--touch);
+  }
+}
+
+@layer components {
+  /* 标签页内容区：撑满顶栏下面的空间，里面的标签自己决定怎么滚 */
+  .m-tabbody {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    /* 标签页里的窄窗格降级（工具条收文字、收图标）按 @container pane 写；手机上这一层就是「窗格」 */
+    container: pane / inline-size;
+  }
+}

@@ -1,0 +1,117 @@
+/* 字样角色：全站只有这 10 种（ys-ui-design 的 typography）。组件只选类名，不再各写字号 / 字重 / 行高 / 字体族。
+   这是排版属性唯一允许出现的地方（tokens.css 的 body 默认值除外），由 design.guard 核对。
+   外壳族固定大小；内容族（阅读字、文档字、代码字）随字号设置缩放，大小取 fontSize.ts 写在根元素上的变量，
+   再乘上标签自己的缩放 --tab-zoom（Ctrl+滚轮，见 features/workspace/tabs/tabZoom.tsx；没设就是 1）。
+   t-doc：渲染出来的 HTML 正文（Markdown：对话、预览、笔记、画布卡片）没法逐个元素加类，容器选它；
+   它自带一套按文档层级走的标题字阶，不借界面的区块标题与分组名。外观（间距、颜色、块）在 features/markdown/prose.css。 */
+@layer components {
+  /* 页标题：一个页面最上面那个大标题 */
+  .t-page {
+    font: 600 20px / 28px var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  /* 区块标题：弹窗或页面里某一块的标题 */
+  .t-block {
+    font: 600 16px / 24px var(--font-sans);
+    letter-spacing: -0.005em;
+  }
+
+  /* 分组名：一组设置上面的小标题 */
+  .t-group {
+    font: 600 12px / 18px var(--font-sans);
+    letter-spacing: 0.02em;
+    color: var(--fg-2);
+  }
+
+  /* 条目名：一行里被点、被选、被读的那个名字（字段名、按钮文字、会话名、文件名） */
+  .t-entry {
+    font: 500 13px / 20px var(--font-sans);
+  }
+
+  /* 普通字：其余的普通文字（输入框里的内容、摘要行的值） */
+  .t-plain {
+    font: 400 13px / 20px var(--font-sans);
+  }
+
+  /* 辅助字：比条目名低一级的解释（字段下的说明、状态栏、胶囊里的字） */
+  .t-aux {
+    font: 400 12px / 18px var(--font-sans);
+    color: var(--fg-2);
+  }
+
+  /* 等宽字：只给英文、数字、路径、快捷键；中英混排的拆成两段 */
+  .t-mono {
+    font: 400 12px / 18px var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-3);
+  }
+
+  /* 阅读字（内容族）：对话正文、用户输入的消息 */
+  .t-read {
+    font: 400 calc(var(--fs-read) * var(--tab-zoom, 1)) / 1.72 var(--font-sans);
+    text-wrap: pretty;
+  }
+
+  /* 代码字（内容族）：代码块、工具输出、命令参数、文件预览 */
+  .t-code {
+    font: 400 calc(var(--fs-code) * var(--tab-zoom, 1)) / 1.6 var(--font-mono);
+  }
+
+  /* 文档字（内容族）：Markdown 渲染出来的正文。标题按文档的层级走（26 / 21 / 18 / 16 / 14，随阅读字缩放）；
+     不借界面的区块标题与分组名——那两档是 16 / 12，会让 h1、h2 和正文一样大、h3 以下比正文还小。
+     表格比正文小一点点，代码跟代码字。 */
+  .t-doc {
+    font: 400 calc(var(--fs-read) * var(--tab-zoom, 1)) / 1.72 var(--font-sans);
+    text-wrap: pretty;
+  }
+
+  .t-doc :is(h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  .t-doc h1 {
+    font-size: 1.625em;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+
+  .t-doc h2 {
+    font-size: 1.3125em;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  .t-doc h3 {
+    font-size: 1.125em;
+    line-height: 1.4;
+  }
+
+  .t-doc h4 {
+    font-size: 1em;
+    line-height: 1.5;
+  }
+
+  .t-doc :is(h5, h6) {
+    font-size: 0.875em;
+    line-height: 1.5;
+  }
+
+  .t-doc :is(strong, b) {
+    font-weight: 600;
+  }
+
+  .t-doc table {
+    font-size: 0.9em;
+    line-height: 1.55;
+  }
+
+  .t-doc th {
+    font-weight: 600;
+  }
+
+  .t-doc :is(code, pre) {
+    font: 400 calc(var(--fs-code) * var(--tab-zoom, 1)) / 1.6 var(--font-mono);
+  }
+}

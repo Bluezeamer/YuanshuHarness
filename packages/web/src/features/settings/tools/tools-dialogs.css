@@ -1,0 +1,370 @@
+/* 工具与能力页的弹窗（安装技能、查看文件、试装并固定、JSON 编辑器、版本候选…）用到的样式。
+   页面本身（列表、详情）的样式在 tools-page.css。 */
+@layer components {
+  .st-tl-dim {
+    margin: 0;
+    color: var(--meta);
+  }
+
+  /* 弹窗：确认、表单、版本候选 */
+
+  .st-tl-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .st-tl-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 8px;
+    margin: 0;
+    padding: 8px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    background: var(--surface-2);
+  }
+
+  .st-tl-preview dt {
+    color: var(--meta);
+  }
+
+  .st-tl-preview dd {
+    margin: 4px 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-tl-cands {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .st-tl-cands legend {
+    padding: 0 0 4px;
+  }
+
+  .st-tl-cands ul {
+    max-height: 240px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .st-tl-vers {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 260px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .st-tl-ver {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .st-tl-ver.u-btn[aria-checked="true"] {
+    border-color: var(--accent-line);
+    background: var(--accent-bg);
+  }
+
+  .st-tl-ver-n {
+    color: inherit;
+  }
+
+  .st-tl-vcustom {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .st-tl-dbar {
+    width: 3px;
+    height: 14px;
+    border-radius: var(--r-pill);
+    background: var(--fg);
+  }
+
+  .st-tl-dbar[data-state="behind"] {
+    background: var(--warn);
+  }
+
+  .st-tl-dbar[data-state="missing"] {
+    background: var(--border-strong);
+  }
+
+  .st-tl-block-h + .st-tl-enrow {
+    border-top: 0;
+  }
+
+  /* 详情弹窗：左文件树 + 右只读预览 */
+
+  .st-tl-info {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 12px;
+    height: min(60vh, 480px);
+  }
+
+  .st-tl-tree {
+    min-height: 0;
+    padding: 6px 4px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    background: var(--surface-2);
+  }
+
+  .st-tl-tree-d {
+    padding: 4px 8px;
+    color: var(--meta);
+  }
+
+  .st-tl-tree-f {
+    justify-content: flex-start;
+    width: 100%;
+    text-align: left;
+  }
+
+  .st-tl-tree-f.u-btn[aria-pressed="true"] {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+
+  .st-tl-pv {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+  }
+
+  .st-tl-pv-path {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .st-tl-pv-file {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 8px 12px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: inherit;
+  }
+
+  .st-tl-enrow > .st-tl-mono {
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 720px) {
+    .st-tl-info {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 150px minmax(0, 1fr);
+    }
+  }
+
+  .st-tl-fg {
+    color: var(--fg);
+  }
+
+  /* 检测三步：失败的那一步点名原因 */
+
+  .st-tl-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .st-tl-steps li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .st-tl-steps li[data-state="ok"] .st-tl-step-m {
+    color: var(--live-ink);
+  }
+
+  .st-tl-steps li[data-state="error"] .st-tl-step-m,
+  .st-tl-step-e {
+    color: var(--danger);
+  }
+
+  .st-tl-step-e {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: inherit;
+  }
+
+  .st-tl-pinsteps {
+    margin: 0;
+    padding-left: 16px;
+    color: var(--muted);
+  }
+
+  .st-tl-pinfail {
+    margin-top: 8px;
+  }
+
+  /* 编辑器：JSON + 模板 + 逐条诊断 + 解析预览 */
+
+  .st-tl-jrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .st-tl-preview-4 {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 1.6fr) minmax(
+        0,
+        0.8fr
+      );
+  }
+
+  .st-tl-diags {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .st-tl-diags li {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+
+  .st-tl-diags li[data-level="error"] {
+    color: var(--danger);
+  }
+
+  .st-tl-diags li[data-level="warning"] {
+    color: var(--warn-ink);
+  }
+
+  /* 引用列表缩进到提示文字的位置（小圆点 8 + 间距 8） */
+  .st-tl-refs ul {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0 0 0 16px;
+    list-style: none;
+    color: var(--fg);
+  }
+
+  .st-tl-refs li {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+
+  /* 详情弹窗：六格事实 + 握手返回的工具 */
+
+  .st-tl-minfo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: min(64vh, 520px);
+    overflow-y: auto;
+  }
+
+  .st-tl-msum {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .st-tl-facts6 {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+  }
+
+  .st-tl-facts6 > div {
+    min-width: 0;
+    padding: 6px 8px;
+    border-left: 1px solid var(--surface-3);
+  }
+
+  .st-tl-facts6 > div:first-child {
+    border-left: 0;
+  }
+
+  .st-tl-facts6 dt {
+    color: var(--meta);
+  }
+
+  .st-tl-facts6 dd {
+    margin: 4px 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-tl-mtools {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .st-tl-mtools th {
+    padding: 0 8px 4px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    color: var(--meta);
+  }
+
+  .st-tl-mtools th:first-child {
+    width: 38%;
+  }
+
+  .st-tl-mtools td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--surface-3);
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    color: var(--muted);
+  }
+
+  @media (max-width: 720px) {
+    .st-tl-facts6 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .st-tl-facts6 > div:nth-child(4) {
+      border-left: 0;
+    }
+
+    .st-tl-facts6 > div:nth-child(n + 4) {
+      border-top: 1px solid var(--surface-3);
+    }
+
+    .st-tl-preview-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}

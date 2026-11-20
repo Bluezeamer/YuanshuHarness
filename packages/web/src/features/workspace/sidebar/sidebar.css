@@ -1,0 +1,705 @@
+/* 左轨样张（/?gallery=rail）。只写布局：颜色取令牌，间距与高度取刻度，字样由组件选 t-* 类。
+   左轨宽 252 / 收起 62 是布局级数字（ys-ui-design 的 visual-language §3），只在这里写一次。 */
+@layer components {
+  .rl-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--bg);
+  }
+
+  .rl-demo {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--fg-3);
+  }
+
+  .rl-frame {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ---------- 左轨外壳 ---------- */
+  .rl {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: 252px;
+    min-height: 0;
+    border-right: 1px solid var(--line);
+    background: var(--side);
+  }
+
+  .rl-top {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 8px 0 16px;
+  }
+
+  .rl-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rl-top-act {
+    display: flex;
+    gap: 4px;
+  }
+
+  .rl-search {
+    flex: none;
+    padding: 0 8px 8px;
+  }
+
+  .rl-list {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 12px;
+    overflow: auto;
+  }
+
+  .rl-empty {
+    margin: 8px 0;
+  }
+
+  /* ---------- 分组 ---------- */
+  .rl-group + .rl-group {
+    margin-top: 12px;
+  }
+
+  .rl-ghead {
+    color: var(--fg-3);
+  }
+
+  .rl-ghead[data-drop] {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    background: var(--accent-bg);
+  }
+
+  .rl-ungrouped {
+    padding: 8px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .rl-ungrouped[data-drop] {
+    color: var(--fg-1);
+    background: var(--accent-bg);
+  }
+
+  /* 分组颜色只占一个小圆点（用现成的 Dot，只换底色）；样张借用旧的色相令牌占位，最终色板待定 */
+  /* 方块而不是圆：圆点留给状态，免得分组色被当成状态点 */
+  .rl-tone {
+    border-radius: 0;
+  }
+
+  .rl-tone[data-hue="1"] {
+    background: var(--h1);
+  }
+
+  .rl-tone[data-hue="2"] {
+    background: var(--h2);
+  }
+
+  .rl-tone[data-hue="3"] {
+    background: var(--h3);
+  }
+
+  .rl-tone[data-hue="4"] {
+    background: var(--h4);
+  }
+
+  .rl-tone[data-hue="5"] {
+    background: var(--h5);
+  }
+
+  .rl-tone[data-hue="6"] {
+    background: var(--h6);
+  }
+
+  .rl-gdlg {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .rl-swatches {
+    display: flex;
+    gap: 4px;
+  }
+
+  .rl-swatch[aria-pressed="true"] {
+    background: var(--accent-bg);
+  }
+
+  .rl-gchev {
+    color: var(--icon);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .rl-ghead[data-open] .rl-gchev {
+    transform: rotate(90deg);
+  }
+
+  /* ---------- 工作区块 ---------- */
+  .rl-ws {
+    position: relative;
+    margin-top: 4px;
+    animation: u-rise var(--dur) var(--ease) backwards;
+    animation-delay: calc(var(--i, 0) * 28ms);
+  }
+
+  .rl-ws[data-dragging] {
+    opacity: 0.45;
+  }
+
+  .rl-wh {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .rl-wh:hover {
+    background: var(--hover);
+  }
+
+  .rl-wh[data-selected] {
+    background: var(--accent-bg);
+  }
+
+  /* 整块的底色由 .rl-wh 给，里面的行不再各铺一层；悬停卡片的外层 .u-hc 才是 flex 子项 */
+  .rl-wh .u-hc {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rl-wh .u-lrow,
+  .rl-wh .u-lrow:hover {
+    background: transparent;
+  }
+
+  .rl-chev {
+    margin-left: 6px;
+  }
+
+  .rl-chev-i {
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .rl-ws[data-open] .rl-chev-i {
+    transform: rotate(90deg);
+  }
+
+  /* 当前工作区：块左缘一道墨色细线，名字从次要色提到正文色 */
+  .rl-ws[data-current] > .rl-wh::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: -8px;
+    width: 2px;
+    border-radius: 999px;
+    background: var(--ink);
+  }
+
+  .rl-wtitle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  /* 置顶的小图钉：工作区名与会话行的时间旁 */
+  .rl-pinned {
+    flex: none;
+    color: var(--fg-3);
+  }
+
+  .rl-wname {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-2);
+    text-overflow: ellipsis;
+  }
+
+  .rl-ws[data-current] .rl-wname {
+    color: var(--fg);
+  }
+
+  .rl-wrow .u-lrow-sub {
+    color: var(--fg-3);
+  }
+
+  .rl-agg {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rl-wline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* 悬停时右上角让给「…」，和行上的时间一个处理 */
+  .rl-wrow .rl-agg {
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .rl-wrow:is(:hover, :focus-within) .rl-agg {
+    opacity: 0;
+  }
+
+  .rl-n {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .rl-total {
+    color: var(--fg-3);
+  }
+
+  /* 展开的内容挂在一道很淡的导引线上：线的位置在箭头正下方 */
+  .rl-wb {
+    margin-left: 16px;
+    padding: 0 0 8px 4px;
+    border-left: 1px solid var(--line);
+  }
+
+  .rl-none {
+    padding: 4px 8px;
+    color: var(--fg-3);
+  }
+
+  /* ---------- 会话行 ---------- */
+  .rl-row {
+    animation: u-rise var(--dur) var(--ease) backwards;
+    animation-delay: calc(var(--i, 0) * 28ms + 60ms);
+  }
+
+  .rl-lead {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 8px;
+  }
+
+  .rl-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--fg-3);
+  }
+
+  .rl-row[data-archived] .u-lrow-label {
+    color: var(--fg-3);
+  }
+
+  .rl-row[data-dragging] {
+    opacity: 0.45;
+  }
+
+  /* 「我在看」：正在窗格里显示的会话，在导引线上亮一小段墨色 */
+  .rl-row[data-viewing]::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: -5px;
+    width: 2px;
+    border-radius: 999px;
+    background: var(--ink);
+  }
+
+  /* fork：缩进一格，用一道肘形线接回父会话 */
+  .rl-fork {
+    position: relative;
+    margin-left: 16px;
+  }
+
+  .rl-fork::before {
+    content: "";
+    position: absolute;
+    top: -4px;
+    bottom: 22px;
+    left: -4px;
+    width: 1px;
+    background: var(--line-strong);
+  }
+
+  .rl-fork .rl-row::after {
+    content: "";
+    position: absolute;
+    top: 22px;
+    left: -4px;
+    width: 8px;
+    height: 1px;
+    background: var(--line-strong);
+  }
+
+  .rl-fold,
+  .rl-new {
+    color: var(--fg-3);
+  }
+
+  .rl-new:hover {
+    color: var(--fg);
+  }
+
+  .rl-fchev {
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .rl-fold[data-open] .rl-fchev {
+    transform: rotate(90deg);
+  }
+
+  /* ---------- 页脚 / 批量操作条 ---------- */
+  .rl-foot {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 44px;
+    padding: 0 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .rl-foot-idle {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 4px;
+    animation: u-rise var(--dur-fast) var(--ease) backwards;
+  }
+
+  .rl-host {
+    margin-left: auto;
+    padding-right: 8px;
+    color: var(--fg-3);
+  }
+
+  /* ---------- 拖拽 ---------- */
+  .rl-dropline {
+    position: relative;
+    margin: 4px 8px;
+    border-top: 2px solid var(--accent);
+    border-radius: 999px;
+  }
+
+  .rl-dropline::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: -4px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    background: var(--side);
+  }
+
+  /* 组尾落点：只在拖着工作区时出现，给「排到最后」一块能放的地方 */
+  .rl-dropend {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+
+  .rl-dropend > .rl-dropline {
+    flex: 1;
+  }
+
+  /* ---------- 收起 62px ---------- */
+  .rl-mini {
+    width: 62px;
+  }
+
+  .rl-mini .rl-top {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .rl-mini-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+  }
+
+  .rl-mini-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .rl-mini-group + .rl-mini-group {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .rl-mini-foot {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .rl-mi {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+  }
+
+  .rl-mini .rl-mi-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--fg-2);
+  }
+
+  .rl-mini .rl-mi-btn:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+
+  .rl-mi[data-current] .rl-mi-btn {
+    border-color: var(--ink);
+    color: var(--fg);
+  }
+
+  .rl-mi-dot {
+    position: absolute;
+    top: -2px;
+    right: 10px;
+    box-shadow: 0 0 0 2px var(--side);
+  }
+
+  /* ≤900px：左轨横过来做顶部条（工作区首字母一排，放不下就换行），悬停浮出的列表改到下方 */
+  @media (max-width: 900px) {
+    .rl-mini {
+      flex-direction: row;
+      width: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .rl-mini .rl-top {
+      display: none;
+    }
+
+    .rl-mini-list {
+      flex-flow: row wrap;
+      justify-content: flex-start;
+      padding: 8px 12px;
+    }
+
+    .rl-mini-group {
+      flex-direction: row;
+      width: auto;
+    }
+
+    .rl-mini-group + .rl-mini-group {
+      padding-top: 0;
+      padding-left: 12px;
+      border-top: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .rl-mini-foot {
+      flex-direction: row;
+      align-self: flex-start;
+      padding: 8px 12px;
+      border-top: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .rl-mi {
+      width: auto;
+    }
+
+    .rl-mi-dot {
+      right: -2px;
+    }
+
+    .rl-fly {
+      top: 100%;
+      left: 0;
+      padding-top: 8px;
+      padding-left: 0;
+    }
+  }
+
+  /* 悬停浮出：左侧留 8px 透明桥，鼠标从按钮移进卡片时不会断 */
+  .rl-fly {
+    position: absolute;
+    top: -8px;
+    left: 100%;
+    z-index: 20;
+    display: none;
+    width: 272px;
+    padding-left: 8px;
+  }
+
+  .rl-mi:is(:hover, :focus-within) .rl-fly,
+  .rl-fly[data-pin] {
+    display: block;
+  }
+
+  .rl-fly-card {
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--sh-pop);
+    animation: u-pop-in var(--dur-fast) var(--ease);
+  }
+
+  .rl-fly-h {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 8px 8px;
+  }
+
+  .rl-fly-path {
+    color: var(--fg-3);
+  }
+
+  /* ---------- 右侧工作区主体（只为给左轨一个上下文） ---------- */
+  .rl-stage {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--surface);
+  }
+
+  .rl-panes {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1.3fr) minmax(240px, 1fr);
+  }
+
+  .rl-pane {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .rl-pane + .rl-pane {
+    border-left: 1px solid var(--line);
+  }
+
+  .rl-pane-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 24px;
+    color: var(--fg-3);
+  }
+
+  .rl-pane-body .t-block {
+    color: var(--fg);
+  }
+
+  .rl-dz {
+    position: absolute;
+    inset: 40px 12px 12px;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    animation: u-fade-in var(--dur-fast) var(--ease);
+  }
+
+  .rl-ghost {
+    position: absolute;
+    top: 176px;
+    left: 64%;
+    z-index: 20;
+    padding: 6px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--sh-pop);
+  }
+
+  .rl-ghost[data-ws] {
+    top: 128px;
+    left: 24px;
+  }
+
+  /* ---------- 删除确认里的影响清单 ---------- */
+  .rl-impact {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .rl-impact-h {
+    color: var(--fg-3);
+  }
+
+  .rl-impact-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 12px;
+  }
+
+  .rl-impact-row > .u-chip {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+
+  .rl-impact-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rl-impact-n {
+    color: var(--fg-3);
+  }
+
+  .rl-note {
+    margin-top: 8px;
+    color: var(--fg-3);
+  }
+}

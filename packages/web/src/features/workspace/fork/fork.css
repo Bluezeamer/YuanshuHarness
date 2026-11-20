@@ -1,0 +1,11 @@
+/* P09 分叉入口：轮末操作行里的小按钮，点一下就分叉。
+   按钮样式与对话流其它小控件同高，禁用态只降透明度并给 not-allowed。 */
+
+.ch-fork {
+  display: inline-flex;
+}
+
+.ch-fork-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

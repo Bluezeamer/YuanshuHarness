@@ -1,0 +1,353 @@
+/* 远程连接页：只写布局；颜色取令牌，间距 / 高度 / 圆角取刻度，字样一律在 TSX 里选 t-* 类。
+   外壳、页签条、左列表、保存条、区块小标题的样式在 ../frame/frame.css，这里只有连接自己的东西。 */
+@layer components {
+  .st-rc-hint {
+    color: var(--fg-2);
+  }
+
+  .st-rc-err {
+    margin-top: 16px;
+  }
+
+  .st-rc-note {
+    margin: 8px 0 0;
+  }
+
+  /* 头与各设置块之间「有事才出现」的几条 */
+  .st-rc-notes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .st-rc-notes .u-notice {
+    margin: 0;
+  }
+
+  .st-rc-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .st-rc-inline > .u-inp {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  .st-rc-pw {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ---------- 六段激活步骤：耗时列定宽 + 等宽数字，毫秒定格后不挤动细节 ---------- */
+  .st-rc-steps {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    animation: u-rise var(--dur) var(--ease);
+  }
+
+  .st-rc-steps[data-state="failed"] {
+    border-color: var(--danger);
+  }
+
+  .st-rc-steps[data-state="blocked"] {
+    border-color: var(--warn);
+  }
+
+  .st-rc-steps ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .st-rc-step {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 64px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .st-rc-step:first-child {
+    border-top: 0;
+  }
+
+  .st-rc-step .u-dot {
+    justify-self: center;
+  }
+
+  .st-rc-step-t {
+    min-width: 0;
+  }
+
+  .st-rc-step-t .t-mono {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-rc-step[data-state="pending"] .st-rc-step-t {
+    color: var(--fg-3);
+  }
+
+  .st-rc-step-ms {
+    text-align: end;
+  }
+
+  .st-rc-step[data-state="failed"] .st-rc-step-ms {
+    color: var(--danger);
+  }
+
+  .st-rc-fail {
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .st-rc-fail-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+  }
+
+  .st-rc-fail-raw {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .st-rc-actfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+
+  /* ---------- 主机密钥核对：并排「记录 / 本次」 ---------- */
+  .st-rc-hk {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--warn);
+    border-radius: 12px;
+  }
+
+  .st-rc-hk-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .st-rc-hk p {
+    margin: 0;
+  }
+
+  .st-rc-fps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+  }
+
+  .st-rc-fprow {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .st-rc-fprow dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .st-rc-hk-a {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .st-rc-hk-tip {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  /* ---------- 地址：跳板链与行内小件 ---------- */
+  .st-rc-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 0;
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+
+  .st-rc-node {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .st-rc-node-line {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 1px;
+    margin: 0 8px;
+    background: var(--line-strong);
+  }
+
+  .st-rc-node-line::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    right: 0;
+    width: 4px;
+    height: 4px;
+    border-top: 1px solid var(--line-strong);
+    border-right: 1px solid var(--line-strong);
+    transform: rotate(45deg);
+  }
+
+  .st-rc-node-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .st-rc-node-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .st-rc-node-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-strong);
+    transition: background var(--dur) var(--ease);
+  }
+
+  .st-rc-node[data-on] .st-rc-node-dot {
+    background: var(--live);
+  }
+
+  .st-rc-node-addr {
+    padding-left: 8px;
+    white-space: nowrap;
+  }
+
+  .st-rc-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 120px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .st-rc-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .st-rc-hkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .st-rc-fp-inline {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- 目录挂载 ---------- */
+  .st-rc-mounts {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .st-rc-mounts li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .st-rc-mounts li:first-child {
+    border-top: 0;
+  }
+
+  .st-rc-mount-path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- 密钥 / 日志页 ---------- */
+  .st-rc-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .st-rc-bar p {
+    margin: 0;
+  }
+
+  .st-rc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+    margin: 0 0 16px;
+    padding: 0;
+    border: 0;
+  }
+
+  .st-rc-logtype {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .st-rc-logdetail {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-rc-more {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+  }
+}

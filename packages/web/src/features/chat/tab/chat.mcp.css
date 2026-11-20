@@ -1,0 +1,66 @@
+/* /mcp 弹窗：本会话里每个 MCP 服务的连接状态。 */
+@layer components {
+  .ch-mcp {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ch-mcp-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ch-mcp-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ch-mcp-row:last-child {
+    border-bottom: 0;
+  }
+
+  .ch-mcp-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-mcp-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-mcp-state {
+    margin-left: auto;
+    color: var(--fg-3);
+  }
+
+  .ch-mcp-where {
+    padding-left: 16px;
+    color: var(--fg-3);
+  }
+
+  .ch-mcp-err {
+    max-height: 160px;
+    margin: 4px 0 0 16px;
+    overflow: auto;
+    color: var(--danger);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .ch-mcp-note,
+  .ch-mcp-empty {
+    margin: 0;
+    color: var(--fg-3);
+  }
+}

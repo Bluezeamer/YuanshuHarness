@@ -1,0 +1,346 @@
+/* 浮层：弹窗、锚点浮层、菜单、Toast。只有浮层使用 --elev-lg。 */
+@layer components {
+  .u-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    /* 列宽钉在视口内：不写的话隐式列按卡片的固定宽度撑开，窄屏上卡片会伸出屏幕 */
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+    padding: 16px;
+    background: color-mix(in oklch, var(--fg) 18%, transparent);
+    animation: u-fade-in 160ms var(--ease);
+  }
+
+  /* 弹窗：圆角 14、内边距 24，页头与页脚不画分隔线，层次靠留白 */
+  .u-mcard {
+    width: 560px;
+    max-width: 100%;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+    border-radius: 14px;
+    box-shadow: var(--sh-pop);
+    animation: u-modal-in var(--dur) var(--ease);
+  }
+
+  .u-mcard:focus {
+    outline: none;
+  }
+
+  .u-mcard[data-size="sm"] {
+    width: 420px;
+  }
+
+  .u-mcard[data-size="lg"] {
+    width: 720px;
+  }
+
+  .u-mcard[data-size="xl"] {
+    width: 880px;
+  }
+
+  .u-mcard[data-size="full"] {
+    width: 100%;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .u-modal[data-full] {
+    padding: 0;
+  }
+
+  .u-mhead {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 24px 24px 8px;
+  }
+
+  .u-mhead-mid {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .u-msub {
+    margin-top: 4px;
+  }
+
+  .u-mbody {
+    padding: 8px 24px 16px;
+    overflow-y: auto;
+  }
+
+  .u-mfoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 24px 24px;
+  }
+
+  /* 底部抽屉：遮罩铺满，抽屉贴底；头部一条细线，内容区自己滚 */
+  .u-sheet-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: color-mix(in oklch, var(--fg) 28%, transparent);
+    animation: u-fade-in var(--dur) var(--ease);
+  }
+
+  .u-sheet {
+    display: flex;
+    flex-direction: column;
+    max-height: 80dvh;
+    background: var(--surface);
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--sh-pop);
+    animation: u-modal-in var(--dur) var(--ease);
+  }
+
+  .u-sheet:focus {
+    outline: none;
+  }
+
+  .u-sheet-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 4px 0 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .u-sheet-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .u-sheet-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 8px 16px;
+  }
+
+  /* 表单弹窗：字段竖排；页脚左侧的次要操作靠左，其余靠右 */
+  .u-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .u-form-aside {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+  }
+
+  .u-confirm {
+    color: var(--fg-2);
+  }
+
+  .u-confirm p {
+    margin: 0;
+  }
+
+  .u-confirm-err {
+    margin-top: 8px;
+  }
+
+  .u-pop {
+    position: fixed;
+    z-index: 40;
+    min-width: 160px;
+    max-width: calc(100vw - 16px);
+    max-height: min(360px, calc(100vh - 16px));
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--sh-pop);
+    animation: u-pop-in var(--dur-fast) var(--ease);
+  }
+
+  .u-menu {
+    padding: 4px;
+  }
+
+  .u-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: var(--fg);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .u-menu-item:hover:not(:disabled),
+  .u-menu-item:focus-visible,
+  .u-menu-item[data-active] {
+    background: var(--hover);
+    outline: none;
+  }
+
+  .u-menu-item[data-tone="danger"] {
+    color: var(--danger);
+  }
+
+  .u-menu-item:disabled {
+    color: var(--fg-3);
+    cursor: not-allowed;
+  }
+
+  .u-menu-sep {
+    height: 1px;
+    margin: 4px -4px;
+    border: 0;
+    background: var(--line);
+  }
+
+  .u-toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 40px;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    pointer-events: none;
+  }
+
+  .u-toast {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 360px;
+    padding: 8px 12px;
+    border-radius: var(--r-ctl);
+    background: var(--fg);
+    color: var(--surface);
+    box-shadow: var(--elev-lg);
+    animation: u-toast-in var(--dur) var(--ease);
+  }
+
+  .u-toast-actions {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    margin-left: 4px;
+    pointer-events: auto;
+  }
+
+  .u-toast-act {
+    height: 20px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: transparent;
+    color: var(--surface);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
+  }
+
+  .u-toast-act[data-primary] {
+    background: color-mix(in oklch, var(--surface) 18%, transparent);
+  }
+
+  .u-toast-act:hover {
+    background: color-mix(in oklch, var(--surface) 28%, transparent);
+  }
+
+  .u-toast svg {
+    flex: 0 0 auto;
+    color: color-mix(in oklch, var(--surface) 70%, var(--meta));
+  }
+
+  .u-toast[data-tone="ok"] svg {
+    color: color-mix(in oklch, var(--surface) 70%, var(--live));
+  }
+
+  .u-toast[data-tone="warn"] svg {
+    color: color-mix(in oklch, var(--surface) 55%, var(--warn));
+  }
+
+  .u-toast[data-tone="danger"] svg {
+    color: color-mix(in oklch, var(--surface) 55%, var(--danger));
+  }
+
+  /* 列表行悬停详情卡片（HoverCard）：只读，不接鼠标 */
+  .u-hc-card {
+    position: fixed;
+    z-index: 40;
+    width: 296px;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--sh-pop);
+    pointer-events: none;
+    animation: u-pop-in var(--dur-fast) var(--ease);
+  }
+
+  .u-hc-title {
+    overflow-wrap: anywhere;
+  }
+
+  .u-hc-text {
+    margin: 4px 0 0;
+    color: var(--fg-2);
+  }
+
+  .u-hc-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .u-hc-fact {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .u-hc-fact dt,
+  .u-hc-fact dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .u-hc-fact dd {
+    color: var(--fg);
+  }
+
+  /* 弹窗里的二级页 */
+  .u-drill {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .u-drill-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: -8px;
+  }
+}

@@ -1,0 +1,586 @@
+/* 内置浏览器标签（虚拟浏览器窗口）：只用 ui/tokens.css 的令牌。
+   工具条永远一行（观察态与手动态是同一行的两种内容）；窄窗格的取舍按窗格宽度（@container pane）做。 */
+@layer components {
+  .ws-wb {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+    color: var(--fg);
+  }
+
+  /* ── 顶部提示：沙盒降级、接管请求。状态点 + 文字，不铺底 ── */
+  .ws-wb-strip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  .ws-wb-strip .u-notice {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ws-wb-strip-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ws-wb-refuse {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ws-wb-refuse .u-inp {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── 工具条（一行） ── */
+  .ws-wb-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px;
+    min-width: 0;
+  }
+
+  .ws-wb-pages {
+    flex: none;
+    color: var(--fg-3);
+  }
+
+  .ws-wb-pages[aria-expanded="true"] {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+
+  /* 地址：观察态只读、手动态可编辑，外形不变，只在聚焦时出环 */
+  .ws-wb-addr {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: var(--side);
+  }
+
+  .ws-wb-addr:focus-within {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+
+  .ws-wb-addr .u-inp {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    text-overflow: ellipsis;
+  }
+
+  .ws-wb-lock {
+    display: grid;
+    flex: none;
+    color: var(--icon);
+  }
+
+  .ws-wb-lock[data-secure] {
+    color: var(--ok-text);
+  }
+
+  .ws-wb-loading {
+    flex: none;
+    color: var(--warn-text);
+  }
+
+  .ws-wb-sub {
+    flex: none;
+    max-width: 40%;
+    overflow: hidden;
+    color: var(--meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 有新页面可看：可点的小条，蓝点 + 名字 */
+  .ws-wb-hint {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-wb-count {
+    color: var(--meta);
+  }
+
+  .ws-wb-con-btn[aria-pressed="true"],
+  .ws-wb-rp-btn[aria-pressed="true"] {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+
+  /* 窄窗格按宽度分四档（阈值是实测的：每档地址栏都要留出 100px 以上）：
+     宽：次要动作带文字；≤ 640：只剩图标；≤ 500：三个次要动作（保存登录 / 回放 / 控制台）收进「…」菜单；
+     ≤ 400：后退 / 前进 / 刷新与「有新页面」小条也收进去，「页面 N」只留数字、地址栏里的锁图标也去掉，工具条只剩 页面、地址栏、「…」、主按钮。
+     「…」菜单永远是完整的动作清单（400–500 这一档里后退 / 前进 / 刷新在条上和菜单里都有，不为这一小段再做一套判断）。 */
+  .ws-wb-bar .ws-wb-more {
+    display: none;
+  }
+
+  @container pane (max-width: 640px) {
+    .ws-wb-ctext {
+      display: none;
+    }
+  }
+
+  @container pane (max-width: 520px) {
+    .ws-wb-sub {
+      display: none;
+    }
+  }
+
+  @container pane (max-width: 500px) {
+    .ws-wb-sec {
+      display: none;
+    }
+
+    .ws-wb-bar .ws-wb-more {
+      display: inline-grid;
+    }
+  }
+
+  @container pane (max-width: 400px) {
+    .ws-wb-hint,
+    .ws-wb-nav,
+    .ws-wb-ptext,
+    .ws-wb-lock {
+      display: none;
+    }
+  }
+
+  /* ── 画面区：16:10 的画面按容器等比缩放居中，四周露出次级底色 ── */
+  .ws-wb-stage {
+    position: relative;
+    display: grid;
+    flex: 1;
+    place-items: center;
+    min-height: 0;
+    overflow: hidden;
+    container-type: size;
+    background: var(--side);
+  }
+
+  .ws-wb-view {
+    position: relative;
+    width: min(100cqw, 160cqh);
+    aspect-ratio: 8 / 5;
+    background: var(--surface);
+    outline: none;
+  }
+
+  .ws-wb-stage[hidden] {
+    display: none;
+  }
+
+  /* 手动操作：画面区外一圈强调色描边 */
+  .ws-wb-view[data-manual] {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  /* 输入法的落脚点：透明、不接鼠标，位置由 useInputCapture 随点击更新 */
+  .ws-wb-ime {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    resize: none;
+  }
+
+  .ws-wb-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .ws-wb-canvas[hidden] {
+    display: none;
+  }
+
+  /* 画面上盖一层说明：休眠、连接中、没有页面、出错；重连用半透明 */
+  .ws-wb-veil {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface);
+    color: var(--fg-3);
+    text-align: center;
+  }
+
+  .ws-wb-veil[data-soft] {
+    background: color-mix(in oklch, var(--surface) 62%, transparent);
+  }
+
+  .ws-wb-veil[data-tone="danger"] {
+    color: var(--danger);
+  }
+
+  .ws-wb-thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.3;
+  }
+
+  .ws-wb-veil > :not(.ws-wb-thumb) {
+    position: relative;
+  }
+
+  /* 观察态左下角的小标：哪个会话在操作；不接鼠标 */
+  .ws-wb-tag {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    pointer-events: none;
+  }
+
+  /* 画面上方临时浮出的提示（输入被拒、另一个窗口在操作），一条一行 */
+  .ws-wb-float {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--sh-sm);
+  }
+
+  .ws-wb-float-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ws-wb-float-row .u-notice {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 引擎没装好时给的可复制命令 */
+  .ws-wb-fix {
+    display: block;
+    margin-top: 8px;
+    word-break: break-all;
+  }
+
+  /* ── 控制台抽屉：默认隐藏，工具条上的开关展开 ── */
+  .ws-wb-con {
+    display: flex;
+    flex: 0 0 40%;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .ws-wb-con-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--meta);
+  }
+
+  .ws-wb-con-head > span:first-child {
+    flex: 1;
+  }
+
+  .ws-wb-con-list {
+    flex: 1;
+    min-height: 0;
+    padding: 4px 12px 8px;
+    overflow-y: auto;
+  }
+
+  .ws-wb-con-line {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    word-break: break-word;
+  }
+
+  .ws-wb-con-line[data-level="error"],
+  .ws-wb-con-line[data-kind="request-failed"] {
+    color: var(--danger);
+  }
+
+  .ws-wb-con-line[data-level="warn"] {
+    color: var(--warn-text);
+  }
+
+  .ws-wb-con-time {
+    flex: none;
+    color: var(--meta);
+  }
+
+  /* ── 回放：画面区复用 .ws-wb-stage，下面一行控制 + 当前步的说明 ── */
+  .ws-wb-rp {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* 控制行：宽窗格一行（会话 · 上一步 播放 下一步 · 进度 · 进度数 · 刷新）；
+     窄窗格两行，滑块拿到整行剩余宽度：第一行会话 / 进度数 / 刷新，第二行翻步控件 + 滑块 */
+  .ws-wb-rp-bar {
+    display: grid;
+    flex: none;
+    grid-template-areas: "sel prev play next slider count reload";
+    grid-template-columns: minmax(0, 200px) 28px 28px 28px minmax(0, 1fr) auto 28px;
+    align-items: center;
+    gap: 4px;
+    min-height: 36px;
+    padding: 4px 8px;
+    min-width: 0;
+  }
+
+  .ws-wb-rp-sel {
+    grid-area: sel;
+    min-width: 0;
+    margin-right: 4px;
+  }
+
+  .ws-wb-rp-prev {
+    grid-area: prev;
+  }
+
+  .ws-wb-rp-play {
+    grid-area: play;
+  }
+
+  .ws-wb-rp-next {
+    grid-area: next;
+  }
+
+  .ws-wb-rp-slider {
+    grid-area: slider;
+    min-width: 0;
+    margin: 0 8px;
+  }
+
+  .ws-wb-rp-count {
+    grid-area: count;
+    min-width: 56px;
+    text-align: right;
+  }
+
+  .ws-wb-rp-reload {
+    grid-area: reload;
+  }
+
+  @container pane (max-width: 520px) {
+    .ws-wb-rp-bar {
+      grid-template-areas:
+        "sel sel sel sel count reload"
+        "prev play next slider slider slider";
+      grid-template-columns: 28px 28px 28px minmax(0, 1fr) auto 28px;
+    }
+  }
+
+  .ws-wb-rp-note {
+    display: flex;
+    flex: none;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    padding: 0 12px 8px;
+  }
+
+  .ws-wb-rp-note > .t-plain {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-wb-rp-meta {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── 「页面」悬浮列表 ── */
+  .ws-pg {
+    display: flex;
+    flex-direction: column;
+    max-height: min(480px, 70vh);
+  }
+
+  .ws-pg-scroll {
+    flex: 1;
+    min-height: 0;
+    padding: 4px;
+    overflow-y: auto;
+  }
+
+  .ws-pg-sec {
+    padding: 8px 8px 4px;
+  }
+
+  .ws-pg-gtrail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ws-pg-count {
+    color: var(--meta);
+  }
+
+  .ws-pg-used {
+    color: var(--meta);
+  }
+
+  .ws-pg-add {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 4px;
+  }
+
+  .ws-pg-add .u-inp {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ws-pg-open {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .ws-pg-open .u-inp {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ws-pg-note {
+    flex: none;
+    padding: 0 8px 8px;
+  }
+
+  /* 下载弹窗：文件名一行，过长省略 */
+  .ws-dl-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ws-dl-file svg {
+    flex: none;
+  }
+
+  .ws-dl-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-dl-more {
+    margin: 0;
+    color: var(--meta);
+  }
+
+  /* JS 对话框弹窗：页面给的原文，保留换行，过长在框内滚 */
+  .ws-dlg-msg {
+    margin: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* 上传弹窗：已选文件的列表，一行一个，名字过长省略 */
+  .ws-ul-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ws-ul-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ws-ul-list svg {
+    flex: none;
+  }
+
+  .ws-ul-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-ul-size {
+    flex: none;
+    color: var(--meta);
+  }
+}

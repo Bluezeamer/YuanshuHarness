@@ -1,0 +1,27 @@
+/* 工作区页：窗口条 + 平铺的窗格树。通用的格子、分隔条、窗口条、窗格框在 ui/styles/tiling.css；
+   这里只有页面容器。类名 ws- 前缀。 */
+@layer components {
+  .ws-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .ws-wnwrap {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .ws-wnbody {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+}

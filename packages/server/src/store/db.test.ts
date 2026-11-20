@@ -1,0 +1,165 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import Database from "better-sqlite3";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { DB_FILE, MIGRATIONS, type Migration, openDatabase } from "./db.js";
+
+let dir: string;
+const open: Array<{ close(): void }> = [];
+beforeEach(async () => {
+  dir = await mkdtemp(path.join(tmpdir(), "yuanshu-db-"));
+});
+afterEach(async () => {
+  for (const d of open.splice(0)) {
+    try {
+      d.close();
+    } catch {}
+  }
+  await rm(dir, { recursive: true, force: true });
+});
+const track = <T extends { close(): void }>(d: T) => {
+  open.push(d);
+  return d;
+};
+const baks = () => readdirSync(dir).filter((f) => f.includes(".bak-"));
+const version = (d: Database.Database) =>
+  d.pragma("user_version", { simple: true });
+
+describe("R1 迁移与备份", () => {
+  test("全新数据库：直接建到当前版本，无备份", () => {
+    const db = track(openDatabase(dir));
+    expect(version(db)).toBe(MIGRATIONS.length);
+    expect(db.prepare("SELECT count(*) n FROM sessions").get()).toEqual({
+      n: 0,
+    });
+    expect(baks()).toEqual([]);
+  });
+
+  test("基线建出当前的表：带 sessions 与 workspaces，不再有 workbench、saved_layouts、session_groups", () => {
+    const db = track(openDatabase(dir));
+    const tables = (
+      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {
+        name: string;
+      }[]
+    ).map((t) => t.name);
+    expect(tables).toEqual(expect.arrayContaining(["sessions", "workspaces"]));
+    for (const gone of ["workbench", "saved_layouts", "session_groups"])
+      expect(tables).not.toContain(gone);
+  });
+
+  test("重新打开已是当前版本：不备份、数据保留", () => {
+    const a = openDatabase(dir);
+    a.prepare(
+      "INSERT INTO sessions (id, name, created_at, updated_at) VALUES ('x', NULL, 'a', 'b')",
+    ).run();
+    a.close();
+    const b = track(openDatabase(dir));
+    expect(b.prepare("SELECT id FROM sessions").all()).toEqual([{ id: "x" }]);
+    expect(baks()).toEqual([]);
+  });
+
+  test("旧版本（v0 但已有表）：迁移前备份，数据保留", () => {
+    const legacy = new Database(path.join(dir, DB_FILE));
+    legacy.exec(
+      "CREATE TABLE legacy_marker (v TEXT); INSERT INTO legacy_marker VALUES ('keep')",
+    );
+    legacy.close();
+    const before = readFileSync(path.join(dir, DB_FILE));
+    const db = track(openDatabase(dir));
+    expect(version(db)).toBe(MIGRATIONS.length);
+    expect(db.prepare("SELECT v FROM legacy_marker").get()).toEqual({
+      v: "keep",
+    });
+    expect(baks()).toEqual([`${DB_FILE}.bak-v0`]);
+    expect(readFileSync(path.join(dir, `${DB_FILE}.bak-v0`))).toEqual(before);
+  });
+
+  test("多一步迁移：只备份升级前的版本，且逐步升版本", () => {
+    openDatabase(dir).close();
+    const n = MIGRATIONS.length;
+    const two: Migration[] = [
+      ...MIGRATIONS,
+      (db) => db.exec("ALTER TABLE sessions ADD COLUMN extra TEXT"),
+    ];
+    const db = track(openDatabase(dir, two));
+    expect(version(db)).toBe(n + 1);
+    expect(baks()).toEqual([`${DB_FILE}.bak-v${n}`]);
+  });
+
+  test("迁移中途失败：回滚、启动失败、原库不变", () => {
+    openDatabase(dir).close();
+    const file = path.join(dir, DB_FILE);
+    const snapshot = readFileSync(file);
+    const bad: Migration[] = [
+      ...MIGRATIONS,
+      (db) => {
+        db.exec("ALTER TABLE sessions ADD COLUMN half TEXT");
+        throw new Error("migration boom");
+      },
+    ];
+    expect(() => openDatabase(dir, bad)).toThrow(/migration boom/);
+    expect(readFileSync(file)).toEqual(snapshot);
+    const check = track(new Database(file));
+    expect(version(check)).toBe(MIGRATIONS.length);
+    expect(
+      (
+        check.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]
+      ).map((c) => c.name),
+    ).not.toContain("half");
+  });
+});
+
+describe("R2 版本高于代码", () => {
+  test("拒绝启动，信息含两个版本号，库文件字节不变", () => {
+    const file = path.join(dir, DB_FILE);
+    const d = new Database(file);
+    d.exec("CREATE TABLE future (x)");
+    d.pragma("user_version = 999");
+    d.close();
+    const before = readFileSync(file);
+    expect(() => openDatabase(dir)).toThrow(
+      new RegExp(`999.*高于.*${MIGRATIONS.length}`),
+    );
+    expect(readFileSync(file)).toEqual(before);
+    expect(baks()).toEqual([]);
+  });
+});
+
+describe("R3 独占锁", () => {
+  test("同一数据目录的第二个实例启动失败；第一个关闭后可再打开", () => {
+    const first = openDatabase(dir);
+    expect(() => openDatabase(dir)).toThrow(/另一个 Server/);
+    first.close();
+    track(openDatabase(dir));
+  });
+});
+
+describe("审计 v2：latest_request", () => {
+  const count = (db: Database.Database, table: string) =>
+    (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+
+  test("latest_request 每会话一行：同一会话再写冲突则替换", () => {
+    const db = track(openDatabase(dir));
+    const put = (at: string) =>
+      db
+        .prepare(
+          `INSERT INTO latest_request (session_id, request_z, updated_at) VALUES ('s', x'00', ?)
+           ON CONFLICT(session_id) DO UPDATE SET updated_at = excluded.updated_at`,
+        )
+        .run(at);
+    put("a");
+    put("b");
+    expect(count(db, "latest_request")).toBe(1);
+    expect(
+      (
+        db
+          .prepare(
+            "SELECT updated_at AS t FROM latest_request WHERE session_id = 's'",
+          )
+          .get() as { t: string }
+      ).t,
+    ).toBe("b");
+  });
+});

@@ -1,0 +1,194 @@
+/* 输入卡、排队气泡、斜杠菜单。版面只写布局，颜色取令牌，间距 / 高度 / 圆角取刻度，字样一律选 t-* 类。 */
+@layer components {
+  .ch-composer {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .ch-notice {
+    margin-bottom: 8px;
+  }
+
+  .ch-notice > div {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-notice > div > span {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ch-chiprow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ch-qchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+  }
+
+  .ch-qchip .u-chip {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 输入卡：textarea + 工具行同卡；聚焦时整张卡出聚焦环 */
+  .ch-box {
+    position: relative;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    background: var(--surface);
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
+  }
+
+  .ch-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--ring);
+  }
+
+  .ch-ta {
+    display: block;
+    width: 100%;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    resize: none;
+    color: var(--fg);
+  }
+
+  .ch-ta::placeholder {
+    color: var(--fg-3);
+  }
+
+  /* 工具行：左边附件 / 模式 / 审批，右边模型与档位、停止、发送 */
+  .ch-toolrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ch-sp {
+    flex: 1;
+  }
+
+  /* 窄屏放不下时模型名截成省略号，档位与箭头留着；发送与停止永远在卡片里 */
+  .ch-toolrow [data-modelpick] {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .ch-toolrow [data-modelname] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 再窄（≤ 340，手机最小的一档）连模型名省掉后发送与停止还是放不下：审批档位只留档位名，完整名字在 aria-label 里 */
+  @container (max-width: 340px) {
+    .ch-toolrow [data-permlead] {
+      display: none;
+    }
+  }
+
+  /* ---------- 排队消息：靠右的虚线气泡，贴着输入卡 ---------- */
+  .ch-queue {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .ch-queue-h {
+    color: var(--fg-3);
+  }
+
+  .ch-q {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 85%;
+    padding: 4px 4px 4px 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    color: var(--fg-2);
+  }
+
+  .ch-q:is(:hover, :focus-within) .u-reveal {
+    opacity: 1;
+  }
+
+  .ch-q-t {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-q-act {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+  }
+
+  .ch-q-edit {
+    width: 100%;
+  }
+
+  /* ---------- 斜杠菜单：分组，MCP 是只读提示 ---------- */
+  .ch-slash {
+    padding: 8px;
+  }
+
+  .ch-slash-g + .ch-slash-g {
+    margin-top: 8px;
+  }
+
+  .ch-slash-h {
+    padding: 4px 8px;
+  }
+
+  .ch-slash .u-lrow-trail {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .ch-slash-hint {
+    display: block;
+    max-width: 200px;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-slash .u-lrow[aria-disabled="true"] .u-lrow-main {
+    cursor: default;
+  }
+
+  .ch-slash .u-lrow[aria-disabled="true"]:hover {
+    background: none;
+  }
+
+  .ch-slash-empty {
+    padding: 16px 8px;
+    text-align: center;
+  }
+}

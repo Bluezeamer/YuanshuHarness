@@ -1,0 +1,34 @@
+/* pi 扩展页签：只写布局；颜色取令牌，间距 / 高度 / 圆角取刻度，字样在 TSX 里选 t-* 类。
+   列表、详情头、区块小标题、弹窗表单的通用样式在 ../../frame/frame.css 与 ../tools-dialogs.css。 */
+@layer components {
+  .pl-err {
+    margin-top: 16px;
+  }
+
+  .pl-counts {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 来源是长串（git 地址、绝对路径）：不撑破设置行，超出省略 */
+  .pl-source {
+    display: block;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 安装弹窗：预览结果只有两列信息，沿用技能安装弹窗的三列网格即可 */
+  .pl-preview {
+    margin: 0;
+  }
+
+  .pl-script {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

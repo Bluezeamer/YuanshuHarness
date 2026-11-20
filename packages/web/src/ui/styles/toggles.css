@@ -1,0 +1,191 @@
+/* 开关类控件与展示：switch、checkbox、分段单选、读条、空态。 */
+@layer components {
+  /* Switch / Checkbox：开 = 选中态，用蓝 */
+  .u-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .u-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--sh-sm);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .u-switch[aria-checked="true"] {
+    background: var(--accent);
+  }
+
+  .u-switch[aria-checked="true"]::after {
+    transform: translateX(16px);
+  }
+
+  .u-switch:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .u-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg);
+    text-align: left;
+  }
+
+  .u-check-box {
+    position: relative;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--surface);
+    color: transparent;
+    transition:
+      background var(--dur-fast) var(--ease),
+      border-color var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  .u-check-box svg {
+    width: 10px;
+    height: 10px;
+    stroke-width: 2.6;
+  }
+
+  .u-check[aria-checked="true"] .u-check-box,
+  .u-check[aria-checked="mixed"] .u-check-box {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+
+  .u-check[aria-checked="false"]:hover:not(:disabled) .u-check-box {
+    border-color: var(--icon);
+  }
+
+  .u-check:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* 分段：灰底容器里滑动的白色指示块（u-seg-pill 由组件量位置）；选中不改字重，只改色与底 */
+  .u-seg {
+    position: relative;
+    display: inline-flex;
+    padding: 4px;
+    border-radius: 8px;
+    background: var(--active);
+  }
+
+  .u-seg-pill {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    border-radius: 6px;
+    background: var(--surface);
+    box-shadow: var(--sh-sm);
+    transition:
+      left 220ms var(--ease),
+      width 220ms var(--ease);
+  }
+
+  .u-seg > button {
+    position: relative;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 6px;
+    color: var(--fg-2);
+    transition: color var(--dur-fast) var(--ease);
+  }
+
+  .u-seg[data-size="sm"] > button {
+    height: 20px;
+    padding: 0 8px;
+  }
+
+  .u-seg > button:hover:not(:disabled),
+  .u-seg > button[aria-checked="true"] {
+    color: var(--fg);
+  }
+
+  .u-seg-n {
+    margin-left: 4px;
+  }
+
+  .u-seg > button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .u-seg[aria-disabled="true"] {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  /* 读条：横向，不画圆环。占用百分比旁必须由使用方给出绝对值。 */
+  .u-readbar-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .u-readbar {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 3px;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+    overflow: hidden;
+  }
+
+  .u-readbar > i {
+    display: block;
+    height: 100%;
+    width: var(--w, 0%);
+    background: var(--fg-2);
+    transition: width var(--dur) var(--ease);
+  }
+
+  .u-readbar[data-level="warn"] > i {
+    background: var(--warn);
+  }
+
+  .u-readbar[data-level="danger"] > i {
+    background: var(--danger);
+  }
+
+  .u-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 24px 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    color: var(--fg-2);
+  }
+
+  .u-empty[data-tone="danger"] .u-empty-title {
+    color: var(--danger);
+  }
+
+  .u-empty[data-compact="true"] {
+    padding: 12px;
+  }
+}

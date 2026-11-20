@@ -1,0 +1,68 @@
+/* 工具行的弹层：审批档位、模式、模型与推理强度。 */
+@layer components {
+  .ch-pick {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .ch-pick-h {
+    padding: 4px 8px;
+  }
+
+  .ch-pick-f {
+    margin: 0;
+    padding: 8px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .ch-mdl {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .ch-mdl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .ch-mdl-g {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ch-mdl-gh {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+  }
+
+  .ch-mdl-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-mdl .u-lrow[data-cursor] {
+    background: var(--hover);
+  }
+
+  .ch-mdl-empty {
+    padding: 16px 8px;
+    text-align: center;
+  }
+
+  .ch-mdl-eff {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 0;
+    border-top: 1px solid var(--line);
+  }
+}

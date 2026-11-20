@@ -1,0 +1,293 @@
+/* 平铺布局（ui/tiling）：格子、分隔条、窗格框、落点叠层、窗口条。
+   平铺：格子之间只有一条细线，没有外框与卡片。窗格框的头是标签条（nav.css 的 .u-strip），高 36，与落点 strip 同高。 */
+@layer components {
+  /* ── 格子与分隔条 ── */
+  .u-tile {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    container: tile / inline-size;
+  }
+
+  .u-tile-scroll {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .u-tile-node {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .u-tile-node[data-dir="row"] {
+    flex-direction: row;
+  }
+
+  .u-tile-node[data-dir="col"] {
+    flex-direction: column;
+  }
+
+  .u-tile-cell {
+    display: flex;
+    flex: var(--grow, 1) 1 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* 分隔条：布局上只占 1px 的线，热区靠伪元素向两侧各伸 3px，悬停才显蓝 */
+  .u-tile-node > .u-tile-gutter.u-split {
+    z-index: 10;
+    flex: 0 0 1px;
+    background: var(--line);
+  }
+
+  .u-tile-gutter.u-split::before {
+    content: "";
+    position: absolute;
+  }
+
+  .u-tile-gutter.u-split[data-orientation="vertical"]::before {
+    inset: 0 -3px;
+  }
+
+  .u-tile-gutter.u-split[data-orientation="horizontal"]::before {
+    inset: -3px 0;
+  }
+
+  .u-tile-gutter.u-split[data-orientation="vertical"]::after {
+    left: -1px;
+  }
+
+  .u-tile-gutter.u-split[data-orientation="horizontal"]::after {
+    top: -1px;
+  }
+
+  /* 容器窄：左右分栏改上下堆叠，每个窗格保底 260，整体纵向滚动；分隔条不再可拖 */
+  @container tile (max-width: 780px) {
+    .u-tile-scroll {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .u-tile-node[data-dir] {
+      flex-direction: column;
+    }
+
+    .u-tile-cell {
+      flex: var(--grow, 1) 0 auto;
+    }
+
+    .u-tile-cell[data-leaf] {
+      flex-basis: 260px;
+    }
+
+    .u-tile-gutter.u-split[data-orientation="vertical"] {
+      width: auto;
+    }
+
+    .u-tile-gutter.u-split {
+      pointer-events: none;
+    }
+
+    .u-tile-gutter.u-split::before,
+    .u-tile-gutter.u-split::after {
+      display: none;
+    }
+  }
+
+  /* ── 窗格框 ── */
+  .u-pane {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    outline: none;
+    background: var(--surface);
+    container: pane / inline-size;
+  }
+
+  .u-pane[data-dragging="true"] {
+    opacity: 0.55;
+  }
+
+  .u-pane-body {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* 焦点格的当前标签顶线是墨色，其余格退成灰色 */
+  .u-pane[data-focus="false"] .u-strip-tab[data-on]::before {
+    border-top-color: var(--line-strong);
+  }
+
+  /* ── 落点叠层：四边各 24%，中部并入，顶部一条标签条高；只显示指针所在的那一个 ── */
+  .u-dz {
+    position: absolute;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--accent);
+    background: var(--accent-bg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 100ms linear;
+  }
+
+  .u-pane[data-dz="left"] .u-dz[data-z="left"],
+  .u-pane[data-dz="right"] .u-dz[data-z="right"],
+  .u-pane[data-dz="top"] .u-dz[data-z="top"],
+  .u-pane[data-dz="bottom"] .u-dz[data-z="bottom"],
+  .u-pane[data-dz="center"] .u-dz[data-z="center"],
+  .u-pane[data-dz="strip"] .u-dz[data-z="strip"] {
+    opacity: 1;
+  }
+
+  .u-dz[data-z="left"] {
+    top: 36px;
+    bottom: 0;
+    left: 0;
+    width: 24%;
+  }
+
+  .u-dz[data-z="right"] {
+    top: 36px;
+    right: 0;
+    bottom: 0;
+    width: 24%;
+  }
+
+  .u-dz[data-z="top"] {
+    top: 36px;
+    right: 0;
+    left: 0;
+    height: calc(24% - 36px);
+  }
+
+  .u-dz[data-z="bottom"] {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 24%;
+  }
+
+  .u-dz[data-z="center"] {
+    inset: 24%;
+  }
+
+  /* 并成标签页：不盖住标签条，只在底边画一道蓝线，标签放在右端 */
+  .u-dz[data-z="strip"] {
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 36px;
+    border: 0;
+    background: transparent;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .u-dz[data-z="strip"] span {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+
+  .u-dz span {
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--surface);
+    white-space: nowrap;
+  }
+
+  /* 不可用（如跨主机的并入）：虚线，文案换成原因；四向拆分照常 */
+  .u-dz[data-off] {
+    border: 1px dashed var(--fg-3);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .u-dz[data-off] span {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+    color: var(--fg-3);
+  }
+
+  /* ── 窗口条：一排浅灰胶囊，与窗格头的方标签分开 ── */
+  .u-wbar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 36px;
+    padding: 0 8px;
+    background: var(--side);
+  }
+
+  .u-wbar-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .u-wbar-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 4px 0 12px;
+    border-radius: var(--r-ctl);
+    color: var(--fg-2);
+    white-space: nowrap;
+    transition:
+      background var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  .u-wbar-tab:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  .u-wbar-tab[data-on] {
+    background: var(--active);
+    color: var(--fg);
+  }
+
+  .u-wbar-tab[data-drop] {
+    background: var(--accent-bg);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: var(--accent-text);
+  }
+
+  .u-wbar-tab:is(:hover, :focus-within, [data-on]) .u-reveal {
+    opacity: 1;
+  }
+
+  .u-wbar-main {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    height: 100%;
+    color: inherit;
+  }
+
+  .u-wbar-hint {
+    margin-left: auto;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+}

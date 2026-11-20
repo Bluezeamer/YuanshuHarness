@@ -1,0 +1,265 @@
+/* 审计页右栏：详情头、事实行、组成条、结构视图的五张卡片与 JSON 视图（接 audit.css）。 */
+@layer components {
+  .au-detail {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .au-dhead {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 16px 12px;
+  }
+
+  .au-dtop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .au-dacts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .au-facts {
+    color: var(--fg-3);
+    overflow-wrap: anywhere;
+  }
+
+  .au-est {
+    margin-left: 8px;
+  }
+
+  /* 组成条：四段墨 / 中灰 / 浅灰 / 蓝，段间有缝；颜色与下面各卡标题前的小方块一一对应 */
+  .au-comp-bar {
+    padding: 4px 0;
+    overflow: hidden;
+    border-radius: 999px;
+  }
+
+  .au-comp-bar svg {
+    display: block;
+    width: 100%;
+    height: 6px;
+  }
+
+  .au-seg-system {
+    fill: var(--au-system);
+  }
+
+  .au-seg-tools {
+    fill: var(--au-tools);
+  }
+
+  .au-seg-history {
+    fill: var(--au-history);
+  }
+
+  .au-seg-current {
+    fill: var(--au-current);
+  }
+
+  /* 「响应」不算请求的一部分：色块是空心的 */
+  .au-seg-none {
+    fill: none;
+    stroke: var(--line-strong);
+  }
+
+  .au-dbody {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 0 16px 16px;
+    overflow-y: auto;
+  }
+
+  .au-dbody > * {
+    flex: none;
+  }
+
+  .au-sbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg-3);
+  }
+
+  .au-sbar-t {
+    margin-right: auto;
+  }
+
+  /* ── 卡片 ── */
+  .au-sec {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .au-sec .u-lrow {
+    border-radius: 0;
+  }
+
+  .au-sec-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .au-sw {
+    flex: none;
+    width: 8px;
+  }
+
+  .au-sec-n {
+    color: var(--fg-3);
+  }
+
+  .au-sec-b {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--line);
+  }
+
+  .au-blk + .au-blk {
+    border-top: 1px solid var(--line);
+  }
+
+  .au-blk-h {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--side);
+    color: var(--fg-3);
+  }
+
+  .au-role {
+    color: var(--fg-2);
+  }
+
+  .au-blk-b {
+    margin: 0;
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .au-toolrow {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-height: 28px;
+    padding: 4px 12px;
+  }
+
+  .au-toolrow + .au-toolrow {
+    border-top: 1px solid var(--line);
+  }
+
+  .au-toolname {
+    flex: none;
+  }
+
+  .au-tooldesc {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .au-hround {
+    padding: 8px 12px 4px;
+    background: var(--side);
+    color: var(--fg-3);
+  }
+
+  .au-msg + .au-msg {
+    border-top: 1px solid var(--line);
+  }
+
+  .au-msg-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .au-msg-k {
+    flex: none;
+    max-width: 45%;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .au-msg-t {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .au-msg-b {
+    margin: 0;
+    padding: 8px 12px 8px 32px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    background: var(--side);
+    color: var(--fg-2);
+  }
+
+  .au-hint {
+    margin: 0;
+    color: var(--fg-3);
+  }
+
+  .au-err {
+    padding: 8px 12px;
+  }
+
+  .au-sec-b > .au-none {
+    padding: 8px 12px;
+  }
+
+  /* ── JSON 视图：原样的 {request, response}，本事件范围那一段浅蓝底 ── */
+  .au-json-wrap {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .au-json {
+    margin: 0;
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .au-json.is-range {
+    background: var(--accent-bg);
+  }
+
+  .au-range-note {
+    margin: 0;
+    padding: 8px 12px;
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+}

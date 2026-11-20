@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "note": "提示词槽位骨架。顺序与 pi 原生的段顺序一致（preamble → tools → rules → docs → project_context → skills → cwd），对齐阶段用来验证我们的渲染器能逐字节复现 pi 的投影。之后改 tag/内容即进入我们自己的设计，不需要改代码。注意 skills 段在线上由 pi 产出，我们的渲染器只在离线（golden / 预览）时产出它。",
+  "slots": [
+    {
+      "id": "identity",
+      "title": "角色定义",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "identity",
+          "tag": null,
+          "source": {
+            "kind": "file",
+            "file": "identity.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "convention",
+      "title": "工具与规则",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "tools",
+          "tag": "tools",
+          "source": {
+            "kind": "file",
+            "file": "convention/tools.md"
+          }
+        },
+        {
+          "id": "rules",
+          "tag": "rules",
+          "source": {
+            "kind": "file",
+            "file": "convention/rules.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "title": "自身文档",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "docs",
+          "tag": "docs",
+          "source": {
+            "kind": "file",
+            "file": "docs.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "agentsmd",
+      "title": "项目约定",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "agentsmd",
+          "tag": "project_context",
+          "source": {
+            "kind": "provider",
+            "name": "agentsmd"
+          }
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "title": "技能清单",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "skills",
+          "tag": "skills",
+          "source": {
+            "kind": "provider",
+            "name": "skills"
+          }
+        }
+      ]
+    },
+    {
+      "id": "environment",
+      "title": "环境信息",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "environment",
+          "tag": "cwd",
+          "source": {
+            "kind": "provider",
+            "name": "environment"
+          }
+        }
+      ]
+    }
+  ]
+}

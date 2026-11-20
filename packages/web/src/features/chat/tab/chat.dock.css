@@ -1,0 +1,23 @@
+/* 停靠区：状态条 + 输入卡，各是一张 1px 发丝线圆角卡，卡间 8px、左右 16px。 */
+
+.ch-dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 16px 12px calc(var(--ch-gutter, 0px) + 16px);
+}
+
+/* 与对话流同一条阅读列：最宽 720，居中 */
+.ch-dock > * {
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .ch-dock {
+    padding: 0 12px 12px calc(var(--ch-gutter, 0px) + 12px);
+  }
+}

@@ -1,0 +1,41 @@
+/* 轮末操作行：原文 / 渲染切换、分叉入口、消息时间；以及原文模式的纯文本块。 */
+
+.ch-turn-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ch-turn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 切换键是标准幽灵按钮：平时退成次要灰，按下（= 正在看原文）用选中蓝 */
+.ch-turn-act {
+  color: var(--fg-3);
+}
+
+.ch-turn-act[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.ch-turn-time {
+  margin-left: auto;
+}
+
+/* 原文模式：文字块按纯文本 pre 展示，保留换行与空白（字样由 t-code 给） */
+.ch-raw {
+  margin: 0;
+  padding: 8px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

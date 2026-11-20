@@ -1,0 +1,232 @@
+import path from "node:path";
+import type { FastifyInstance } from "fastify";
+import { uuidv7 } from "../id.js";
+import { isObject, str } from "../lib/validate.js";
+import {
+  buildRuntime,
+  type Compat,
+  MODEL_APIS,
+  type ModelApi,
+  type ModelEntry,
+  type ModelStore,
+  type ThinkingLevelMap,
+  toView,
+} from "../store/models.js";
+import type { SecretStore } from "../store/secrets.js";
+import { bad } from "./lib/reply.js";
+
+const COMPAT_BOOLS = [
+  "supportsDeveloperRole",
+  "supportsMidConvoSystemMessages",
+  "supportsMidConvoToolAdditions",
+  "supportsMidConvoToolChanges",
+  "supportsStrictMode",
+  "supportsOpenAIGrammarTools",
+] as const;
+const MAX_TOKENS_FIELDS = ["max_completion_tokens", "max_tokens"];
+const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+// 只收白名单内的 compat 键（pi 的完整 compat 远多于向导需要的）；空对象视为未设置。
+function parseCompat(v: unknown): Compat | null | string {
+  if (v === undefined || v === null) return null;
+  if (!isObject(v)) return "invalid_compat";
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (val === undefined || val === null) continue;
+    if ((COMPAT_BOOLS as readonly string[]).includes(k)) {
+      if (typeof val !== "boolean") return "invalid_compat";
+    } else if (k === "maxTokensField") {
+      if (!MAX_TOKENS_FIELDS.includes(val as string)) return "invalid_compat";
+    } else return "invalid_compat";
+    out[k] = val;
+  }
+  return Object.keys(out).length ? (out as Compat) : null;
+}
+
+// 值为字符串或 null（null 表示该档位不支持）；键必须是 pi 的推理档位。
+function parseLevelMap(v: unknown): ThinkingLevelMap | null | string {
+  if (v === undefined || v === null) return null;
+  if (!isObject(v)) return "invalid_thinking_level_map";
+  const out: ThinkingLevelMap = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (!LEVELS.includes(k) || (val !== null && typeof val !== "string"))
+      return "invalid_thinking_level_map";
+    out[k as keyof ThinkingLevelMap] = val;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+const positiveInt = (v: unknown): number | null | false =>
+  v === undefined || v === null
+    ? null
+    : typeof v === "number" && Number.isInteger(v) && v > 0
+      ? v
+      : false;
+
+interface Parsed {
+  name: string;
+  api: ModelApi;
+  baseUrl: string;
+  modelId: string;
+  contextWindow: number | null;
+  maxTokens: number | null;
+  reasoning: boolean;
+  input: Array<"text" | "image">;
+  thinkingLevelMap: ThinkingLevelMap | null;
+  compat: Compat | null;
+  apiKey: string | null;
+}
+
+function parse(body: unknown): Parsed | string {
+  if (!isObject(body)) return "bad_request";
+  const name = str(body.name, 64);
+  if (!name) return "invalid_name";
+  if (!MODEL_APIS.includes(body.api as ModelApi)) return "invalid_api";
+  const baseUrl = str(body.baseUrl, 512);
+  if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) return "invalid_base_url";
+  const modelId = str(body.modelId, 200);
+  if (!modelId) return "invalid_model_id";
+  const contextWindow = positiveInt(body.contextWindow);
+  if (contextWindow === false) return "invalid_context_window";
+  const maxTokens = positiveInt(body.maxTokens);
+  if (maxTokens === false) return "invalid_max_tokens";
+  // input 缺省为纯文本；text 必含。
+  let input: Array<"text" | "image"> = ["text"];
+  if (body.input !== undefined) {
+    if (
+      !Array.isArray(body.input) ||
+      body.input.some((x) => x !== "text" && x !== "image")
+    )
+      return "invalid_input";
+    input = body.input.includes("image") ? ["text", "image"] : ["text"];
+  }
+  const compat = parseCompat(body.compat);
+  if (typeof compat === "string") return compat;
+  const thinkingLevelMap = parseLevelMap(body.thinkingLevelMap);
+  if (typeof thinkingLevelMap === "string") return thinkingLevelMap;
+  const apiKey =
+    typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : null;
+  return {
+    name,
+    api: body.api as ModelApi,
+    baseUrl,
+    modelId,
+    contextWindow,
+    maxTokens,
+    reasoning: body.reasoning === true,
+    input,
+    thinkingLevelMap,
+    compat,
+    apiKey,
+  };
+}
+
+// 模型接入向导的后端（ADR-0015）：登记、默认、删除与保存前的真实连接测试。
+export async function modelsApi(
+  app: FastifyInstance,
+  opts: { models: ModelStore; secrets: SecretStore; agentDir: string },
+): Promise<void> {
+  const { models, secrets, agentDir } = opts;
+
+  app.get("/api/v1/models", async () => ({
+    models: models.list().map(toView),
+  }));
+
+  app.post("/api/v1/models", async (req, reply) => {
+    const p = parse(req.body);
+    if (typeof p === "string") return bad(reply, p);
+    let secretId: string | null = null;
+    if (p.apiKey) {
+      const s = secrets.create(
+        `model:${p.name}:${uuidv7().slice(-8)}`,
+        "password",
+        p.apiKey,
+      );
+      secretId = s?.id ?? null;
+    }
+    const entry: ModelEntry = {
+      id: uuidv7(),
+      name: p.name,
+      api: p.api,
+      baseUrl: p.baseUrl,
+      modelId: p.modelId,
+      contextWindow: p.contextWindow,
+      maxTokens: p.maxTokens,
+      reasoning: p.reasoning,
+      input: p.input,
+      thinkingLevelMap: p.thinkingLevelMap,
+      compat: p.compat,
+      secretId,
+      isDefault: false,
+    };
+    models.save(entry);
+    return reply.code(201).send(toView(models.get(entry.id) as ModelEntry));
+  });
+
+  app.patch<{ Params: { id: string } }>(
+    "/api/v1/models/:id",
+    async (req, reply) => {
+      const entry = models.get(req.params.id);
+      if (!entry) return reply.code(404).send({ error: "not_found" });
+      const body = isObject(req.body) ? req.body : {};
+      if (body.isDefault !== true) return bad(reply, "bad_request");
+      models.save({ ...entry, isDefault: true });
+      return toView(models.get(entry.id) as ModelEntry);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/models/:id",
+    async (req, reply) => {
+      const removed = models.remove(req.params.id);
+      if (!removed) return reply.code(404).send({ error: "not_found" });
+      if (removed.secretId) secrets.remove(removed.secretId);
+      return reply.code(204).send();
+    },
+  );
+
+  // 保存前测试：不落盘，用传入的字段直接发一次真实请求。
+  app.post("/api/v1/models/test", async (req, reply) => {
+    const p = parse(req.body);
+    if (typeof p === "string") return bad(reply, p);
+    const entry: ModelEntry = {
+      id: `test-${uuidv7().slice(-12)}`,
+      name: p.name,
+      api: p.api,
+      baseUrl: p.baseUrl,
+      modelId: p.modelId,
+      contextWindow: p.contextWindow,
+      maxTokens: p.maxTokens,
+      reasoning: p.reasoning,
+      input: p.input,
+      thinkingLevelMap: p.thinkingLevelMap,
+      compat: p.compat,
+      secretId: null,
+      isDefault: false,
+    };
+    try {
+      const { runtime, model } = await buildRuntime(
+        path.join(agentDir, "test"),
+        entry,
+        secrets,
+        p.apiKey ?? undefined,
+      );
+      const reply1 = await runtime.completeSimple(
+        model,
+        {
+          messages: [{ role: "user", content: "ping", timestamp: Date.now() }],
+        },
+        { signal: AbortSignal.timeout(20_000) },
+      );
+      if (reply1.stopReason === "error" || reply1.stopReason === "aborted") {
+        return { ok: false, error: reply1.errorMessage ?? "请求失败" };
+      }
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });
+}

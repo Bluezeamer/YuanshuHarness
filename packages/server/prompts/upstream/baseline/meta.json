@@ -1,0 +1,23 @@
+{
+  "pi": "1.3.0",
+  "captured": "2026-10-29",
+  "chars": 7727,
+  "sections": [
+    "preamble",
+    "tools",
+    "rules",
+    "docs",
+    "addendum",
+    "skills",
+    "available_skills",
+    "cwd"
+  ],
+  "fixtures": {
+    "globalAgentsMd": "GLOBAL-MARKER-1",
+    "projectAgentsMd": "PROJECT-MARKER-1",
+    "skill": "skill-harness",
+    "mcp": "pi-createMcpExtension/direct",
+    "tools": 24,
+    "codemode": true
+  }
+}

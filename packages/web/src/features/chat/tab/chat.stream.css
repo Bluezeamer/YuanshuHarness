@@ -1,0 +1,207 @@
+/* 对话流：消息、工具链、计划、回执、typing。 */
+
+.ch-stream-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* 左缘导航的槽（对话标签里才有；与输入栏、页脚同一条阅读列） */
+  padding-left: var(--ch-gutter, 0px);
+}
+
+.ch-stream {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 16px;
+  overflow-anchor: none;
+}
+
+.ch-note {
+  color: var(--fg-3);
+}
+
+.ch-note.is-bad {
+  color: var(--danger);
+}
+
+.ch-earlier {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 「回到底部」：浮在对话流右下角的标准小按钮，只改位置、胶囊形与阴影 */
+.ch-tobottom {
+  position: absolute;
+  right: 20px;
+  bottom: 12px;
+  border-radius: 999px;
+  box-shadow: var(--sh-md);
+  animation: u-rise var(--dur) var(--ease) backwards;
+}
+
+/* ── 消息 ── */
+.ch-msg {
+  min-width: 0;
+  animation: u-rise var(--dur) var(--ease) backwards;
+}
+
+.ch-you {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ch-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Markdown ──
+   外观在 features/markdown/prose.css（容器同时带 md-prose t-doc）；.ch-md 只留作选择器钩子。 */
+
+.ch-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  background: var(--live);
+  vertical-align: text-bottom;
+  animation: ch-blink 1s steps(2) infinite;
+}
+
+.ch-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+}
+
+.ch-typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--meta);
+  animation: ch-dot 1.2s var(--ease) infinite;
+}
+
+.ch-typing i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.ch-typing i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes ch-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes ch-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* ── 压缩边界卡：标出上下文在这里被压缩过，默认折叠 ── */
+.ch-compact {
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  color: var(--fg-2);
+  animation: u-rise var(--dur) var(--ease) backwards;
+}
+
+/* 标题行是一个整行的幽灵按钮（Button），右端箭头展开时转 90° */
+.ch-compact > .ch-compact-h {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--fg-3);
+}
+
+.ch-compact-x {
+  margin-left: auto;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.ch-compact-h[aria-expanded="true"] .ch-compact-x {
+  transform: rotate(90deg);
+}
+
+.ch-compact-body {
+  padding: 0 12px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.ch-compact-meta {
+  margin: 6px 0 0;
+}
+
+.ch-compact-sum {
+  margin: 4px 0 0;
+  color: var(--fg-2);
+  white-space: pre-wrap;
+}
+
+/* ── 后台任务回调卡：一行，点开去任务标签 / 执行体标签 ── */
+.ch-job {
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  color: var(--fg-2);
+  animation: u-rise var(--dur) var(--ease) backwards;
+}
+
+.ch-job-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 12px;
+  justify-content: flex-start;
+}
+
+div.ch-job-h {
+  height: 28px;
+}
+
+.ch-job-kind {
+  flex: none;
+  color: var(--fg-3);
+}
+
+.ch-job-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-job-state {
+  flex: none;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+
+.ch-job-state[data-tone="failed"] {
+  color: var(--danger);
+}
+
+.ch-job-x {
+  flex: none;
+  margin-left: auto;
+  color: var(--fg-3);
+}

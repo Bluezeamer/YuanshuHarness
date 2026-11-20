@@ -1,0 +1,51 @@
+/* 页脚：输入卡下面一条分割线 + 居中一行指标。 */
+@layer components {
+  .ch-foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex: none;
+    height: 28px;
+    padding-left: var(--ch-gutter, 0px);
+    border-top: 1px solid var(--line);
+    color: var(--fg-3);
+  }
+
+  .ch-foot .u-hc {
+    display: flex;
+  }
+
+  .ch-foot-i {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  /* 工作位置：主机色圆点（--tone 取自窗格头同一套主机色），没有主机色就退回图标灰 */
+  .ch-foot-dot.u-dot {
+    align-self: center;
+    background: var(--tone, var(--icon));
+  }
+
+  .ch-sep {
+    align-self: stretch;
+    margin: 8px 0;
+    border-left: 1px solid var(--line-strong);
+  }
+
+  /* 窄窗格放不下：收掉速度 */
+  @container (max-width: 440px) {
+    .ch-foot .u-hc:has([data-foot="speed"]),
+    .ch-foot .u-hc:has([data-foot="speed"]) + .ch-sep {
+      display: none;
+    }
+  }
+
+  .ch-foot-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}

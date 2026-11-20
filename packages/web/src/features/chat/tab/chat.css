@@ -1,0 +1,62 @@
+/* 对话标签：对话头 / 对话流 / 停靠区 / 指标。类名一律 ch- 前缀；
+   颜色、圆角、字号、动效只引用 ui/tokens.css。 */
+@import "./chat.stream.css";
+@import "./chat.turn.css";
+@import "./chat.flow.css";
+@import "./chat.dock.css";
+@import "./chat.attach.css";
+@import "./chat.composer.css";
+@import "./chat.pickers.css";
+@import "./chat.mcp.css";
+@import "./chat.foot.css";
+@import "./chat.nav.css";
+@import "./chat.history.css";
+@import "../input/input.css";
+
+.ch-shell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.ch-main {
+  --ch-gutter: 40px;
+  position: relative;
+  container-type: inline-size;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 审计页没有左缘导航，不留槽 */
+.ch-shell[data-ctab="audit"] .ch-main {
+  --ch-gutter: 0px;
+}
+
+/* 审计页自己是 flex:1 的整块，需要父容器 flex + min-height:0 */
+.ch-audit {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+/* 连接异常条：InlineNotice（状态点 + 字，不铺底）；里面的文字与「重新连接」同一行 */
+.ch-conn {
+  flex: 0 0 auto;
+  margin: 8px 16px 0;
+}
+
+.ch-conn > div {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

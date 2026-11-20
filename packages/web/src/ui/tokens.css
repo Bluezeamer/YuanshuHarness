@@ -1,0 +1,247 @@
+/* 设计令牌的唯一定义处（brand-spec）。派生色一律 color-mix(in oklch, ...)，不加色阶。 */
+@import "tailwindcss";
+
+:root {
+  /* 色：冷静中性纸面 + 钴蓝焦点 + 青绿存活 */
+  --bg: oklch(0.975 0.003 265);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.982 0.002 265);
+  --surface-3: oklch(0.962 0.004 265);
+  --fg: oklch(0.21 0.006 286); /* 样张 18181b */
+  --muted: oklch(0.5 0.012 265);
+  --meta: oklch(0.52 0.012 265);
+  --border: oklch(0.92 0.005 265);
+  --border-strong: oklch(0.86 0.007 265);
+  --accent: oklch(0.546 0.215 263); /* 样张 2563eb */
+  --accent-ink: oklch(0.46 0.17 262);
+  --live: oklch(0.62 0.15 152);
+  --live-ink: oklch(0.52 0.14 152);
+  --warn: oklch(0.666 0.157 58); /* 样张 d97706 */
+  --warn-ink: oklch(0.5 0.13 70);
+  --danger: oklch(0.577 0.215 27); /* 样张 dc2626 */
+
+  /* 色相轮：主机色与分组色的识别色，不与语义色混用 */
+  --h1: oklch(0.55 0.15 255);
+  --h2: oklch(0.55 0.11 172);
+  --h3: oklch(0.575 0.135 38);
+  --h4: oklch(0.55 0.13 300);
+  --h5: oklch(0.56 0.145 352);
+  --h6: oklch(0.54 0.11 124);
+
+  /* 语法高亮：语义色派生，代码块与文件预览器（CodeMirror）共用同一套配色 */
+  --syntax-keyword: color-mix(in oklch, var(--accent) 84%, var(--fg));
+  --syntax-string: color-mix(in oklch, var(--live) 72%, var(--fg));
+  --syntax-number: color-mix(in oklch, var(--warn) 78%, var(--fg));
+  --syntax-comment: var(--muted);
+  --syntax-function: color-mix(in oklch, var(--h4) 78%, var(--fg));
+  --syntax-type: color-mix(in oklch, var(--h2) 72%, var(--fg));
+  --syntax-attr: color-mix(in oklch, var(--h3) 70%, var(--fg));
+
+  /* 派生：现场混合 */
+  --accent-line: color-mix(in oklch, var(--accent) 32%, transparent);
+  --ring: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
+  --elev-lg:
+    0 24px 60px color-mix(in oklch, var(--fg) 16%, transparent),
+    0 6px 16px color-mix(in oklch, var(--fg) 7%, transparent);
+
+  /* 圆角：控件 / 卡片与浮层 / 面板 / 会话栏 / 胶囊；xs 只给 chip、cap、kbd 这类微标 */
+  --r-xs: 4px;
+  --r-ctl: 7px;
+  --r-card: 10px;
+  --r-panel: 12px;
+  --r-bar: 14px;
+  --r-pill: 999px;
+
+  /* 手机端的触控目标最小边长（ys-mobile）：高度刻度里没有 48，用令牌而不是写死 */
+  --touch: 48px;
+
+  /* 动效：只动透明度与位移，位移不超过 6px */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur: 200ms;
+  --dur-fast: 140ms;
+
+  /* 字体：工具型界面共用一套无衬线，路径、命令、数字走 mono */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+}
+
+/* 新视觉语言的令牌（ys-ui-design 的 visual-language §2）。与上面的旧令牌并存：
+   --fg / --accent / --warn / --danger 四个同名令牌已对齐新值，其余用新名字，旧名随各区迁移完成后删除。
+   尺寸（间距、高度、圆角、层级）不做变量，直接写刻度里的 px，由 design.guard 核对。 */
+:root {
+  /* 面：内容面 = --surface（白）；侧栏 / 次级面；悬停；当前项 */
+  --side: oklch(0.976 0 0); /* 样张 f7f7f8 */
+  --hover: oklch(0.959 0 0); /* 样张 f1f1f3 */
+  --active: oklch(0.944 0.004 286); /* 样张 ececef */
+  /* 字：次要、弱；纯图标另用 --icon，文字不得用 */
+  --fg-2: oklch(0.442 0.015 286); /* 样张 52525b */
+  --fg-3: oklch(0.528 0.016 286); /* 样张 6a6a74 */
+  --icon: oklch(0.64 0.015 286); /* 样张 8b8b95 */
+  /* 线 */
+  --line: oklch(0.944 0 0); /* 样张 ececee */
+  --line-strong: oklch(0.871 0.005 286); /* 样张 d4d4d8 */
+  /* 墨：主按钮、当前页签顶线、发送键。同屏只有一个墨色实心按钮 */
+  --ink: oklch(0.21 0.006 286); /* 样张 18181b */
+  --ink-hover: oklch(0.303 0.009 286); /* 样张 2e2e33 */
+  /* 蓝只给聚焦环、选中态、链接；选中的极浅底是唯一允许的淡底 */
+  --accent-bg: oklch(0.967 0.016 266); /* 样张 eff4ff */
+  --accent-text: oklch(0.488 0.217 264); /* 样张 1d4ed8 */
+  /* 语义色只用于字、点、描边，不铺底 */
+  --ok: oklch(0.627 0.17 149); /* 样张 16a34a */
+  --ok-text: oklch(0.527 0.137 150); /* 样张 15803d */
+  --warn-text: oklch(0.555 0.146 49); /* 样张 b45309 */
+  /* 文件类型图标的色板：Catppuccin 的浅色主题（Latte），图标里写 var(--ci-*)，换色只改这里。
+     这是图标自己的颜色，不是语义色，不用在文字、按钮或状态上。text 取比 Latte 原值浅一档的灰。 */
+  --ci-text: oklch(0.547 0.034 279);
+  --ci-overlay: oklch(0.654 0.027 278);
+  --ci-blue: oklch(0.559 0.226 262);
+  --ci-sapphire: oklch(0.648 0.107 213);
+  --ci-sky: oklch(0.682 0.145 235);
+  --ci-teal: oklch(0.602 0.098 201);
+  --ci-green: oklch(0.625 0.177 140);
+  --ci-yellow: oklch(0.714 0.149 68);
+  --ci-peach: oklch(0.692 0.204 42);
+  --ci-maroon: oklch(0.625 0.197 20);
+  --ci-red: oklch(0.55 0.216 20);
+  --ci-mauve: oklch(0.555 0.25 297);
+  --ci-pink: oklch(0.726 0.174 338);
+  --ci-lavender: oklch(0.664 0.175 273);
+  --ci-indigo: oklch(0.469 0.303 272);
+  --ci-rosewater: oklch(0.714 0.105 33);
+  --ci-flamingo: oklch(0.686 0.126 21);
+  /* 阴影三档：分层主要靠灰度与细线 */
+  --sh-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.03);
+  --sh-md: 0 6px 18px oklch(0 0 0 / 0.08), 0 1px 3px oklch(0 0 0 / 0.05);
+  --sh-pop: 0 12px 40px oklch(0 0 0 / 0.14), 0 2px 8px oklch(0 0 0 / 0.06);
+}
+
+/* 阅读字号：长时间要读的字（对话正文、代码、工具输出、文件预览）随界面字号设置自由缩放；
+   其余文字都是 type.css 里固定大小的外壳族。连外壳一起放大就等于浏览器缩放，
+   左侧会话卡与标签栏会跟着变胖——正是用户抱怨的现象。
+   这里是缺省值的兜底（基准 16px 的推导结果）；运行时由 src/app/fontSize.ts 把用户设置写成
+   根元素上的内联变量，内联样式优先级高于本块，因此不再按档位写选择器。 */
+html {
+  --fs-read: 16px;
+  --fs-code: 14px;
+}
+
+/* 重置默认色板、圆角与字号：Tailwind 内置的黑白、色阶和字号名字在这里根本不存在。 */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-meta: var(--meta);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-line: var(--accent-line);
+  --color-live: var(--live);
+  --color-live-ink: var(--live-ink);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-danger: var(--danger);
+
+  --radius-*: initial;
+  --radius-xs: var(--r-xs);
+  --radius-ctl: var(--r-ctl);
+  --radius-card: var(--r-card);
+  --radius-panel: var(--r-panel);
+  --radius-bar: var(--r-bar);
+  --radius-pill: var(--r-pill);
+
+  --text-*: initial;
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --shadow-elev-lg: var(--elev-lg);
+  --ease-ui: var(--ease);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Tailwind v4 的 preflight 不再清按钮内边距，这里统一归零，尺寸由组件自己给。 */
+  button {
+    padding: 0;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  code,
+  kbd {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的 display 声明 */
+    display: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-ink);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--accent) 24%, transparent);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: 必须压过组件上的动画类 */
+    transition-duration: 0.01ms !important;
+  }
+}

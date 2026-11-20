@@ -1,0 +1,488 @@
+/* 「提示词与能力」页：只写布局，颜色取令牌，间距与高度取刻度；字样一律在 TSX 里选 t-* 类。
+   页签、列表页留白、保存条沿用设置壳（settings/frame/frame.css）。 */
+@layer components {
+  .sd-sp {
+    flex: 1;
+  }
+
+  .sd-empty {
+    padding: 8px 12px;
+  }
+
+  /* ---------- 列表页 ---------- */
+  .sd-note {
+    margin-bottom: 16px;
+  }
+
+  .sd-note-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .sd-lede {
+    margin: 0 0 16px;
+  }
+
+  /* ---------- 编辑页 ---------- */
+  .sd-ed {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sd-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px var(--st-gutter) 8px 16px;
+  }
+
+  .sd-head[data-line] {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sd-head-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 保存条浮在编辑区底部，不随任何一栏滚动 */
+  .sd-ed > .st-save {
+    position: absolute;
+    right: 0;
+    bottom: 16px;
+    left: 0;
+    margin: 0 auto;
+  }
+
+  /* 滚到底时让出保存条的位置 */
+  .sd-ed .st-form::after,
+  .sd-col::after,
+  .sd-prev-body::after {
+    display: block;
+    height: 48px;
+    content: "";
+  }
+
+  /* 提示词页：段 | 卡片 | 预览，三栏各自滚动；第一栏左缘 = 留白 */
+  .sd-pw {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns:
+      calc(var(--st-gutter) + 184px + 16px) 400px
+      minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .sd-pw[data-flat] {
+    grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  }
+
+  .sd-col {
+    min-width: 0;
+    min-height: 0;
+    padding: 16px 16px 0;
+    overflow-y: auto;
+  }
+
+  .sd-col-segs {
+    padding-left: var(--st-gutter);
+  }
+
+  .sd-pw[data-flat] .sd-col-cards {
+    padding-left: var(--st-gutter);
+  }
+
+  .sd-prev {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .sd-prev-tabs {
+    flex: none;
+    padding-inline: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sd-prev-tabs .u-tabs {
+    border-bottom: 0;
+  }
+
+  .sd-prev-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 16px var(--st-gutter) 0 16px;
+    overflow-y: auto;
+  }
+
+  /* ---------- 工具 ---------- */
+  .sd-tlede {
+    margin: 0 0 16px;
+  }
+
+  /* 描述是整段英文，表格里最多露三行，全文在「调优」里看 */
+  .sd-tdesc {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+  }
+
+  .sd-tsec + .sd-tsec {
+    margin-top: 32px;
+  }
+
+  .sd-tsec-h {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .sd-chain {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sd-sec-h {
+    padding: 12px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .sd-seg {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .sd-seg-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .sd-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: 8px;
+  }
+
+  .sd-grip {
+    color: var(--fg-3);
+    cursor: grab;
+  }
+
+  .sd-list[data-drop],
+  .sd-gbox[data-drop],
+  .u-lrow[data-drop] {
+    background: var(--accent-bg);
+  }
+
+  .sd-pw .u-lrow[data-skip] {
+    opacity: 0.5;
+  }
+
+  .sd-kids-f {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0 0;
+  }
+
+  .sd-help {
+    margin-left: 8px;
+  }
+
+  /* 分组：一个带头的容器，条件写在头上，卡片拖进来就归它 */
+  .sd-gbox {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+  }
+
+  .sd-gh-t {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 4px;
+  }
+
+  /* 分组里的一张：第一行「如果 [条件]」，第二行「则用 卡片」 */
+  .sd-case {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+  }
+
+  .sd-case-c,
+  .sd-case-u {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sd-case-k {
+    flex: none;
+    width: 56px;
+  }
+
+  .sd-case-r {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sd-cond {
+    max-width: 240px;
+    justify-content: space-between;
+  }
+
+  .sd-cond[data-empty] {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .sd-cond-t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sd-condpop {
+    padding: 12px;
+  }
+
+  .sd-ce {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sd-ce-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow: auto;
+  }
+
+  .sd-ce-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 24px;
+    margin-top: 4px;
+  }
+
+  .sd-prev-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sd-cp {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sd-cp-h,
+  .sd-cp-act {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sd-pre {
+    max-height: 72vh;
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--side);
+    white-space: pre-wrap;
+  }
+
+  .sd-prev-body .sd-pre {
+    max-height: none;
+  }
+
+  /* ---------- 添加卡片 / 卡片库 ---------- */
+  /* 添加卡片：左边分组，右边搜索与卡片 */
+  .sd-add {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 16px;
+    height: 60vh;
+  }
+
+  .sd-add-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+  }
+
+  .sd-add-main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .sd-search {
+    width: 100%;
+  }
+
+  .sd-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    align-content: start;
+  }
+
+  .sd-tile[data-selected] {
+    border-color: var(--accent);
+  }
+
+  .sd-tile[data-used] {
+    opacity: 0.55;
+  }
+
+  .sd-clamp {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: pre-wrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  /* 卡片编辑：左改右看 */
+  .sd-ced {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sd-ced-panes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .sd-ced-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  /* ---------- 能力 / 工具 ---------- */
+  .sd-caps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sd-caps-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sd-caps-body {
+    margin-top: 16px;
+  }
+
+  .sd-caps-body[data-off] {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .sd-caps-grp {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .sd-caps-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .sd-cap-d {
+    margin-left: 12px;
+  }
+
+  .sd-ck {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    color: var(--surface);
+  }
+
+  .sd-ck[data-on] {
+    border-color: var(--ink);
+    background: var(--ink);
+  }
+
+  /* 窄窗口：提示词页改成上下叠放，各栏不再单独滚动 */
+  @media (max-width: 1180px) {
+    .sd-pw,
+    .sd-pw[data-flat] {
+      display: block;
+      overflow-y: auto;
+    }
+
+    .sd-col,
+    .sd-prev-body {
+      overflow: visible;
+    }
+
+    .sd-prev {
+      border-top: 1px solid var(--line);
+      border-left: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .sd-ced-panes {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

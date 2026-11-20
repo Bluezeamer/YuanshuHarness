@@ -1,0 +1,167 @@
+@layer components {
+  /* 输入：高 32 / 36，描边用 line-strong，聚焦才出蓝环。字样由组件选 t-plain / t-mono。 */
+  .u-inp,
+  .u-textarea {
+    width: 100%;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--fg);
+    outline: none;
+    transition:
+      border-color var(--dur-fast) var(--ease),
+      box-shadow var(--dur-fast) var(--ease);
+  }
+
+  .u-inp {
+    height: 32px;
+    padding: 0 12px;
+  }
+
+  .u-inp[data-size="lg"] {
+    height: 36px;
+  }
+
+  .u-textarea {
+    padding: 8px 12px;
+    resize: vertical;
+  }
+
+  /* 等宽字样默认是灰字；输入框里的内容要读要核对，用正文色 */
+  .u-inp.u-mono,
+  .u-textarea.u-mono {
+    color: var(--fg);
+  }
+
+  .u-inp:hover:not(:disabled),
+  .u-textarea:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--line-strong) 55%, var(--icon));
+  }
+
+  .u-inp::placeholder,
+  .u-textarea::placeholder {
+    color: var(--fg-3);
+  }
+
+  .u-inp:focus,
+  .u-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: var(--ring);
+  }
+
+  .u-inp[aria-invalid="true"],
+  .u-textarea[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+
+  .u-inp:disabled,
+  .u-textarea:disabled {
+    background: var(--side);
+    color: var(--fg-3);
+    cursor: not-allowed;
+  }
+
+  /* 搜索框：外壳承载焦点环，内部 input 无边框 */
+  .u-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 8px 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    transition:
+      border-color var(--dur-fast) var(--ease),
+      box-shadow var(--dur-fast) var(--ease);
+  }
+
+  .u-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--ring);
+  }
+
+  .u-search > svg {
+    flex: 0 0 auto;
+    color: var(--icon);
+  }
+
+  .u-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    outline: none;
+    color: var(--fg);
+  }
+
+  .u-search input::placeholder {
+    color: var(--fg-3);
+  }
+
+  .u-search-clear {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    color: var(--icon);
+  }
+
+  .u-search-clear:hover {
+    color: var(--fg);
+    background: var(--active);
+  }
+
+  .u-search-clear svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* 堆叠字段：弹窗与小表单，标签在上 */
+  .u-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .u-field-label {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .u-field-error {
+    color: var(--danger);
+  }
+
+  /* 设置行：左边名字与说明，右边控件，行与行之间只有一根细线 */
+  .u-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    gap: 8px 32px;
+    align-items: center;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .u-row:first-child {
+    border-top: 0;
+  }
+
+  .u-row-ctl {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  @media (max-width: 900px) {
+    .u-row {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+  }
+}

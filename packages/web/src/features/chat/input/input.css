@@ -1,0 +1,55 @@
+/* 富输入（RichInput）：文字 + 附件的统一输入块，提问回答 / 目标 / 排队编辑 / 执行体补充要求共用。
+   外观与主输入卡的 .ch-box 同形：无框文字框、聚焦环落在整块上；拖入文件时整块高亮。 */
+@layer components {
+  .ch-rin {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
+  }
+
+  .ch-rin:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--ring);
+  }
+
+  .ch-rin[data-drop] {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+
+  .ch-rin > .ch-filelist {
+    padding: 0 0 4px;
+  }
+
+  .ch-rin .ch-rin-ta {
+    min-height: 28px;
+    max-height: 160px;
+    padding: 4px 8px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    resize: none;
+  }
+
+  /* 工具行：左边上传文件，右边提交等 */
+  .ch-rin-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-rin-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+}

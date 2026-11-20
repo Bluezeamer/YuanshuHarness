@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebShop 演示 · 春季上新</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink: #18181b;
+    --muted: #71717a;
+    --line: #e9e9ec;
+    --bg: #ffffff;
+    --card: #ffffff;
+    --accent: #0f766e;
+    --accent-soft: #d9f2ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.5 "Noto Sans CJK SC", "Lato", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+  }
+  header {
+    height: 68px;
+    display: flex;
+    align-items: center;
+    gap: 44px;
+    padding: 0 40px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font: 900 24px "Lato", sans-serif; letter-spacing: -0.02em; }
+  .brand span { color: var(--accent); }
+  nav { display: flex; gap: 30px; font-size: 16px; color: var(--muted); }
+  nav .on { color: var(--ink); font-weight: 700; box-shadow: 0 2px 0 var(--ink); padding-bottom: 6px; }
+  .spacer { flex: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 16px;
+  }
+  .badge b {
+    min-width: 26px; height: 26px; padding: 0 8px; border-radius: 13px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--ink); color: #fff; font-size: 14px;
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: 1fr 384px;
+    gap: 36px;
+    padding: 26px 40px 0;
+    align-items: start;
+  }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.01em; }
+  .sub { margin: 2px 0 18px; color: var(--muted); font-size: 16px; }
+  .sub b { color: var(--accent); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .pic { height: 148px; display: flex; align-items: center; justify-content: center; }
+  .pic svg { width: 104px; height: 104px; }
+  .info { padding: 12px 18px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .info h3 { margin: 0; font-size: 18px; }
+  .info p { margin: 0; color: var(--muted); font-size: 14px; }
+  .row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+  .price { font: 900 20px "Lato", sans-serif; }
+  .add {
+    font: 700 14px "Noto Sans CJK SC", sans-serif;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--ink); background: var(--card); color: var(--ink);
+  }
+  .add:hover { background: var(--ink); color: #fff; }
+  aside {
+    background: #fafaf9; border: 1px solid var(--line); border-radius: 18px;
+    padding: 22px 24px 24px;
+  }
+  aside h2 { margin: 0 0 14px; font-size: 20px; display: flex; justify-content: space-between; align-items: baseline; }
+  aside h2 small { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .lines { display: flex; flex-direction: column; min-height: 118px; }
+  .empty { color: var(--muted); padding: 36px 0; text-align: center; font-size: 15px; }
+  .line { display: grid; grid-template-columns: 52px 1fr auto; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .line:first-child { border-top: 0; }
+  .thumb { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .thumb svg { width: 36px; height: 36px; }
+  .line .n { font-weight: 700; font-size: 16px; }
+  .line .q { color: var(--muted); font-size: 14px; }
+  .line .t { font: 900 17px "Lato", sans-serif; }
+  .coupon { margin: 14px 0 6px; display: flex; gap: 10px; }
+  .coupon input {
+    flex: 1; min-width: 0; height: 44px; padding: 0 14px; font: 600 15px "Lato", "Noto Sans CJK SC", sans-serif;
+    letter-spacing: 0.04em; border: 1.5px solid var(--line); border-radius: 12px; background: #fafafa; color: var(--ink);
+  }
+  .coupon input:focus { outline: 0; border-color: var(--accent); background: #fff; }
+  .coupon button {
+    height: 44px; padding: 0 18px; border-radius: 12px; border: 0; cursor: pointer;
+    background: var(--accent); color: #fff; font: 700 15px "Noto Sans CJK SC", sans-serif;
+  }
+  .ok { margin: 6px 0 0; font-size: 14px; color: var(--accent); min-height: 21px; }
+  .sum { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+  .sum div { display: flex; justify-content: space-between; color: var(--muted); }
+  .sum .disc { color: var(--accent); }
+  .sum .total { color: var(--ink); font-size: 18px; font-weight: 700; margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .sum .total span:last-child { font: 900 26px "Lato", sans-serif; }
+  .checkout {
+    margin-top: 16px; width: 100%; height: 50px; border: 0; border-radius: 14px; cursor: pointer;
+    background: var(--ink); color: #fff; font: 700 17px "Noto Sans CJK SC", sans-serif;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">WebShop<span>.</span> 演示</div>
+  <nav><span class="on">春季上新</span><span>服饰</span><span>家居</span><span>配件</span></nav>
+  <div class="spacer"></div>
+  <div class="badge">购物车 <b id="count">0</b></div>
+</header>
+
+<div class="wrap">
+  <main>
+    <h1>春季上新</h1>
+    <p class="sub">全场满 <b>¥99</b> 包邮，不满则统一运费 ¥8；优惠券在右侧购物车里使用。</p>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <aside aria-label="购物车">
+    <h2>购物车 <small id="items-label">暂无商品</small></h2>
+    <div class="lines" id="lines"></div>
+    <div class="coupon">
+      <input id="code" aria-label="优惠券代码" placeholder="优惠券代码" autocomplete="off">
+      <button id="apply" type="button">应用</button>
+    </div>
+    <p class="ok" id="coupon-msg" role="status"></p>
+    <div class="sum" id="sum"></div>
+    <button class="checkout" type="button">去结算</button>
+  </aside>
+</div>
+
+<script>
+  const ICON = {
+    tee: '<path d="M38 22 22 34l8 16 10-5v53h40V45l10 5 8-16-16-12c-4 8-12 12-22 12s-18-4-22-12Z"/>',
+    coaster: '<circle cx="60" cy="60" r="40"/><circle cx="60" cy="60" r="26" fill="none" stroke="#fff" stroke-width="3"/>',
+    tote: '<path d="M30 46h60l6 54H24Z"/><path d="M44 46c0-26 32-26 32 0" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>',
+    mug: '<path d="M32 34h50v46c0 10-6 16-16 16H48c-10 0-16-6-16-16Z"/><path d="M82 46h6a12 12 0 0 1 0 28h-6" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>',
+    notebook: '<rect x="34" y="20" width="52" height="82" rx="6"/><path d="M46 20v82" stroke="#fff" stroke-width="3"/><path d="M58 40h18M58 52h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
+    cap: '<path d="M24 78c0-30 18-46 38-46s34 16 34 46Z"/><path d="M20 78h82c0 9-16 14-42 14S20 87 20 78Z" opacity=".75"/>'
+  };
+  const PRODUCTS = [
+    { id: "tee", name: "黑色纯棉 T 恤", desc: "260g 厚磅，圆领", price: 19.9, bg: "#e6f4f1", fg: "#0f766e", icon: "tee" },
+    { id: "coaster", name: "软木杯垫", desc: "防滑隔热，单片", price: 5, bg: "#fdf0d8", fg: "#b7791f", icon: "coaster" },
+    { id: "tote", name: "帆布托特包", desc: "加厚帆布，可机洗", price: 39, bg: "#e4e8fb", fg: "#4c5bd4", icon: "tote" },
+    { id: "mug", name: "陶瓷马克杯", desc: "350ml，哑光釉面", price: 24, bg: "#fde7e9", fg: "#c2415a", icon: "mug" },
+    { id: "notebook", name: "A5 点阵笔记本", desc: "120g 米白纸，160 页", price: 12.5, bg: "#e5f1fb", fg: "#2b6cb0", icon: "notebook" },
+    { id: "cap", name: "棒球帽", desc: "水洗棉，可调节", price: 29, bg: "#efeeea", fg: "#52525b", icon: "cap" }
+  ];
+  const COUPONS = { SPRING10: 10, WELCOME5: 5 };
+  const SHIPPING_FREE_OVER = 99, SHIPPING_FLAT = 8;
+  const yuan = (n) => `¥${(Math.round(n * 100) / 100).toFixed(2)}`;
+  const svg = (p) => `<svg viewBox="0 0 120 120" fill="${p.fg}" color="${p.fg}" aria-hidden="true">${ICON[p.icon]}</svg>`;
+
+  const cart = {};
+  let coupon = null;
+
+  document.getElementById("grid").innerHTML = PRODUCTS.map((p) => `
+    <article class="card">
+      <div class="pic" style="background:${p.bg}">${svg(p)}</div>
+      <div class="info">
+        <h3>${p.name}</h3>
+        <p>${p.desc}</p>
+        <div class="row">
+          <span class="price">${yuan(p.price)}</span>
+          <button class="add" type="button" aria-label="加入购物车：${p.name}" data-id="${p.id}">加入购物车</button>
+        </div>
+      </div>
+    </article>`).join("");
+
+  function render() {
+    const rows = PRODUCTS.filter((p) => cart[p.id]);
+    const qty = rows.reduce((s, p) => s + cart[p.id], 0);
+    const sub = rows.reduce((s, p) => s + cart[p.id] * p.price, 0);
+    const disc = coupon ? sub * (coupon.percent / 100) : 0;
+    const after = sub - disc;
+    const ship = rows.length === 0 ? 0 : after >= SHIPPING_FREE_OVER ? 0 : SHIPPING_FLAT;
+    if (qty) console.log(`[cart] total ${yuan(after + ship)} (subtotal ${yuan(sub)}, shipping ${yuan(ship)})`);
+    document.getElementById("count").textContent = qty;
+    document.getElementById("items-label").textContent = qty ? `共 ${qty} 件` : "暂无商品";
+    document.getElementById("lines").innerHTML = rows.length
+      ? rows.map((p) => `
+        <div class="line">
+          <div class="thumb" style="background:${p.bg}">${svg(p)}</div>
+          <div><div class="n">${p.name}</div><div class="q">${yuan(p.price)} × ${cart[p.id]}</div></div>
+          <div class="t">${yuan(p.price * cart[p.id])}</div>
+        </div>`).join("")
+      : '<div class="empty">购物车是空的，先挑几件吧</div>';
+    document.getElementById("sum").innerHTML = `
+      <div><span>小计</span><span>${yuan(sub)}</span></div>
+      ${coupon ? `<div class="disc"><span>优惠券 ${coupon.code}（-${coupon.percent}%）</span><span>-${yuan(disc)}</span></div>` : ""}
+      <div><span>运费${ship === 0 && rows.length ? "（已包邮）" : ""}</span><span>${yuan(ship)}</span></div>
+      <div class="total"><span>合计</span><span>${yuan(after + ship)}</span></div>`;
+  }
+
+  document.getElementById("grid").addEventListener("click", (e) => {
+    const b = e.target.closest(".add");
+    if (!b) return;
+    cart[b.dataset.id] = (cart[b.dataset.id] || 0) + 1;
+    console.log(`[cart] add ${b.dataset.id}, qty=${cart[b.dataset.id]}`);
+    render();
+  });
+  document.getElementById("apply").addEventListener("click", () => {
+    const code = document.getElementById("code").value.trim().toUpperCase();
+    const msg = document.getElementById("coupon-msg");
+    if (COUPONS[code]) {
+      coupon = { code, percent: COUPONS[code] };
+      msg.textContent = `已使用优惠券 ${code}，立减 ${COUPONS[code]}%`;
+      console.log(`[coupon] ${code} applied, -${COUPONS[code]}%`);
+    } else {
+      coupon = null;
+      msg.textContent = code ? "这个优惠券不存在" : "";
+    }
+    render();
+  });
+  console.log(`[webshop] demo store ready, ${PRODUCTS.length} products`);
+  render();
+</script>
+</body>
+</html>

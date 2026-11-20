@@ -1,0 +1,145 @@
+/* 工作区窗格里与业务有关的部分：窗格头右端的主机标识、绑了主机的窗格的底边色线、拖标签的插入位置、「+」菜单。
+   窗格头本身是标签条（nav.css 的 .u-strip）；主机色由窗格在 style 里传 --tone（var(--hN)）。 */
+@layer components {
+  .ws-pn-head {
+    position: relative;
+    min-width: 0;
+  }
+
+  /* 绑了主机的窗格：头底边一道主机色线（与右端的色点、名字一起标明这格属于哪台主机） */
+  .ws-pane[data-host]:not([data-host=""]) .ws-pn-head {
+    box-shadow: inset 0 -2px 0 var(--tone);
+  }
+
+  .ws-pn-tabs {
+    scrollbar-width: none;
+  }
+
+  .ws-pn-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ws-pn-tab[data-dragging="true"] {
+    opacity: 0.4;
+  }
+
+  /* 拖标签时的插入位置：蓝色竖线 */
+  .ws-pn-tab[data-before="true"]::after,
+  .ws-pn-tab[data-after="true"]::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent);
+  }
+
+  .ws-pn-tab[data-before="true"]::after {
+    left: -1px;
+  }
+
+  .ws-pn-tab[data-after="true"]::after {
+    right: -1px;
+  }
+
+  .ws-pn-tab-ic {
+    display: grid;
+    flex: none;
+    place-items: center;
+  }
+
+  .ws-pn-tab-ic svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* 右端：当前标签的小入口、主机标识、窗格菜单；整条头可拖，空白处就是抓手 */
+  .ws-pn-end {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding-left: 8px;
+  }
+
+  .ws-pn-host {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 144px;
+    padding: 0 4px;
+    overflow: hidden;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .ws-hdot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--tone, var(--icon));
+  }
+
+  .ws-hname {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 窗格窄：主机只留色点（名字在悬停提示里） */
+  @container pane (max-width: 440px) {
+    .ws-hname {
+      display: none;
+    }
+  }
+
+  .ws-tabbody {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Ctrl+滚轮缩放后的当前比例（tabs/tabZoom.tsx） */
+  .ws-tab-zoom {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    z-index: 10;
+    border-radius: var(--r-pill);
+  }
+
+  /* ── 「+」菜单里的小标题与说明 ── */
+  .ws-menu-h {
+    padding: 6px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .ws-menu-note {
+    padding: 4px 8px 6px;
+    color: var(--fg-3);
+  }
+
+  .ws-menu-lab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ws-menu-ic {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    color: var(--icon);
+  }
+
+  .ws-tab-ph {
+    display: grid;
+    flex: 1;
+    place-items: center;
+  }
+}

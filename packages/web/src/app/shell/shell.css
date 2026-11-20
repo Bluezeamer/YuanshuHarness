@@ -1,0 +1,137 @@
+/* 新壳：左轨 + 主区 + 盖在上面的设置页 + 命令面板。类名一律 sh- 前缀。
+   颜色、圆角、动效只引用 ui/tokens.css。 */
+
+.sh-app {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .sh-app {
+    flex-direction: column;
+  }
+}
+
+/* 设置页：盖住整个壳，保持下面的工作区挂载（终端、对话连接不断） */
+.sh-settings {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--bg);
+  overflow: hidden;
+  animation: sh-in var(--dur) var(--ease);
+}
+
+@keyframes sh-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-settings {
+    animation: none;
+  }
+}
+
+/* ── 命令面板 ── */
+.sh-pal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.sh-pal-list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  position: relative;
+}
+
+.sh-pal-k {
+  padding: 8px 8px 4px;
+}
+
+/* 行是幽灵 Button 压成整行：左对齐、占满宽，光标行用底色 */
+.sh-pal-row {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.sh-pal-row[aria-selected="true"] {
+  background: var(--surface-3);
+  color: var(--fg);
+}
+
+.sh-pal-l {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-pal-note {
+  flex: none;
+}
+
+.sh-pal-empty {
+  margin: 0;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+/* ── 令牌门（Gate）：全屏居中一张卡 ── */
+.sh-gate {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+
+.sh-gate-wait {
+  margin: 0;
+}
+
+.sh-gate-card {
+  width: min(420px, 92vw);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  animation: sh-in var(--dur) var(--ease);
+}
+
+.sh-gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+.sh-gate-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+
+.sh-gate-alt {
+  align-self: center;
+  color: var(--accent-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-gate-card {
+    animation: none;
+  }
+}

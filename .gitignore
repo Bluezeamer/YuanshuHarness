@@ -1,0 +1,35 @@
+# 临时产物（见 AGENTS.md 的目录约定）
+tmp/
+
+# agent 并发用的 worktree
+.worktrees/
+
+# 本地 agent 配置；技能的唯一来源是 .agents/skills，.claude/skills 是指向它的本地符号链接
+.claude/
+
+# pi运行产生的临时文件
+.pi/
+
+# 给 agent 粘贴图片用的本地暂存目录，不入库
+/imgs/
+
+
+# pdf.js 的字体/CMap/WASM 资源：scripts/copy-pdfjs-assets.mjs 在构建前从 node_modules 复制
+packages/web/public/pdfjs/
+
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 排除playwright-cli相关配置和目录
+.playwright-cli/
+.playwright/
+.agents/skills/playwright-cli/
+
+# server 包里的 web 产物：构建时从 packages/web/dist 复制而来
+packages/server/web/
+# 同上：打包时从仓库根复制进来的 NOTICE 与 licenses
+packages/server/NOTICE
+packages/server/licenses/

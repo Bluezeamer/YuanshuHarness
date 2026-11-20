@@ -1,0 +1,57 @@
+@layer components {
+  .st-dv-note {
+    margin: 8px 0 0;
+  }
+
+  /* 右边只有一个撤销按钮，不占设置行默认的 300 宽控件列 */
+  .u-row.st-dv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .st-dv-ctl {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .st-dv-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+
+  .st-dv-add {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  /* 二维码：220 见方、居中；白底由 SVG 自己画（扫码需要深色在浅色上） */
+  .st-dv-qr {
+    align-self: center;
+    width: 220px;
+    aspect-ratio: 1;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .st-dv-left {
+    margin: 0;
+    text-align: center;
+  }
+
+  .st-dv-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .st-dv-url {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--fg-2);
+  }
+}

@@ -1,0 +1,210 @@
+/* 按钮与图标按钮。放在 components 层，使用方的 utility 永远能覆盖。 */
+@layer components {
+  /* 按钮：高 28 / 32 / 36，字样由组件选 t-entry。主按钮是墨色实心，同屏只有一个；
+     危险只改字与边，不铺底；两步确认上膛转琥珀描边。 */
+  .u-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--fg);
+    white-space: nowrap;
+    transition:
+      background var(--dur-fast) var(--ease),
+      border-color var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease),
+      transform var(--dur-fast) var(--ease);
+  }
+
+  .u-btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  .u-btn:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+
+  .u-btn svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+
+  .u-btn[data-size="sm"] {
+    height: 28px;
+    padding: 0 8px;
+  }
+
+  .u-btn[data-size="lg"] {
+    height: 36px;
+    padding: 0 16px;
+  }
+
+  .u-btn[data-variant="primary"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--surface);
+  }
+
+  .u-btn[data-variant="primary"]:hover:not(:disabled) {
+    background: var(--ink-hover);
+    border-color: var(--ink-hover);
+  }
+
+  .u-btn[data-variant="secondary"] {
+    border-color: transparent;
+    background: var(--active);
+  }
+
+  .u-btn[data-variant="ghost"] {
+    border-color: transparent;
+    background: transparent;
+    color: var(--fg-2);
+  }
+
+  .u-btn[data-variant="ghost"]:hover:not(:disabled) {
+    color: var(--fg);
+  }
+
+  /* 开关式按钮：aria-pressed 为按下，底色加深、字转正文色，不改字重 */
+  .u-btn[aria-pressed="true"] {
+    background: var(--active);
+    color: var(--fg);
+  }
+
+  .u-btn[data-variant="danger"] {
+    color: var(--danger);
+  }
+
+  .u-btn[data-variant="danger"]:hover:not(:disabled) {
+    border-color: var(--danger);
+  }
+
+  .u-btn[data-armed="true"] {
+    border-color: var(--warn);
+    color: var(--warn-text);
+  }
+
+  .u-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* 图标按钮：28，不可用时置灰；悬停才出现的用 u-reveal */
+  .u-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    color: var(--icon);
+    transition:
+      background var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  .u-icon-btn[data-size="sm"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .u-icon-btn:hover:not(:disabled),
+  .u-icon-btn[aria-pressed="true"] {
+    color: var(--fg);
+  }
+
+  .u-icon-btn:hover:not(:disabled) {
+    background: var(--active);
+  }
+
+  .u-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* 进度条：2px 细线，墨色。确定进度用宽度；不确定进度是一道墨色渐变匀速扫过，不用实心滑块、不用蓝。 */
+  .u-progress {
+    position: relative;
+    height: 2px;
+    overflow: hidden;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+  }
+
+  .u-progress i {
+    display: block;
+    height: 100%;
+    background: var(--ink);
+    transition: width 360ms linear;
+  }
+
+  .u-progress[data-indeterminate] i {
+    width: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--line) 0,
+      var(--ink) 50%,
+      var(--line) 100%
+    );
+    background-size: 200% 100%;
+    animation: u-progress-slide 1.6s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .u-progress[data-indeterminate] i {
+      animation: none;
+    }
+  }
+
+  /* 滑块：轨道 3px 与读条同厚，拇指用焦点色；两条 vendor 前缀各自成对，缺一个就退回系统外观。 */
+  .u-range {
+    flex: 1 1 auto;
+    min-width: 80px;
+    height: 16px;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .u-range::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: var(--r-pill);
+    background: var(--surface-3);
+  }
+
+  .u-range::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    margin-top: -4.5px;
+    border: 1px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
+    appearance: none;
+  }
+
+  .u-range::-moz-range-track {
+    height: 3px;
+    border-radius: var(--r-pill);
+    background: var(--surface-3);
+  }
+
+  .u-range::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border: 1px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .u-range:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}

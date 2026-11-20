@@ -1,0 +1,160 @@
+/* 终端标签：只用 ui/tokens.css 的令牌。终端配色由令牌组合而成，不引入新色值；
+   不放进 @layer，免得和 Tailwind 的层顺序互相牵连（.ws-term-* 选择器足够具体）。 */
+.ws-term {
+  /* 纸面终端：背景比面板略深一档，ANSI 色取令牌的 ink 档保证浅底可读 */
+  --ws-term-bg: var(--surface-2);
+  --ws-term-fg: var(--fg);
+  --ws-term-cursor: var(--accent);
+  --ws-term-sel: color-mix(in oklch, var(--accent) 22%, var(--surface-2));
+  --ws-term-sel-off: color-mix(in oklch, var(--fg) 12%, var(--surface-2));
+  --ws-term-black: var(--fg);
+  --ws-term-red: var(--danger);
+  --ws-term-green: var(--live-ink);
+  --ws-term-yellow: var(--warn-ink);
+  --ws-term-blue: var(--accent-ink);
+  --ws-term-magenta: color-mix(in oklch, var(--accent-ink) 55%, var(--danger));
+  --ws-term-cyan: color-mix(in oklch, var(--accent-ink) 50%, var(--live-ink));
+  --ws-term-white: var(--muted);
+  --ws-term-bright-black: var(--meta);
+  --ws-term-bright-red: color-mix(in oklch, var(--danger) 80%, var(--fg));
+  --ws-term-bright-green: color-mix(in oklch, var(--live-ink) 80%, var(--fg));
+  --ws-term-bright-yellow: color-mix(in oklch, var(--warn-ink) 80%, var(--fg));
+  --ws-term-bright-blue: color-mix(in oklch, var(--accent-ink) 80%, var(--fg));
+  --ws-term-bright-magenta: color-mix(
+    in oklch,
+    var(--ws-term-magenta) 80%,
+    var(--fg)
+  );
+  --ws-term-bright-cyan: color-mix(
+    in oklch,
+    var(--ws-term-cyan) 80%,
+    var(--fg)
+  );
+  --ws-term-bright-white: var(--fg);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--ws-term-bg);
+  color: var(--ws-term-fg);
+}
+
+.ws-term-gap {
+  flex: 1;
+}
+
+.ws-term-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* xterm 挂载点：FitAddon 用父元素的 computed height/width 算行列，而 border-box 下
+   computed height 含 padding，留白若写成 padding 会被当成可用空间，终端网格比可视区
+   多出近一行、底行被裁。所以留白用 inset 收缩挂载盒，padding 必须保持 0。 */
+.ws-term-screen {
+  position: absolute;
+  inset: 8px 4px 4px 10px;
+}
+
+/* 连接中 / 重连的提示：浮在屏幕顶上，不占位 */
+.ws-term-note {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+}
+
+/* 终端不可用时盖在最近输出上的说明层：输出隐约可见但不可操作，卡片落在下方，不挡最近的输出 */
+.ws-term-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 32px 16px;
+  background: color-mix(in oklch, var(--ws-term-bg) 70%, transparent);
+  animation: u-rise var(--dur) var(--ease);
+}
+
+.ws-term-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  padding: 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--sh-md);
+}
+
+.ws-term-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+}
+
+.ws-term-card-desc {
+  color: var(--fg-3);
+}
+
+.ws-term-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  color: var(--fg-3);
+}
+
+.ws-term-card-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-term-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── 终端管理 ── */
+.ws-term-mgr {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ws-term-mgr-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.ws-term-mgr-count {
+  color: inherit;
+}
+
+.ws-term-mgr-id {
+  color: var(--fg);
+}
+
+.ws-term-close-list {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: var(--muted);
+}

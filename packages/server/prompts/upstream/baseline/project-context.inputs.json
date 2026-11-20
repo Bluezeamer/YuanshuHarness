@@ -1,0 +1,9 @@
+{
+  "note": "合成 fixture：三个目录各一份 AGENTS.md，用来验证 project_context 的发现顺序与拼接格式",
+  "order": ["agent/AGENTS.md", "repo/AGENTS.md", "repo/sub/AGENTS.md"],
+  "files": {
+    "agent/AGENTS.md": "# 全局约定\n\n- 全局标记 GLOBAL-MARK\n",
+    "repo/AGENTS.md": "# 项目约定\n\n- 项目标记 PROJECT-MARK\n",
+    "repo/sub/AGENTS.md": "# 子目录约定\n\n- 子目录标记 SUB-MARK\n"
+  }
+}

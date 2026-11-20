@@ -1,0 +1,195 @@
+/* 「提示词与能力」样张：编辑页的版心。页签、列表页留白沿用设置壳（settings/frame/frame.css）。 */
+@layer components {
+  .sp-sp {
+    flex: 1;
+  }
+
+  /* ---------- 列表页 ---------- */
+  .sp-note {
+    margin-bottom: 16px;
+  }
+
+  .sp-note-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .sp-lede {
+    margin: 0 0 16px;
+  }
+
+  .sp-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .sp-search {
+    width: 280px;
+  }
+
+  .sp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  /* ---------- 编辑页 ---------- */
+  .sp-ed {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sp-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px var(--st-gutter) 8px 16px;
+  }
+
+  .sp-head[data-line] {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sp-head-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 保存条浮在编辑区底部，不随任何一栏滚动 */
+  .sp-ed > .st-save {
+    position: absolute;
+    right: 0;
+    bottom: 16px;
+    left: 0;
+    margin: 0 auto;
+  }
+
+  .sp-ed .st-form {
+    padding-bottom: 48px;
+  }
+
+  /* 保存条浮在底部，滚到底时内容要能让出它的位置 */
+  .sp-ed .st-form::after,
+  .sp-col::after,
+  .sp-prev-body::after {
+    display: block;
+    height: 24px;
+    content: "";
+  }
+
+  /* 提示词页：段 | 卡片 | 预览，三栏各自滚动；第一栏左缘 = 留白 */
+  .sp-pw {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns:
+      calc(var(--st-gutter) + 184px + 16px) 400px
+      minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .sp-pw[data-flat] {
+    grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  }
+
+  .sp-col {
+    min-width: 0;
+    min-height: 0;
+    padding: 16px 16px 48px;
+    overflow-y: auto;
+  }
+
+  .sp-col-segs {
+    padding-left: var(--st-gutter);
+  }
+
+  .sp-pw[data-flat] .sp-col-cards {
+    padding-left: var(--st-gutter);
+  }
+
+  .sp-prev {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .sp-prev-tabs {
+    flex: none;
+    padding-inline: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sp-prev-tabs .u-tabs {
+    border-bottom: 0;
+  }
+
+  .sp-prev-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 16px var(--st-gutter) 48px 16px;
+    overflow-y: auto;
+  }
+
+  .sp-prev-body .gl-pre {
+    max-height: none;
+  }
+
+  /* ---------- 弹窗里的表单 ---------- */
+  .sp-dlg {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ---------- 卡片库详情 ---------- */
+  .sp-dh {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sp-dsub {
+    margin: 4px 0 16px;
+  }
+
+  .sp-dnote {
+    margin-bottom: 16px;
+  }
+
+  .sp-dfields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sp-none {
+    padding: 48px 16px;
+    text-align: center;
+  }
+
+  /* ---------- 工具 ---------- */
+  .sp-tsec + .sp-tsec {
+    margin-top: 32px;
+  }
+
+  .sp-tsec-h {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+}

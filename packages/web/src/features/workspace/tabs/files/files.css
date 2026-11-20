@@ -1,0 +1,430 @@
+/* 文件管理器标签：只用 ui/tokens.css 的令牌；主机色 --tone 由窗格（.ws-pane）传入。
+   工具条永远一行；窄窗格的取舍按窗格宽度（@container pane）做。 */
+@layer components {
+  .ws-fm {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+    color: var(--fg);
+  }
+
+  /* ── 工具条（一行）与选择条（同一行换内容） ── */
+  .ws-fm-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px;
+    min-width: 0;
+  }
+
+  .ws-fm-selbar {
+    background: var(--accent-bg);
+  }
+
+  .ws-fm-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* 面包屑：放不下就只露出末尾，左端淡出（data-cut 由组件按溢出情况写） */
+  .ws-fm-crumb {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+
+  .ws-fm-crumb[data-cut] {
+    mask-image: linear-gradient(to right, transparent, var(--ink) 16px);
+  }
+
+  .ws-fm-crumb::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ws-fm-crumb .u-btn {
+    flex: none;
+    padding: 0 6px;
+    color: var(--fg-3);
+  }
+
+  .ws-fm-crumb .u-btn[aria-current="location"] {
+    color: var(--fg);
+  }
+
+  .ws-fm-sep {
+    flex: none;
+    color: var(--icon);
+  }
+
+  /* 分支胶囊：未提交条数用琥珀字；按下 = 正在看版本视图 */
+  .ws-fm-branch {
+    gap: 4px;
+    padding: 0 8px;
+    color: var(--fg-3);
+  }
+
+  .ws-fm-bcount {
+    color: var(--warn-text);
+  }
+
+  .ws-fm-branch[aria-pressed="true"] {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+
+  .ws-fm-branch[aria-pressed="true"] .ws-fm-bcount {
+    color: inherit;
+  }
+
+  .ws-fm-bar .u-icon-btn[aria-busy] svg {
+    animation: u-spin 900ms linear infinite;
+  }
+
+  @container pane (max-width: 400px) {
+    .ws-fm-newtxt {
+      display: none;
+    }
+  }
+
+  @container pane (max-width: 340px) {
+    .ws-fm-bname {
+      display: none;
+    }
+  }
+
+  /* ── 文件列表 ── */
+  .ws-fm-list {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px;
+    overflow-y: auto;
+  }
+
+  .ws-fm-ic {
+    display: grid;
+    place-items: center;
+  }
+
+  .ws-fm-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .ws-fm-mark {
+    width: 12px;
+    text-align: center;
+  }
+
+  .ws-fm-size {
+    min-width: 56px;
+    text-align: right;
+  }
+
+  .ws-fm-time {
+    min-width: 88px;
+    text-align: right;
+  }
+
+  @container pane (max-width: 460px) {
+    .ws-fm-time {
+      display: none;
+    }
+  }
+
+  @container pane (max-width: 340px) {
+    .ws-fm-size {
+      display: none;
+    }
+  }
+
+  /* git 状态：文件名与字母一起着色（颜色只区分「要不要留意」，具体状态看 title） */
+  .ws-fm-row[data-git="untracked"],
+  .ws-fm-row[data-git="added"],
+  .ws-fm-grow[data-git="untracked"],
+  .ws-fm-grow[data-git="added"] {
+    --ws-fm-git: var(--ok-text);
+  }
+
+  .ws-fm-row[data-git="modified"],
+  .ws-fm-row[data-git="renamed"],
+  .ws-fm-grow[data-git="modified"],
+  .ws-fm-grow[data-git="renamed"] {
+    --ws-fm-git: var(--warn-text);
+  }
+
+  .ws-fm-row[data-git="deleted"],
+  .ws-fm-row[data-git="conflict"],
+  .ws-fm-grow[data-git="deleted"],
+  .ws-fm-grow[data-git="conflict"] {
+    --ws-fm-git: var(--danger);
+  }
+
+  .ws-fm-row[data-git] .u-lrow-label,
+  .ws-fm-row[data-git] .ws-fm-mark,
+  .ws-fm-grow[data-git] .u-lrow-label,
+  .ws-fm-grow .ws-fm-gstat {
+    color: var(--ws-fm-git);
+  }
+
+  .ws-fm-row[data-git="deleted"] .u-lrow-label,
+  .ws-fm-grow[data-git="deleted"] .u-lrow-label {
+    text-decoration: line-through;
+  }
+
+  /* ── 版本视图：分支行 + 按目录分组的变更列表 ── */
+  .ws-fm-gitview {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ws-fm-githead {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 8px;
+  }
+
+  .ws-fm-gbranch {
+    color: var(--fg);
+  }
+
+  .ws-fm-gbranch[data-detached] {
+    color: var(--warn-text);
+  }
+
+  .ws-fm-gnote {
+    padding-right: 8px;
+    color: var(--fg-3);
+  }
+
+  .ws-fm-glist {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px;
+    overflow-y: auto;
+  }
+
+  .ws-fm-gdir {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .ws-fm-gstat {
+    width: 16px;
+    text-align: center;
+  }
+
+  .ws-fm-note {
+    padding: 12px 8px;
+    color: var(--meta);
+  }
+  .ws-fm-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+  .ws-fm-formerr {
+    margin-top: 6px;
+  }
+  .ws-fm-hint {
+    color: var(--meta);
+  }
+  /* 上传进度条：夹在列表上方的一条，不盖住任何一行 */
+  .ws-fm-up {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+  .ws-fm-up span {
+    flex: none;
+  }
+  .ws-fm-up .u-progress {
+    flex: 1;
+    min-width: 0;
+  }
+  /* 同名冲突弹窗里的文件清单：等宽字体便于看扩展名 */
+  .ws-fm-dup {
+    margin: 0 0 6px;
+    padding-left: 16px;
+    max-height: 120px;
+    overflow: auto;
+    color: var(--fg);
+  }
+
+  /* ── 拖放：落点 = 2px 强调色描边 + 极浅蓝底（与侧栏、卡片库一致，不用主机色）；
+     同主机「移动」与跨主机「传输」靠行尾标签的文字区分 ── */
+  .ws-fm-row[data-dragging] {
+    opacity: 0.38;
+  }
+  .ws-fm-row[data-dz] {
+    background: var(--accent-bg);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .ws-fm-row[data-dz] .ws-fm-meta {
+    opacity: 0;
+  }
+  .ws-fm-row[data-dz]::after {
+    content: attr(data-dz);
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    translate: 0 -50%;
+    padding: 1px 5px;
+    letter-spacing: 0.04em;
+    color: var(--accent-text);
+    pointer-events: none;
+  }
+  .ws-fm-list[data-dz] {
+    outline: 2px solid var(--accent-line);
+    outline-offset: -2px;
+  }
+  .ws-fm-crumb button[data-dz] {
+    color: var(--fg);
+    background: var(--accent-bg);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* 幽灵条跟随指针，右侧常显判定；挂在 body 下，所以主机色由 JS 以变量传入 */
+  .ws-xghost {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 280px;
+    padding: 4px 8px 4px 6px;
+    border-radius: var(--r-xs);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--elev-lg);
+    color: var(--fg);
+    pointer-events: none;
+    transform: translate(12px, 10px);
+    white-space: nowrap;
+  }
+  .ws-xghost svg {
+    flex: none;
+    color: var(--meta);
+  }
+  .ws-xg-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ws-xg-n {
+    flex: none;
+    color: var(--meta);
+  }
+  .ws-xg-to {
+    padding-left: 6px;
+    border-left: 1px solid var(--border);
+    color: var(--meta);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 判定文字：跨主机时用目标主机色（字，不描边不铺底） */
+  .ws-xghost[data-live] .ws-xg-to {
+    color: var(--ws-xg-tone, var(--accent));
+  }
+  .ws-xghost[data-bad] .ws-xg-to {
+    color: var(--danger);
+  }
+
+  /* 传输条：底部居中，一次只有一条 */
+  /* 作业栈：传输与上传共用，多个时自上而下堆叠（容器负责定位，卡片只管自己） */
+  .ws-xfer-stack {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    z-index: 40;
+    translate: -50% 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(360px, calc(100% - 24px));
+  }
+
+  .ws-xfer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 8px 12px 8px;
+    border-radius: var(--r-card);
+    background: var(--fg);
+    color: var(--surface);
+    box-shadow: var(--elev-lg);
+  }
+  .ws-xfer-k {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .ws-xfer-t {
+    flex: none;
+  }
+  .ws-xfer-n {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    color: color-mix(in oklch, var(--surface) 62%, transparent);
+  }
+  .ws-xfer-k .u-btn {
+    color: inherit;
+    margin-left: auto;
+  }
+  .ws-xfer-err {
+    color: color-mix(in oklch, var(--danger) 55%, var(--surface));
+  }
+  /* 进度条本体是 ui 的 .u-progress，这里只把配色换成深底上的反白。 */
+  .ws-xfer-bar {
+    background: color-mix(in oklch, var(--surface) 22%, transparent);
+  }
+  .ws-xfer-bar i {
+    background: var(--surface);
+  }
+  .ws-xfer-bar[data-indeterminate] i {
+    background: linear-gradient(
+      90deg,
+      transparent 0,
+      var(--surface) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+  .ws-xfer[data-phase="done"] .ws-xfer-bar i {
+    background: var(--live);
+  }
+  .ws-xfer[data-phase="failed"] .ws-xfer-bar i {
+    background: var(--danger);
+  }
+}

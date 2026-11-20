@@ -1,0 +1,118 @@
+// @vitest-environment node
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "vite";
+import { expect, test } from "vitest";
+
+const srcDir = fileURLToPath(new URL("./", import.meta.url));
+
+// 测试夹具（只被 *.test.* 引用，不进产物）：testkit / harness 命名，或位于 src/test/ 下。
+const isFixture = (rel: string) =>
+  /(^|\/)(testkit|harness)\.tsx?$/.test(rel) || rel.startsWith("test/");
+
+// 递归读取 src/ 下所有源文件，排除测试文件、测试夹具与目录本身。
+function walkSources(dir: string, prefix = ""): { f: string; text: string }[] {
+  return readdirSync(dir).flatMap((name) => {
+    const fullPath = join(dir, name);
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if (statSync(fullPath).isDirectory()) return walkSources(fullPath, rel);
+    if (name.endsWith(".test.ts") || name.endsWith(".test.tsx")) return [];
+    if (isFixture(rel)) return [];
+    return [{ f: rel, text: readFileSync(fullPath, "utf8") }];
+  });
+}
+
+const sources = walkSources(srcDir);
+const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+const config = readFileSync(
+  new URL("../vite.config.ts", import.meta.url),
+  "utf8",
+);
+const HEX = /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/;
+// 协议相对地址（//host/x）同样会向第三方发请求。
+const REMOTE =
+  /https?:\/\/|(?:src|href)=["']?\/\/|url\(["']?\/\/|@import\s+["']?\/\//;
+
+test("R2 风格变量文件之外没有写死色值", () => {
+  for (const { f, text } of [
+    ...sources,
+    { f: "index.html", text: html },
+    { f: "vite.config.ts", text: config },
+  ]) {
+    expect(text, f).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
+  }
+});
+
+test("R12 源码不用 Tailwind 内置的黑白，一律走调色板变量", () => {
+  for (const { f, text } of sources) {
+    expect(text, f).not.toMatch(
+      /\b(?:text|bg|border|ring|fill|stroke)-(?:white|black)\b/,
+    );
+  }
+});
+
+test("R2 不引用第三方域名的资源", () => {
+  for (const { f, text } of [...sources, { f: "index.html", text: html }]) {
+    expect(text, f).not.toMatch(REMOTE);
+  }
+});
+
+// 内存里真构建一次，不写盘。React 的报错文案里有 https 链接，那是字符串不是资源，所以 JS 只查色值。
+test("R2 构建产物：色值只剩调色板变量与 Tailwind 自带的 #0000 / #fff；没有第三方资源引用", async () => {
+  const env = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  const out = (await build({
+    logLevel: "silent",
+    mode: "production",
+    build: { write: false },
+  }).finally(() => {
+    process.env.NODE_ENV = env;
+  })) as {
+    output: {
+      fileName: string;
+      type: string;
+      isEntry?: boolean;
+      code?: string;
+      source?: string | Uint8Array;
+    }[];
+  };
+  const files = out.output.map((o) => ({
+    name: o.fileName,
+    lazy: o.type === "chunk" && !(o as { isEntry?: boolean }).isEntry,
+    text: String(o.type === "chunk" ? o.code : o.source),
+  }));
+  expect(files.some((f) => f.name.endsWith(".css"))).toBe(true);
+  for (const { name, text, lazy } of files) {
+    // pdf.js 的 worker 以独立 .mjs 文件产出（类型是 asset），同样是按需加载的第三方代码。
+    if (/(^|\/)pdf\.worker[^/]*\.mjs$/.test(name)) continue;
+    if (name.endsWith(".js")) {
+      // 按需加载的第三方块（mermaid）自带主题色，不在我们的调色板约束内；只查入口包。
+      if (lazy) continue;
+      // react-markdown 的弃用提示里有 "#add-urltransform" 这类锚点文字，不是色值。
+      const js = text.replace(/#[\w]+-[\w-]+/g, "");
+      expect(js.match(new RegExp(HEX, "g")) ?? [], name).toEqual([]);
+      continue;
+    }
+    // 调色板变量声明，以及 Tailwind 的相对色语法特性探测（不是颜色）。
+    const rest = text
+      .replace(/--[\w-]+:\s*#[0-9a-fA-F]{3,8}\b/g, "")
+      .replace("color:rgb(from red r g b)", "");
+    const found = rest.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g) ?? [];
+    expect(
+      found.filter((c) => c !== "#0000" && c !== "#fff"),
+      name,
+    ).toEqual([]);
+    // Tailwind 文件头的许可注释里有网址，注释不会发请求。
+    const code = text.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(code.match(new RegExp(REMOTE, "g")) ?? [], name).toEqual([]);
+  }
+});
+
+test("产品源码不 import 测试夹具（它们被守卫跳过，进产物就等于绕过守卫）", () => {
+  const IMPORT_FIXTURE = /from\s+["'][^"']*\/(?:testkit|harness)["']/;
+  for (const { f, text } of sources) {
+    expect(text, f).not.toMatch(IMPORT_FIXTURE);
+  }
+});

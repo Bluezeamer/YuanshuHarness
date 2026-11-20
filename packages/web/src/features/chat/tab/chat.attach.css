@@ -1,0 +1,189 @@
+/* 附件卡片：输入卡草稿与历史消息共用。图片只显示缩略图方块，文件显示缩略图 + 名称 + 类型大小；
+   移除键悬停才出现。点开 / 移除 / 重试都是标准按钮（Button / IconButton）。 */
+
+/* 整个对话标签（除审计视图）的文件拖入提示：盖在正文/状态条/输入卡之上，不拦截指针事件。
+   字样由 TSX 上的 t-entry 给。 */
+.ch-drop-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--r-card);
+  background: color-mix(in oklch, var(--accent-bg) 82%, transparent);
+  color: var(--accent-ink);
+  pointer-events: none;
+}
+
+.ch-filelist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 输入框里的附件区：贴在 textarea 上方 */
+.ch-box > .ch-filelist {
+  padding: 8px 12px 0;
+}
+
+.ch-filelist-msg {
+  margin-bottom: 8px;
+}
+
+.ch-file {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 280px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+
+.ch-file[data-status="error"] {
+  border-color: color-mix(in oklch, var(--danger) 32%, var(--border));
+}
+
+/* 主体：可点时是幽灵 Button（这里把它压成无框、无内边距的整块），不可点时是同形的 span */
+.ch-file-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  height: auto;
+  padding: 0 24px 0 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.ch-file-main:hover:not(:disabled) {
+  background: transparent;
+}
+
+.ch-file-thumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--fg-3);
+}
+
+.ch-file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ch-file-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ch-file-name,
+.ch-file-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-file-name {
+  color: var(--fg);
+}
+
+.ch-file-meta {
+  color: var(--fg-3);
+}
+
+.ch-file-meta[data-status="error"] {
+  color: var(--danger);
+}
+
+/* 进度条占满卡片下一行，贴在卡片内沿 */
+.ch-file-progress {
+  flex: 0 0 100%;
+  margin-top: 4px;
+}
+
+/* 重试：卡片右端的小图标键（图片方块里叠在下沿，见下） */
+.ch-file-action {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+.ch-file-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--surface);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.ch-file:hover .ch-file-x,
+.ch-file-x:focus-visible {
+  opacity: 1;
+}
+
+.ch-file-x:hover {
+  color: var(--danger);
+}
+
+/* 消息气泡本身是浅底卡片，附件卡换成更亮的 surface 区分层次 */
+.ch-filelist-msg .ch-file {
+  background: var(--surface);
+}
+
+/* 图片附件只显示缩略图方块：名称 / 类型放在 title、alt 与 aria-label 里，不作为正文 */
+.ch-file.is-image {
+  width: 48px;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ch-file.is-image .ch-file-main {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: inherit;
+}
+
+.ch-file.is-image .ch-file-thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.ch-file.is-image .ch-file-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+}
+
+.ch-file.is-image .ch-file-action {
+  top: auto;
+  right: auto;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+}

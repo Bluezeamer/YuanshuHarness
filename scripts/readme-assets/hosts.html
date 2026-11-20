@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  /* 瑞士国际主义：网格对齐、纯墨色细线、无渐变无阴影；只有连接（箭头与标注）用一处蓝色 */
+  :root { --ink: #18181b; --paper: #f9f9fa; --grey: #52525b; --soft: #a1a1aa; --rule: #e4e4e7; --blue: #2563eb; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--paper); color: var(--ink); }
+  body { position: relative; font-family: "Liberation Sans", "Noto Sans CJK SC", sans-serif; }
+  .mono { font-family: "Liberation Mono", "DejaVu Sans Mono", monospace; }
+  .abs { position: absolute; }
+
+  .top { left: 80px; right: 80px; top: 56px; border-top: 2px solid var(--ink); padding-top: 12px; display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; line-height: 20px; color: var(--grey); letter-spacing: 0.06em; }
+  h1 { left: 80px; top: 104px; font-size: 54px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; }
+  .lede { left: 80px; top: 178px; font-size: 20px; color: var(--grey); }
+
+  .colhead { top: 240px; font-size: 14px; letter-spacing: 0.1em; color: var(--grey); border-top: 1px solid var(--ink); padding-top: 10px; }
+
+  /* 左：Server 方块，一行一个工具 */
+  .server { left: 80px; top: 296px; width: 480px; border: 1.5px solid var(--ink); }
+  .server .head { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1.5px solid var(--ink); }
+  .server .head b { font-size: 26px; letter-spacing: 0.02em; }
+  .server .head span { font-size: 14px; color: var(--grey); letter-spacing: 0.06em; }
+  .tool { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-top: 1px solid var(--rule); }
+  .tool:first-of-type { border-top: 0; }
+  .tool .name { font-size: 22px; }
+  .tool .param { font-size: 15px; color: var(--grey); border: 1px solid var(--soft); padding: 3px 12px; }
+
+  /* 右：三台主机 */
+  .host { left: 1040px; width: 480px; height: 104px; border: 1.5px solid var(--ink); padding: 0 24px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .host .id { font-size: 32px; font-weight: 700; }
+  .host .what { font-size: 16px; color: var(--grey); }
+  .note { left: 1040px; font-size: 17px; color: var(--grey); letter-spacing: 0.02em; }
+
+  svg { left: 0; top: 0; }
+  .label { font-size: 14px; letter-spacing: 0.1em; color: var(--blue); }
+
+  .foot { left: 80px; right: 80px; top: 812px; border-top: 1px solid var(--rule); padding-top: 18px; font-size: 19px; color: var(--grey); }
+  .foot .em { color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="abs top"><span>主机模型</span><span>HOSTS</span></div>
+  <h1 class="abs">一套工具，到任意主机干活</h1>
+  <p class="abs lede">每个工具都带 host 参数，Server 经 SSH / SFTP 直接操作目标主机。</p>
+
+  <div class="abs colhead" style="left:80px;width:480px">统一的工具集</div>
+  <div class="abs colhead" style="left:1040px;width:480px">目标主机</div>
+
+  <div class="abs server">
+    <div class="head"><b>元枢 Server</b><span>TOOLS</span></div>
+    <div class="tool"><span class="name mono">read</span><span class="param mono">host</span></div>
+    <div class="tool"><span class="name mono">write</span><span class="param mono">host</span></div>
+    <div class="tool"><span class="name mono">edit</span><span class="param mono">host</span></div>
+    <div class="tool"><span class="name mono">bash</span><span class="param mono">host</span></div>
+    <div class="tool"><span class="name mono">transfer_files</span><span class="param mono">host</span></div>
+    <div class="tool"><span class="name mono">browser_upload</span><span class="param mono">host</span></div>
+  </div>
+
+  <div class="abs host" style="top:296px"><span class="id mono">local</span><span class="what">Server 所在的机器</span></div>
+  <div class="abs note" style="top:410px">只需 sshd</div>
+  <div class="abs host" style="top:458px"><span class="id mono">gpu-box</span><span class="what">GPU 工作站</span></div>
+  <div class="abs note" style="top:572px">只需 sshd</div>
+  <div class="abs host" style="top:620px"><span class="id mono">staging</span><span class="what">预发布环境</span></div>
+  <div class="abs note" style="top:734px">只需 sshd</div>
+
+  <svg class="abs" width="1600" height="900" viewBox="0 0 1600 900" fill="none" stroke="#2563eb" stroke-width="1.5">
+    <title>Server 经 SSH / SFTP 连接三台主机</title>
+    <path d="M560 510H1040M800 348V672M800 348H1040M800 672H1040"/>
+    <path d="M1028 341L1040 348L1028 355M1028 503L1040 510L1028 517M1028 665L1040 672L1028 679"/>
+    <circle cx="800" cy="510" r="4" fill="#2563eb" stroke="none"/>
+  </svg>
+  <div class="abs label mono" style="left:600px;top:480px">SSH / SFTP</div>
+
+  <p class="abs foot">远端<span class="em">不装 agent、不装 Node、不装 MCP</span></p>
+</body>
+</html>

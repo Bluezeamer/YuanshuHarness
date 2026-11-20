@@ -1,0 +1,316 @@
+/* 面与行：Card、ListRow、SummaryRow、InlineNotice。
+   字样由组件在 TSX 里选 t-* 类，这里不写 font*；间距、高度、圆角全部取刻度（ys-ui-design 的 visual-language §3）。
+   分层靠灰度与细线；语义色只给点和字，不铺底。 */
+@layer components {
+  /* 悬停或键盘聚焦才出现的操作：不能只靠鼠标 */
+  .u-reveal {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  :is(.u-card, .u-lrow, .u-srow):is(:hover, :focus-within) .u-reveal {
+    opacity: 1;
+  }
+
+  /* ---------- Card ---------- */
+  .u-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 16px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    transition:
+      border-color var(--dur-fast) var(--ease),
+      box-shadow var(--dur-fast) var(--ease),
+      transform var(--dur-fast) var(--ease);
+  }
+
+  .u-card[data-open]:is(:hover, :focus-within) {
+    border-color: var(--line-strong);
+    box-shadow: var(--sh-md);
+    transform: translateY(-1px);
+  }
+
+  .u-card-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .u-card-title,
+  .u-card-open {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  /* 整张卡片可点：标题按钮的伪元素铺满卡片，后面的操作区按文档顺序盖在它上面 */
+  .u-card-open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+  }
+
+  .u-card-open:focus-visible {
+    outline: none;
+  }
+
+  .u-card-open:focus-visible::after {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .u-card-d {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .u-card-f {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: auto;
+    padding-top: 8px;
+    min-height: 36px;
+    color: var(--fg-3);
+  }
+
+  .u-card-act {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+  }
+
+  /* ---------- ListRow ---------- */
+  .u-lrow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    border-radius: 8px;
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .u-lrow[data-size="compact"] {
+    min-height: 28px;
+  }
+
+  .u-lrow[data-sub] {
+    min-height: 44px;
+  }
+
+  .u-lrow:hover {
+    background: var(--hover);
+  }
+
+  .u-lrow[data-selected] {
+    background: var(--accent-bg);
+  }
+
+  .u-lrow[data-current] {
+    background: var(--active);
+  }
+
+  .u-lrow[data-disabled] {
+    color: var(--fg-3);
+  }
+
+  .u-lrow[data-disabled]:hover {
+    background: transparent;
+  }
+
+  .u-lrow-main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: inherit;
+    padding: 0 8px;
+    border-radius: 8px;
+    text-align: left;
+  }
+
+  .u-lrow[data-sub] .u-lrow-main {
+    padding-block: 6px;
+  }
+
+  .u-lrow-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .u-lrow-label,
+  .u-lrow-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 名字后面跟的小标记（内置、生效中）：与名字隔一格，仍随名字一起省略 */
+  .u-lrow-label > .u-chip {
+    margin-left: 8px;
+  }
+
+  .u-lrow-trail {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .u-lrow-act {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: flex;
+    gap: 4px;
+    transform: translateY(-50%);
+  }
+
+  .u-lrow[data-actions]:is(:hover, :focus-within) .u-lrow-trail {
+    opacity: 0;
+  }
+
+  /* ---------- SummaryRow ---------- */
+  .u-srow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    margin: 0 -12px;
+    padding: 0 12px;
+    border-radius: 8px;
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .u-srow:hover,
+  .u-srow:focus-within {
+    background: var(--hover);
+  }
+
+  .u-srow-main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .u-srow-main::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+  }
+
+  .u-srow-main:focus-visible {
+    outline: none;
+  }
+
+  .u-srow-main:focus-visible::after {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .u-srow-k {
+    flex: none;
+    width: 72px;
+  }
+
+  .u-srow-v {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .u-srow-note {
+    color: var(--fg-3);
+  }
+
+  .u-srow-reset {
+    position: relative;
+    flex: none;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: var(--accent-text);
+  }
+
+  .u-srow-reset:hover {
+    background: var(--active);
+  }
+
+  .u-srow-go {
+    flex: none;
+    color: var(--icon);
+  }
+
+  /* ---------- Loading：读取中，不画框 ---------- */
+  .u-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 16px;
+    color: var(--fg-3);
+  }
+
+  .u-loading[data-compact="true"] {
+    padding: 12px;
+  }
+
+  /* ---------- InlineNotice ---------- */
+  .u-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    color: var(--fg-2);
+  }
+
+  .u-notice > .u-dot {
+    margin-top: 6px;
+  }
+
+  .u-notice[data-tone="warn"] {
+    color: var(--warn-text);
+  }
+
+  .u-notice[data-tone="danger"] {
+    color: var(--danger);
+  }
+
+  /* 需要更强时加一道 1px 左线，不铺色块 */
+  .u-notice[data-strong] {
+    padding: 4px 0 4px 12px;
+    border-left: 1px solid var(--line-strong);
+  }
+
+  .u-notice[data-strong][data-tone="warn"] {
+    border-left-color: var(--warn);
+  }
+
+  .u-notice[data-strong][data-tone="danger"] {
+    border-left-color: var(--danger);
+  }
+}

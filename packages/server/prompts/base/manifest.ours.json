@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "note": "我们自己的槽位形态（与 manifest.json 共用同一批资产文件）。用途：证明「槽位是设计单位、段名只是投影」——改这份声明即可从 pi 对齐形态切到我们的形态，不需要改代码。convention 槽用一个段承载工具摘要与规则；agentsmd / environment 用我们自己的段名。注意：线上注入时 skills 段由 pi 产出，接线层会跳过它。",
+  "slots": [
+    {
+      "id": "identity",
+      "title": "角色定义",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "identity",
+          "tag": null,
+          "source": { "kind": "file", "file": "identity.md" }
+        }
+      ]
+    },
+    {
+      "id": "convention",
+      "title": "工具与规则",
+      "enabled": true,
+      "join": "\n\n",
+      "parts": [
+        {
+          "id": "tools",
+          "tag": "convention",
+          "source": { "kind": "file", "file": "convention/tools.md" }
+        },
+        {
+          "id": "rules",
+          "tag": "convention",
+          "source": { "kind": "file", "file": "convention/rules.md" }
+        }
+      ]
+    },
+    {
+      "id": "agentsmd",
+      "title": "项目约定",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "agentsmd",
+          "tag": "agentsmd",
+          "source": { "kind": "provider", "name": "agentsmd" }
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "title": "自身文档",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "docs",
+          "tag": "docs",
+          "source": { "kind": "file", "file": "docs.md" }
+        }
+      ]
+    },
+    {
+      "id": "environment",
+      "title": "环境信息",
+      "enabled": true,
+      "parts": [
+        {
+          "id": "environment",
+          "tag": "environment",
+          "source": { "kind": "provider", "name": "environment" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "note": "提示词基线的固定 fixture。基线依赖环境（哪个 directory、挂哪些 skill/MCP、审批档），所以必须把这些钉死才能复现。directory 用 name+path 定位（ID 每台机器不同），agentId 是种子值可直接用。",
+  "directory": {
+    "name": "test",
+    "path": "/home/bluezeamer/projects/test"
+  },
+  "config": {
+    "agentId": "c46ee05d-4ed4-4001-a91a-e7d5e9b4f3c1",
+    "model": {
+      "mode": "follow-agent"
+    },
+    "capabilities": [
+      {
+        "capabilityId": "skills:skill-harness",
+        "level": "global"
+      },
+      {
+        "capabilityId": "mcp:context7",
+        "level": "project"
+      }
+    ],
+    "subagentIds": [],
+    "approval": {
+      "tier": 3
+    },
+    "agentsMd": {
+      "mode": "none"
+    },
+    "permissions": {
+      "tools": {
+        "read": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "grep": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "find": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "ls": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "write": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "edit": {
+          "inside": "allow",
+          "outside": "allow"
+        },
+        "bash": {
+          "inside": "allow",
+          "outside": "allow"
+        }
+      },
+      "mcp": {
+        "context7": "allow"
+      }
+    }
+  }
+}

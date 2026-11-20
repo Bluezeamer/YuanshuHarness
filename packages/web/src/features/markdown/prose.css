@@ -1,0 +1,174 @@
+/* Markdown 渲染出来的正文，所有地方（对话、文件预览、笔记、画布卡片）共用这一份：容器写 `md-prose t-doc`。
+   字号字重行高在 ui/type.css 的 .t-doc 里；这里只管外边距、颜色、块的外观，间距用 em（随字号设置缩放）。
+   外层各自只加自己的布局（宽度上限、内边距），不再改这里的任何规则。 */
+@layer components {
+  .md-prose {
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+
+  .md-prose > :first-child {
+    margin-top: 0;
+  }
+
+  .md-prose > :last-child {
+    margin-bottom: 0;
+  }
+
+  .md-prose :is(h1, h2, h3, h4, h5, h6) {
+    margin: 1.6em 0 0.5em;
+    color: var(--fg);
+  }
+
+  .md-prose h1 {
+    margin-top: 1.4em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .md-prose :is(h5, h6) {
+    color: var(--fg-2);
+  }
+
+  .md-prose :is(p, ul, ol, blockquote, pre, table, hr) {
+    margin: 0 0 0.75em;
+  }
+
+  /* 列表：标记取淡色，项与项之间留一点；嵌套的列表贴着上一项 */
+  .md-prose :is(ul, ol) {
+    padding-left: 1.5em;
+  }
+
+  .md-prose ul {
+    list-style: disc;
+  }
+
+  .md-prose ol {
+    list-style: decimal;
+  }
+
+  .md-prose li {
+    margin: 0.25em 0;
+  }
+
+  .md-prose li::marker {
+    color: var(--fg-3);
+  }
+
+  .md-prose li > :is(ul, ol) {
+    margin: 0.25em 0 0;
+  }
+
+  .md-prose li > p {
+    margin: 0 0 0.25em;
+  }
+
+  .md-prose .contains-task-list {
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .md-prose .task-list-item input[type="checkbox"] {
+    margin: 0 0.5em 0 0;
+    accent-color: var(--accent);
+    vertical-align: -0.1em;
+  }
+
+  .md-prose blockquote {
+    padding: 0.1em 0 0.1em 1em;
+    border-left: 3px solid var(--line-strong);
+    color: var(--fg-2);
+  }
+
+  .md-prose blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* 代码卡片 / 图表外面包一层只带原文偏移的壳（见 copySource.ts）：不占版面，首尾块的外边距照旧归零 */
+  .md-prose > .md-src {
+    display: contents;
+  }
+
+  .md-prose > .md-src:first-child > :first-child {
+    margin-top: 0;
+  }
+
+  .md-prose > .md-src:last-child > :last-child {
+    margin-bottom: 0;
+  }
+
+  .md-prose a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--accent-line);
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--dur-fast) var(--ease);
+  }
+
+  .md-prose a:hover {
+    text-decoration-color: var(--accent-ink);
+  }
+
+  .md-prose del {
+    color: var(--fg-3);
+  }
+
+  /* 行内代码：只有淡底，不描边；代码块：一圈细线加更淡的底，与对话里的围栏卡片是一家人 */
+  .md-prose :not(pre) > code {
+    padding: 0.12em 0.38em;
+    border-radius: var(--r-xs);
+    background: var(--surface-3);
+    color: var(--fg);
+  }
+
+  .md-prose pre {
+    padding: 0.75em 1em;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+
+  /* 表格：没有竖线，只有行与行之间的细线，表头一条稍深的线；首尾列贴着正文的左右边 */
+  .md-prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+
+  .md-prose :is(th, td) {
+    padding: 0.45em 1em;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+
+  .md-prose th {
+    border-bottom-color: var(--line-strong);
+    color: var(--fg);
+  }
+
+  .md-prose :is(th, td):first-child {
+    padding-left: 0;
+  }
+
+  .md-prose :is(th, td):last-child {
+    padding-right: 0;
+  }
+
+  .md-prose tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .md-prose hr {
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  .md-prose img {
+    max-width: 100%;
+    border-radius: var(--r-ctl);
+  }
+}

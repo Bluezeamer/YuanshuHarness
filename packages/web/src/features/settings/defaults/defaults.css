@@ -1,0 +1,104 @@
+/* 默认值设置页。类名 st-def 前缀；颜色/圆角/字号只用 ui/tokens.css 的令牌。 */
+@layer components {
+  /* 块标题下的一段说明 */
+  .st-def-note {
+    margin: 8px 0 4px;
+  }
+
+  .st-def-grow {
+    flex: 1 1 auto;
+  }
+
+  /* 模型角色：名字与一句说明一行，下面三个下拉一行（供应商 / 模型 / 思考级别） */
+  .st-def-role {
+    display: grid;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .st-block-h + .st-def-role {
+    border-top: 0;
+  }
+
+  .st-def-role-h {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+
+  .st-def-sels {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr);
+    gap: 8px;
+  }
+
+  @media (max-width: 900px) {
+    .st-def-sels {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* ── 界面字号：基准行、示例预览、进阶覆盖 ── */
+  .st-def-fs-base,
+  .st-def-fs-adv {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 数字框固定窄列，滑块吃掉剩余宽度：拖动时预览就在旁边，宽度跳动会晃眼 */
+  .st-def-fs-base .u-inp,
+  .st-def-fs-adv .u-inp {
+    flex: none;
+    width: 80px;
+  }
+
+  .st-def-fs-pv {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 4px 0 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface-2);
+  }
+
+  /* 预览块的说明文字留在 chrome 档：它标的是「这一段演示哪一档」，自己不参与缩放 */
+  .st-def-fs-cap {
+    margin: 0 0 4px;
+    color: var(--meta);
+  }
+
+  .st-def-fs-pv-read {
+    margin: 0;
+    color: var(--fg);
+  }
+
+  .st-def-fs-pv-code {
+    margin: 0;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    background: var(--surface);
+    color: var(--muted);
+  }
+
+  .st-def-fs-pv-code span {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* 行号只做观感，不参与选中与朗读 */
+  .st-def-fs-pv-code i {
+    flex: none;
+    min-width: 1.2em;
+    font-style: normal;
+    text-align: right;
+    color: var(--meta);
+    user-select: none;
+  }
+}

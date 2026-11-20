@@ -1,0 +1,232 @@
+/* 对话流：用户气泡、工具组、思考、运行态一行预览、审批卡、回执。
+   版面只写布局，颜色取令牌，间距 / 高度 / 圆角取刻度，字样一律选 t-* 类。 */
+@layer components {
+  /* 阅读列：最宽 720，居中；消息之间的间距 16 */
+  .ch-stream > * {
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  .ch-you {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .ch-bubble {
+    max-width: 85%;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: var(--side);
+  }
+
+  .ch-quotes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* ---------- 一组：一圈细线，行与行之间只有分隔线 ---------- */
+  .ch-group {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .ch-group > * + * {
+    border-top: 1px solid var(--line);
+  }
+
+  .ch-group .u-lrow {
+    border-radius: 0;
+  }
+
+  .ch-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ch-line > :first-child {
+    flex: none;
+  }
+
+  .ch-arg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-add {
+    color: var(--ok-text);
+  }
+
+  .ch-del {
+    color: var(--danger);
+  }
+
+  .ch-out {
+    margin: 0;
+    padding: 8px 16px;
+    overflow-x: auto;
+    background: var(--side);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ch-out[data-kind="error"] {
+    color: var(--danger);
+  }
+
+  /* 嵌套调用（如 call_tool 转发的）：缩进一层 */
+  .ch-kids {
+    padding-left: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .ch-more {
+    padding: 8px;
+  }
+
+  /* ---------- 思考：一行，点开看全文 ---------- */
+  .ch-think-body {
+    margin: 0;
+    padding: 4px 8px 8px 32px;
+    white-space: pre-wrap;
+  }
+
+  /* ---------- 运行态：一行淡色预览，点开是随输出滚到底的输出框 ---------- */
+  .ch-live {
+    min-width: 0;
+  }
+
+  .ch-live .ch-line > :first-child {
+    align-self: center;
+  }
+
+  .ch-live-k {
+    flex: none;
+  }
+
+  .ch-live-t {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-live-body {
+    max-height: 210px;
+    margin: 0 0 0 24px;
+    padding: 8px 12px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- 审批 / 提问：描边加点，不铺底；回答后收成一行 ---------- */
+  .ch-approve {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--warn);
+    border-radius: 12px;
+    animation: u-rise var(--dur) var(--ease) backwards;
+  }
+
+  .ch-approve-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-approve .ch-out {
+    border-radius: 8px;
+  }
+
+  /* 几个待答弹窗合成一处时，卡头右侧的「‹ 1 / 3 ›」 */
+  .ch-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    color: var(--fg-3);
+  }
+
+  .ch-approve-f {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ch-approve-n {
+    margin-left: auto;
+    color: var(--fg-3);
+  }
+
+  p.ch-approve-n {
+    margin: 0;
+  }
+
+  .ch-why {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+
+  .ch-err {
+    margin: 0;
+    color: var(--danger);
+  }
+
+  .ch-settled {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 8px;
+  }
+
+  /* ---------- 系统回执：一行，右侧是徽标 ---------- */
+  .ch-sys-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 8px;
+  }
+
+  .ch-sys-note {
+    margin: 0;
+    padding: 0 8px 0 24px;
+  }
+
+  /* ---------- 目标续跑线：比回执更淡的一行 ---------- */
+  .ch-goal-round {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 20px;
+    padding: 0 8px;
+    color: var(--fg-3);
+  }
+}

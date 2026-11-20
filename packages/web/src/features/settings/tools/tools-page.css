@@ -1,0 +1,90 @@
+/* 工具与能力页：只写布局；颜色取令牌，间距 / 高度 / 圆角取刻度，字样在 TSX 里选 t-* 类。
+   外壳、页签条、左列表、保存条、区块小标题的样式在 ../frame/frame.css。 */
+@layer components {
+  .tp-grow {
+    flex: 1;
+  }
+
+  .tp-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .tp-search {
+    width: 280px;
+  }
+
+  .tp-note {
+    margin: 8px 0 12px;
+  }
+
+  /* 工具表：名字与「常驻 / 已修改」标记同一行 */
+  .tp-nm {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ---------- 主从详情头（与远程连接页同版式） ---------- */
+  .tp-err {
+    margin-top: 16px;
+  }
+
+  .tp-inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tp-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ---------- 环境行：技能分发 / MCP 运行位置 ---------- */
+  .tp-envs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tp-env {
+    display: grid;
+    grid-template-columns: 8px 140px 72px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    min-height: 44px;
+    border-top: 1px solid var(--line);
+  }
+
+  .tp-env:first-child {
+    border-top: 0;
+  }
+
+  .tp-env-state {
+    min-width: 0;
+  }
+
+  /* ---------- 内容 / 工具名清单、JSON ---------- */
+  .tp-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tp-json {
+    margin: 12px 0 0;
+    padding: 12px;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+}

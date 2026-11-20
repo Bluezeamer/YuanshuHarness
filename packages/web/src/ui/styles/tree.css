@@ -1,0 +1,87 @@
+/* 目录树（Tree）：行复用 ListRow 的 .u-lrow（紧凑 28），这里只补缩进、展开箭头、行内改名与落点标记。
+   间距与圆角取刻度；落点用强调色描内框（与文件管理器的同主机落点一致）；动效只动透明度与 ≤6px 位移。 */
+@layer components {
+  .u-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 100%;
+    outline: none;
+  }
+
+  .u-tree-row {
+    position: relative;
+    outline: none;
+  }
+
+  .u-tree-row[data-dragging] {
+    opacity: 0.4;
+  }
+
+  /* 落点（与侧栏、文件管理器一致）：文件夹行 = 2px 强调色描边 + 极浅蓝底；拖到空白（根）时整棵树描一圈淡边 */
+  .u-tree-row[data-drop] > .u-lrow {
+    background: var(--accent-bg);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .u-tree[data-drop-root] {
+    outline: 2px solid var(--accent-line);
+    outline-offset: -2px;
+  }
+
+  .u-tree-caret {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 20px;
+    color: var(--fg-3);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .u-tree-caret[data-open] {
+    transform: rotate(90deg);
+  }
+
+  .u-tree-rename {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 28px;
+    padding-right: 8px;
+  }
+
+  .u-tree-input {
+    flex: 1;
+    min-width: 0;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--fg);
+    outline: none;
+    box-shadow: var(--ring);
+  }
+
+  .u-tree-input[aria-invalid] {
+    border-color: var(--danger);
+  }
+
+  .u-tree-err {
+    flex-basis: 100%;
+    padding-left: 24px;
+    color: var(--danger);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .u-tree-caret {
+      transition: none;
+    }
+  }
+}

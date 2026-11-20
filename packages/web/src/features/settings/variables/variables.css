@@ -1,0 +1,264 @@
+/* 隐私变量页：只写布局；颜色取令牌，间距 / 高度 / 圆角取刻度，字样一律在 TSX 里选 t-* 类。
+   外壳、页签条、左列表、保存条的样式在 ../frame/frame.css，这里只有变量自己的东西。 */
+@layer components {
+  .vr-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .vr-note {
+    margin: 8px 0 0;
+  }
+
+  /* ---------- 详情头 ---------- */
+  .vr-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .vr-tile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--fg-2);
+  }
+
+  .vr-head-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .vr-head-sub {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .vr-grow {
+    flex: 1;
+  }
+
+  .vr-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  /* ---------- 值 ---------- */
+  .vr-value {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .vr-value > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .vr-value-act {
+    display: flex;
+    flex: none;
+    gap: 4px;
+  }
+
+  .vr-dump {
+    max-height: 160px;
+    margin: 0;
+    padding: 8px 12px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* ---------- 有效期 ---------- */
+  .vr-expiry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .vr-days {
+    width: 72px;
+  }
+
+  /* ---------- 勾选工作区 ---------- */
+  .vr-wsp {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .vr-wsp-list {
+    min-width: 0;
+    max-height: 288px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .vr-wsp-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .vr-wsp-row:first-child {
+    border-top: 0;
+  }
+
+  .vr-wsp-row:hover {
+    background: var(--hover);
+  }
+
+  .vr-wsp-path {
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vr-wsp-none {
+    padding: 16px;
+    text-align: center;
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .vr-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .vr-sep {
+    margin: 12px 0 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .vr-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vr-drop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+  }
+
+  /* ---------- 引用记录 ---------- */
+  .vr-refs-head p {
+    margin: 4px 0 0;
+  }
+
+  .vr-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0;
+  }
+
+  .vr-refs-dir {
+    width: 200px;
+    margin-left: auto;
+  }
+
+  .vr-refs-none {
+    padding: 16px 4px;
+  }
+
+  .vr-tbl .vr-row {
+    cursor: pointer;
+  }
+
+  .vr-tbl .vr-row > td {
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  .vr-tbl .vr-row[aria-expanded="true"] > td {
+    border-bottom-color: transparent;
+    background: var(--surface-2);
+  }
+
+  .vr-tbl .vr-row:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .vr-res {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .vr-chev {
+    color: var(--icon);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .vr-row[aria-expanded="true"] .vr-chev {
+    transform: rotate(90deg);
+  }
+
+  .vr-rdetail {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+  }
+
+  .vr-rdetail dt {
+    color: var(--fg-3);
+  }
+
+  .vr-rdetail dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+  }
+
+  .vr-rdetail .vr-rcmd {
+    grid-column: 1 / -1;
+  }
+
+  .vr-rdetail .vr-rcmd dd {
+    white-space: pre-wrap;
+  }
+
+  .vr-more {
+    display: flex;
+    justify-content: center;
+    padding-top: 16px;
+  }
+}

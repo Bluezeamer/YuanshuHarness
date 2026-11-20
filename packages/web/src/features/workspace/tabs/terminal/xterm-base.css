@@ -1,0 +1,205 @@
+/* xterm 的结构样式：改自 @xterm/xterm 的 css/xterm.css（MIT）。
+   去掉写死的色值与第三方网址，颜色改走 --ws-term-*；那份样式表原样引入会带进裸 hex。 */
+.xterm {
+  cursor: text;
+  position: relative;
+  user-select: none;
+}
+
+.xterm.focus,
+.xterm:focus {
+  outline: none;
+}
+
+.xterm .xterm-helpers {
+  position: absolute;
+  top: 0;
+  /* 必须高于 canvas，输入法候选框才会盖在上面 */
+  z-index: 5;
+}
+
+.xterm .xterm-helper-textarea {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  /* 挪出屏幕，光标不可见 */
+  position: absolute;
+  opacity: 0;
+  left: -9999em;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: -5;
+  white-space: nowrap;
+  overflow: hidden;
+  resize: none;
+}
+
+.xterm .composition-view {
+  background: var(--ws-term-bg);
+  color: var(--ws-term-fg);
+  display: none;
+  position: absolute;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.xterm .composition-view.active {
+  display: block;
+}
+
+.xterm .xterm-viewport {
+  background-color: var(--ws-term-bg);
+  overflow-y: scroll;
+  cursor: default;
+  position: absolute;
+  inset: 0;
+}
+
+.xterm .xterm-screen {
+  position: relative;
+}
+
+.xterm .xterm-screen canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.xterm-char-measure-element {
+  display: inline-block;
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: -9999em;
+  line-height: normal;
+}
+
+.xterm.enable-mouse-events {
+  cursor: default;
+}
+
+.xterm.xterm-cursor-pointer,
+.xterm .xterm-cursor-pointer {
+  cursor: pointer;
+}
+
+.xterm.column-select.focus {
+  cursor: crosshair;
+}
+
+.xterm .xterm-accessibility:not(.debug),
+.xterm .xterm-message {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  color: transparent;
+  pointer-events: none;
+}
+
+.xterm .xterm-accessibility-tree:not(.debug) *::selection {
+  color: transparent;
+}
+
+.xterm .xterm-accessibility-tree {
+  font-family: var(--font-mono);
+  user-select: text;
+  white-space: pre;
+}
+
+.xterm .xterm-accessibility-tree > div {
+  transform-origin: left;
+  width: fit-content;
+}
+
+.xterm .live-region {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.xterm-dim {
+  /* 变暗只作用于前景色，其不透明度由生成的类显式给出，这里复位为 1 */
+  /* biome-ignore lint/complexity/noImportantStyles: 必须压过 xterm 生成的内联类 */
+  opacity: 1 !important;
+}
+
+.xterm-underline-1 {
+  text-decoration: underline;
+}
+
+.xterm-underline-2 {
+  text-decoration: double underline;
+}
+
+.xterm-underline-3 {
+  text-decoration: wavy underline;
+}
+
+.xterm-underline-4 {
+  text-decoration: dotted underline;
+}
+
+.xterm-underline-5 {
+  text-decoration: dashed underline;
+}
+
+.xterm-overline {
+  text-decoration: overline;
+}
+
+.xterm-strikethrough {
+  text-decoration: line-through;
+}
+
+.xterm-screen .xterm-decoration-container .xterm-decoration {
+  z-index: 6;
+  position: absolute;
+}
+
+.xterm-screen
+  .xterm-decoration-container
+  .xterm-decoration.xterm-decoration-top-layer {
+  z-index: 7;
+}
+
+.xterm-decoration-overview-ruler {
+  z-index: 8;
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.xterm-decoration-top {
+  z-index: 2;
+  position: relative;
+}
+
+/* 滚动条（派生自 vs/base/browser/ui/scrollbar/media/scrollbar.css） */
+.xterm .xterm-scrollable-element > .scrollbar {
+  cursor: default;
+}
+
+.xterm .xterm-scrollable-element > .visible {
+  opacity: 1;
+  background: transparent;
+  transition: opacity var(--dur-fast) linear;
+  z-index: 11;
+}
+
+.xterm .xterm-scrollable-element > .invisible {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.xterm .xterm-scrollable-element > .invisible.fade {
+  transition: opacity 800ms linear;
+}
+
+.xterm .xterm-scrollable-element > .shadow {
+  position: absolute;
+  display: none;
+}

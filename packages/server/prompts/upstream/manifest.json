@@ -1,0 +1,39 @@
+{
+  "note": "pi 基座提示词的干净基线。这些文件从真实请求逐字节切出，用于对比我们自己的渲染结果。",
+  "piVersion": "1.3.0",
+  "render": {
+    "join": "各段之间用两个换行连接",
+    "wrap": "除 preamble 外，每段包成 <name>\\n正文\\n</name>",
+    "order": ["preamble", "tools", "rules", "docs", "addendum", "skills", "cwd"]
+  },
+  "sections": {
+    "preamble": {
+      "source": "preamble.md",
+      "dynamic": false
+    },
+    "tools": {
+      "source": "tools.trailer.md",
+      "dynamic": "逐工具一行摘要 + 静态尾句"
+    },
+    "rules": {
+      "source": "rules.tail.md",
+      "dynamic": "逐工具要点 + 静态尾两条"
+    },
+    "docs": {
+      "source": "docs.template.md",
+      "dynamic": "三条运行时路径"
+    },
+    "addendum": {
+      "source": "外部",
+      "dynamic": "我们自己的装配结果"
+    },
+    "skills": {
+      "source": "skills.intro.md + skill.entry.template.md",
+      "dynamic": "skill 清单"
+    },
+    "cwd": {
+      "source": "外部",
+      "dynamic": "当前工作目录"
+    }
+  }
+}

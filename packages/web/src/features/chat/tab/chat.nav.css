@@ -1,0 +1,113 @@
+/* 左缘导航：折叠时是一列线（40 宽）；悬停时同一块向右延展成小卡，
+   行高不变、线条不动，文字统一从最长线的末端起对齐。装饰（底、投影）用 box-shadow，不占布局。 */
+@layer components {
+  .ch-nav-wrap {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: 40px;
+    pointer-events: none;
+  }
+
+  .ch-nav {
+    position: absolute;
+    top: 50%;
+    left: 4px;
+    display: flex;
+    flex-direction: column;
+    width: 40px;
+    max-height: 210px;
+    padding: 8px;
+    border-radius: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    pointer-events: auto;
+    scrollbar-width: none;
+    transform: translateY(-50%);
+    transition:
+      width var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease),
+      background var(--dur) var(--ease);
+  }
+
+  .ch-nav[data-expanded] {
+    width: 180px;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      var(--sh-pop);
+    scrollbar-width: thin;
+  }
+
+  .ch-nav .u-hc {
+    display: block;
+    flex: none;
+    margin-right: -8px;
+    padding-right: 8px;
+  }
+
+  .ch-nav .ch-tick {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 8px;
+  }
+
+  .ch-nav[data-expanded] .ch-tick:hover {
+    background: var(--hover);
+  }
+
+  .ch-nav-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ch-nav-lane {
+    display: flex;
+    align-items: center;
+    flex: none;
+    width: 28px;
+  }
+
+  .ch-tick-mark {
+    display: block;
+    border-top: 2px solid currentColor;
+    border-radius: 999px;
+    transition: width var(--dur-fast) var(--ease);
+  }
+
+  .ch-nav-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-2);
+    opacity: 0;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition:
+      opacity var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  .ch-nav[data-expanded] .ch-nav-text {
+    opacity: 1;
+  }
+
+  .ch-nav .ch-tick:is(:hover, [aria-current="true"]) .ch-nav-text {
+    color: var(--fg);
+  }
+
+  /* 点击定位后的短暂高亮：只改底色与描边环，不改尺寸 */
+  .ch-you.is-jump .ch-bubble {
+    background: var(--accent-bg);
+    box-shadow: var(--ring);
+  }
+}

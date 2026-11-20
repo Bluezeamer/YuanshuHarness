@@ -1,0 +1,465 @@
+/* 弹窗：会话（新建 / 设置）与工作区（新建 / 编辑）。字样用 t-* 类，这里只管间距与布局。 */
+@layer components {
+  .dlg-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .dlg-sep {
+    margin: 12px 0 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .dlg-notice {
+    margin-top: 12px;
+  }
+
+  .dlg-grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .dlg-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dlg-spacer {
+    flex: 1;
+  }
+
+  /* ---- 勾选列表：模式、能力 ---- */
+  .dlg-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dlg-checks .u-check {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+  }
+
+  .dlg-checks .u-check:hover {
+    background: var(--hover);
+  }
+
+  .dlg-check-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .dlg-check-meta {
+    flex: none;
+  }
+
+  .dlg-capgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dlg-capgroup-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .dlg-capgrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 12px;
+  }
+
+  /* ---- 工作区：目录行与确认 ---- */
+  .dlg-dir {
+    display: grid;
+    grid-template-columns: 148px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dlg-dir[data-removable] {
+    grid-template-columns: 148px minmax(0, 1fr) auto;
+  }
+
+  .dlg-impact {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .dlg-choices {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  /* ---- 主机选择 / 目录浏览（锚在输入框下的浮层） ---- */
+  .ws-cr-host.u-btn {
+    justify-content: flex-start;
+    width: 100%;
+    padding: 0 8px;
+    text-align: left;
+  }
+
+  .ws-cr-host.u-btn:disabled {
+    background: var(--side);
+    color: var(--fg-3);
+    opacity: 1;
+  }
+
+  .dlg-dir[data-large] .ws-cr-host.u-btn {
+    height: 36px;
+  }
+
+  .ws-cr-host-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-cr-host.u-btn svg {
+    width: 12px;
+    height: 12px;
+    color: var(--icon);
+  }
+
+  .ws-cr-pathbox {
+    position: relative;
+  }
+
+  .ws-cr-pathbox .u-inp {
+    padding-right: 32px;
+  }
+
+  .ws-cr-pathdrop {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    transform: translateY(-50%);
+  }
+
+  .u-pop.ws-cr-pick {
+    display: flex;
+    flex-direction: column;
+    max-height: min(440px, calc(100vh - 16px));
+    overflow: hidden;
+  }
+
+  .ws-cr-pk-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 12px 6px;
+  }
+
+  .ws-cr-pk-q {
+    padding: 0 8px 6px;
+  }
+
+  .ws-cr-pk-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 4px 4px;
+    overflow-y: auto;
+  }
+
+  .ws-cr-pk-foot {
+    padding: 6px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .ws-cr-pk-empty {
+    padding: 16px 8px;
+    text-align: center;
+  }
+
+  .ws-cr-prow.u-btn {
+    justify-content: flex-start;
+    width: 100%;
+    height: auto;
+    padding: 6px 8px;
+    border-radius: 6px;
+    text-align: left;
+  }
+
+  .ws-cr-prow.u-btn:hover:not(:disabled),
+  .ws-cr-prow.u-btn:focus-visible {
+    background: var(--hover);
+  }
+
+  .ws-cr-prow.u-btn[aria-selected="true"] {
+    background: var(--accent-bg);
+  }
+
+  .ws-cr-prow.u-btn svg {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    color: var(--icon);
+  }
+
+  .ws-cr-pr-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .ws-cr-prow.is-up .ws-cr-pr-main {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .ws-cr-pr-name,
+  .ws-cr-pr-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-cr-pr-meta,
+  .ws-cr-kind {
+    flex: 0 0 auto;
+  }
+
+  .ws-cr-kind {
+    min-width: 32px;
+  }
+
+  .ws-cr-crumbs {
+    display: flex;
+    align-items: center;
+    padding: 0 8px 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ws-cr-crumb-wrap {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+  }
+
+  .ws-cr-crumb-sep {
+    padding: 0 4px;
+    color: var(--fg-3);
+  }
+
+  .ws-cr-crumb.u-btn {
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 6px;
+  }
+
+  .ws-cr-crumb.u-btn[aria-current="true"] {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  .ws-cr-warnbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 8px 6px;
+    padding: 4px 8px;
+    border-left: 2px solid var(--warn);
+  }
+
+  .ws-cr-warnbar svg {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    color: var(--warn);
+  }
+
+  .ws-cr-warnbar span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .ws-cr-pk-choose {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .ws-cr-cur {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 680px) {
+    .dlg-grid3,
+    .dlg-capgrid {
+      grid-template-columns: 1fr;
+    }
+
+    .dlg-dir,
+    .dlg-dir[data-removable] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* ---- 技能与 MCP：按工作区勾选 ---- */
+  .dlg-caps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dlg-caps-list {
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .dlg-caps-sec + .dlg-caps-sec {
+    border-top: 1px solid var(--line);
+  }
+
+  .dlg-caps-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    background: var(--side);
+  }
+
+  .dlg-caps-row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .dlg-caps-row:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  .dlg-caps-name {
+    flex: none;
+    min-width: 112px;
+  }
+
+  .dlg-caps-desc {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- 隐私变量：按组三态勾选 ---- */
+  .dlg-vars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dlg-vars-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dlg-vars-bar .u-search {
+    flex: 1;
+  }
+
+  .dlg-vars-list {
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .dlg-vars-sec + .dlg-vars-sec {
+    border-top: 1px solid var(--line);
+  }
+
+  .dlg-vars-grp {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 36px;
+    padding: 0 12px 0 8px;
+    background: var(--side);
+  }
+
+  .dlg-vars-gcheck {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dlg-vars-n {
+    flex: none;
+    color: var(--fg-3);
+  }
+
+  .dlg-vars-chev {
+    color: var(--icon);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .dlg-vars-chev[data-open] {
+    transform: rotate(90deg);
+  }
+
+  .dlg-vars-row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px 0 48px;
+    border-top: 1px solid var(--line);
+  }
+
+  .dlg-vars-row:hover {
+    background: var(--hover);
+  }
+
+  .dlg-vars-name {
+    flex: none;
+    min-width: 112px;
+  }
+
+  .dlg-vars-desc {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dlg-vars-none {
+    padding: 16px;
+    text-align: center;
+  }
+}

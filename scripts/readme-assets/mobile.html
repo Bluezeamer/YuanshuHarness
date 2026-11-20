@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1600px; height: 1000px; overflow: hidden; }
+  body {
+    display: flex; justify-content: center; align-items: center; gap: 112px;
+    background: #f4f4f6;
+    font-family: "Noto Sans CJK SC", "Lato", sans-serif;
+  }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+  .phone {
+    width: 397px; height: 859px;
+    border-radius: 40px; overflow: hidden; background: #fff;
+    border: 1.5px solid #c9c9d0;
+    box-shadow: 0 44px 80px -36px rgba(24, 24, 27, 0.32), 0 14px 30px -14px rgba(24, 24, 27, 0.2);
+  }
+  .phone img { display: block; width: 100%; height: 100%; }
+  figcaption { font-size: 18px; letter-spacing: 0.04em; color: #52525b; }
+  figcaption b { color: #18181b; font-weight: 700; margin-right: 10px; }
+</style>
+</head>
+<body>
+  <figure>
+    <div class="phone"><img alt="" src="{{LEFT}}"></div>
+    <figcaption><b>会话列表</b>需要你的会话置顶</figcaption>
+  </figure>
+  <figure>
+    <div class="phone"><img alt="" src="{{RIGHT}}"></div>
+    <figcaption><b>对话</b>审批卡片随时处理</figcaption>
+  </figure>
+</body>
+</html>

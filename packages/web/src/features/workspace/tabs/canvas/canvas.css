@@ -1,0 +1,952 @@
+/* 灵感画布标签：只用 ui/tokens.css 的令牌。工具条永远一行；窄窗格的取舍按窗格宽度（@container pane）做。
+   画布底色用侧栏灰，卡片是白底细框，项目文件引用换浅灰底，一眼分得开来源。
+   框与连线要看得清：用 --icon 与底色按比例调出的两档中灰（只在画布里用，不加全局令牌）。 */
+@layer components {
+  .cv {
+    --cv-line: color-mix(in oklch, var(--icon) 70%, var(--surface));
+    --cv-edge: var(--icon);
+    /* 库自带的 base.css 不分层，分层里的规则压不过它：拖线预览的线色线宽走它留的变量
+       （已有的连线是自己画的，见 CanvasEdge） */
+    --xy-connectionline-stroke: var(--accent);
+    --xy-connectionline-stroke-width: 2;
+    /* 窄栏的宽度（CanvasRail）；悬浮的树栏贴在它右边 */
+    --cv-rail: 40px;
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    background: var(--surface);
+    color: var(--fg);
+  }
+
+  /* 主区：工具条一行 + 画布或笔记；左边是树 */
+  /* 工具条的取舍按主区的宽度（不是窗格：树栏占了位置，主区比窗格窄），见下面的 @container cvmain */
+  .cv-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    container: cvmain / inline-size;
+  }
+
+  /* 树栏：与主区之间只有一条竖线（主从布局），宽度由使用方给（可拖），自己的头 / 搜索 / 列表各占一行 */
+  .cv-side {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  /* 悬浮：不占位，贴在窄栏右边盖在主区左侧，从顶上开始（它自己的头与工具条那一行对齐） */
+  .cv-side[data-float] {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--cv-rail);
+    z-index: 10;
+    box-shadow: var(--elev-lg);
+    /* 左边挨着窄栏、要和它连成一体：阴影只留右边（裁在盒边上，右边放开阴影能到的范围） */
+    clip-path: inset(0 -80px 0 0);
+    animation: cv-side-in var(--dur-fast) var(--ease) both;
+  }
+
+  /* 窄栏：永久驻留在左边，底色同展开的树栏（白）；右边一条线与主区分开，右边紧挨着树栏（固定的或悬浮的）时
+     不画线，和树栏连成一体；树栏悬浮时鼠标移上去就展开，下面是快捷按钮 */
+  .cv-rail {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: var(--cv-rail);
+    padding: 4px 0;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .cv-rail:has(+ .cv-side) {
+    border-right-color: transparent;
+  }
+
+  .cv-rail-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* 拖宽条骑在树栏右边的竖线上 */
+  .cv-side-grip {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+  }
+
+  @keyframes cv-side-in {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cv-vers-panel {
+      animation: none;
+    }
+
+    .cv-side[data-float] {
+      animation: none;
+    }
+  }
+
+  .cv-tree {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .cv-tree-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px;
+  }
+
+  .cv-tree-search {
+    flex: none;
+    padding: 0 8px 8px;
+  }
+
+  .cv-tree-body {
+    flex: 1;
+    min-height: 0;
+    padding: 0 4px 8px;
+    overflow-y: auto;
+  }
+
+  .cv-tree-empty {
+    margin: 0;
+    padding: 8px;
+    color: var(--fg-3);
+  }
+
+  /* tabIndex 只是为了让点画布时焦点留在这一层（Ctrl+S 才收得到），不需要焦点环 */
+  .cv:focus {
+    outline: none;
+  }
+
+  .cv-main > .u-notice {
+    flex: none;
+    padding: 4px 12px;
+  }
+
+  /* ── 工具条（一行） ── */
+  .cv-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px;
+    min-width: 0;
+  }
+
+  .cv-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* 当前画布 / 笔记的名字：放不下就省略；笔记视图里它后面是笔记自己的控件槽位 */
+  .cv-viewname {
+    min-width: 0;
+    max-width: 240px;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cv-tail {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  /* 「前进」用「后退」的图标翻过来 */
+  .cv-flip {
+    display: inline-flex;
+    transform: scaleX(-1);
+  }
+
+  /* ── 笔记视图 ── */
+  .cv-note {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .cv-note-edit {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .cv-note-read {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .cv-zoom {
+    min-width: 40px;
+    text-align: center;
+    color: var(--fg-3);
+  }
+
+  .cv-save {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .cv-save[data-tone="danger"] {
+    color: var(--danger);
+  }
+
+  /* 主区变窄，先省文字再省控件：缩放百分比与「新建卡片」的字 → 「未保存」的字（只留琥珀点，悬停有提示）
+     → 缩小 / 放大按钮（滚轮照样能缩放）→「适应」与当前名字（树里已经标着） */
+  @container cvmain (max-width: 640px) {
+    .cv-newtxt,
+    .cv-histtxt,
+    .cv-zoom {
+      display: none;
+    }
+  }
+
+  @container cvmain (max-width: 520px) {
+    .cv-save-text {
+      display: none;
+    }
+  }
+
+  @container cvmain (max-width: 440px) {
+    .cv-zoombtn {
+      display: none;
+    }
+  }
+
+  @container cvmain (max-width: 360px) {
+    .cv-fitbtn,
+    .cv-viewname {
+      display: none;
+    }
+  }
+
+  /* ── 主区 ── */
+  .cv-body {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .cv-body > .u-empty,
+  .cv-body > .u-loading {
+    flex: 1 1 auto;
+  }
+
+  /* 版本历史：靠右、盖在主区上，不挤画布（画布的视口不会因此重排）；左边一条线，阴影只留左边 */
+  .cv-vers-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    width: min(320px, 100%);
+    border-left: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--elev-lg);
+    clip-path: inset(0 0 0 -80px);
+    animation: cv-vers-in var(--dur-fast) var(--ease) both;
+  }
+
+  .cv-vers-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px 0 12px;
+  }
+
+  .cv-vers-sub {
+    flex: none;
+    padding: 0 12px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cv-vers-undo {
+    flex: none;
+    padding: 0 8px 8px;
+  }
+
+  .cv-vers-list {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px;
+    overflow-y: auto;
+  }
+
+  @keyframes cv-vers-in {
+    from {
+      opacity: 0;
+      transform: translateX(6px);
+    }
+  }
+
+  /* 版本对话框里的内容：提示、差别、节点名单 */
+  .cv-verdlg {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .cv-verdlg-hint,
+  .cv-verdlg-line {
+    margin: 0;
+  }
+
+  .cv-verdlg-board,
+  .cv-verdlg-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cv-verdlg-names {
+    margin: 0;
+    padding-left: 16px;
+  }
+
+  /* --cv-z 是当前缩放，--cv-iz 是它的倒数（CanvasFlow 随视口写）。要在屏幕上保持大小的东西
+     （卡片名、连接点与缩放柄及其感应区）用它反向换算：calc(N px * var(--cv-iz)) 画出来就是屏幕上的 N px */
+  .cv-flow {
+    --cv-z: 1;
+    --cv-iz: 1;
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--side);
+  }
+
+  /* 缩得太小：卡片名太小也看不清、还互相叠，不显示（分组名仍在） */
+  .cv-flow[data-lowzoom] .cv-label {
+    display: none;
+  }
+
+  /* 连线看得见的那层（线、箭头、标签）在卡片之上，不接收鼠标；点击感应层留在卡片之下（CanvasEdge） */
+  .cv .react-flow__edgelabel-renderer {
+    z-index: 10;
+  }
+
+  /* 不给宽高：宽或高为 0 的 svg 不渲染；画的东西靠 overflow: visible 露出来（库自己的连线也这样） */
+  .cv-edge-over {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  /* 吸附参考线：1 个屏幕像素宽的强调色线（用描边画），盖在卡片之上，不接收鼠标 */
+  .cv-guide {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .cv-guide[data-axis="x"] {
+    width: 0;
+    border-left: calc(1px * var(--cv-iz)) solid var(--accent);
+    transform: translateX(-50%);
+  }
+
+  .cv-guide[data-axis="y"] {
+    height: 0;
+    border-top: calc(1px * var(--cv-iz)) solid var(--accent);
+    transform: translateY(-50%);
+  }
+
+  .cv-edge-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--fg-2);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .cv-flow > .react-flow {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+  }
+
+  /* 拖着文件管理器里的条目经过：画布边缘一圈强调线表示「能放」 */
+  .cv-flow[data-drop] {
+    outline: 2px solid var(--accent-line);
+    outline-offset: -2px;
+  }
+
+  .cv-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+    color: var(--fg-3);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  /* ── 节点：外层只管定位与卡片上方的标注，框在 .cv-box 里 ── */
+  .cv-node {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+  }
+
+  .cv-box {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    border: 2px solid var(--cv-line);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+    transition: border-color var(--dur-fast) var(--ease);
+  }
+
+  .cv-ref .cv-box,
+  .cv-link .cv-box {
+    background: var(--surface-2);
+  }
+
+  .cv-node:hover .cv-box {
+    border-color: var(--icon);
+  }
+
+  .cv-node[data-selected] .cv-box,
+  .cv-node[data-editing] .cv-box {
+    border-color: var(--accent);
+  }
+
+  .cv-node[data-missing] .cv-box {
+    border-style: dashed;
+  }
+
+  /* 卡片上方的灰字：卡片名 / 引用的 主机:路径；正文没保存时右端标「未保存」 */
+  .cv-label {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: calc(100% * var(--cv-z));
+    transform: scale(var(--cv-iz));
+    transform-origin: left bottom;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 20px;
+    padding: 0 4px 4px;
+    color: var(--fg-3);
+    pointer-events: none;
+  }
+
+  .cv-labtext,
+  .cv-labhead {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cv-labname {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .cv-labtail {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .cv-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cv-nbody {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+    color: var(--fg-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* 内容显示不下就直接给滚动条（不用先选中），让人一眼看出显示的不全；滚轮要选中之后才滚（此时滚轮不再缩放画布）。
+     滚动条按右缘一条 8px 画：要自己画（全局的 scrollbar-width / scrollbar-color 会让 ::-webkit-scrollbar 失效，
+     所以放回 auto；这样 macOS 上也不会是用时才显出来的浮条）。它占布局宽度，所以宽度用画布单位、不随缩放变：
+     宽度随缩放变的话，文字的折行会跟着缩放档位变；代价是屏幕上的粗细随缩放变 */
+  .cv-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  .cv-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .cv-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .cv-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--cv-line);
+    background-clip: padding-box;
+  }
+
+  .cv-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--icon);
+    background-clip: padding-box;
+  }
+
+  /* 没选中也没在编辑：滚动条只是提示「显示的不全」，不能交互。容器自己不接鼠标（落到下面的卡片上：拖的是卡片、
+     中键拖的是画布，滚动条与中键自动滚动都碰不到）；里面本来就要点的东西照旧接——链接、视频的播放按钮与播放中的
+     <video>、<audio> 的播放条 */
+  .cv-node:not([data-selected], [data-editing]) .cv-scroll {
+    pointer-events: none;
+  }
+
+  .cv-node:not([data-selected], [data-editing])
+    .cv-scroll
+    :is(a, button, video, audio) {
+    pointer-events: auto;
+  }
+
+  /* 选中后卡片里的内容可以滚（此时滚轮不再缩放画布）；别的节点（链接、别处建的文字节点）没有常显的滚动条，选中才有 */
+  .cv-node[data-selected] .cv-nbody {
+    overflow-y: auto;
+  }
+
+  .cv-nbody.cv-imgbody {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .cv-nbody[data-cut]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 28px;
+    background: linear-gradient(to top, var(--surface), transparent);
+    pointer-events: none;
+  }
+
+  .cv-nbody.cv-muted,
+  .cv-muted {
+    color: var(--fg-3);
+  }
+
+  .cv-plain {
+    white-space: pre-wrap;
+  }
+
+  /* 卡片里的 markdown：外观与预览一样（md-prose t-doc，见 features/markdown/prose.css），没有预览标签里的版心；
+     .cv-md 只留作选择器钩子 */
+
+  /* 原地编辑：编辑器撑满卡片，字体字号与渲染态一致 */
+  .cv-node[data-editing] .cv-nbody {
+    padding: 8px 12px;
+    overflow: hidden;
+  }
+
+  .cv-node[data-editing] .ws-pv-edit {
+    height: 100%;
+  }
+
+  .cv-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--surface-3);
+  }
+
+  .cv-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--surface-3);
+  }
+
+  /* 播放中的视频上沿的拖动条：悬停或选中才显出来，抓住它挪动卡片 */
+  .cv-vgrip {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    background: var(--surface-3);
+    cursor: grab;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .cv-vgrip::before {
+    content: "";
+    width: 24px;
+    border-top: 2px solid var(--fg-3);
+    border-radius: 999px;
+  }
+
+  .cv-node:hover .cv-vgrip,
+  .cv-node[data-selected] .cv-vgrip {
+    opacity: 1;
+  }
+
+  /* 网页链接卡片：封面在上，标题 / 摘要 / 站点在下；高度不够时摘要先被裁掉 */
+  .cv-linkcover {
+    display: block;
+    flex: 0 1 45%;
+    width: 100%;
+    min-height: 0;
+    object-fit: cover;
+    background: var(--surface-3);
+  }
+
+  .cv-linkbody {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cv-linktitle {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--fg);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .cv-linkdesc {
+    display: -webkit-box;
+    min-height: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .cv-linkfoot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-top: auto;
+    color: var(--fg-3);
+  }
+
+  .cv-linkicon {
+    flex: none;
+    width: 16px;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .cv-audio {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cv-pad {
+    padding: 8px 12px;
+  }
+
+  .cv-filebody {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+    color: var(--fg-2);
+  }
+
+  .cv-group {
+    border: 2px dashed var(--cv-line);
+    border-radius: 8px;
+    background: var(--surface-3);
+  }
+
+  .cv-glabel {
+    width: calc(100% * var(--cv-z));
+    padding: 6px 12px;
+    overflow: hidden;
+    color: var(--fg-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transform: scale(var(--cv-iz));
+    transform-origin: left top;
+  }
+
+  .cv-group[data-selected] {
+    border-color: var(--accent);
+  }
+
+  /* ── 连接点：点本体只有 2px、贴在卡片边框内侧（尺寸与位置在文件末尾，要压过库的样式），
+     连线的锚点取点的外沿，线就正好接在卡片边上。
+     感应区是它的伪元素 ::before（32px），悬停或拖线靠近时画出同样大的圈；
+     小圆点 ::after 悬停或选中才露出来，悬停到点上放大。层级盖过卡片本体 ── */
+  .cv-node .cv-handle {
+    --xy-handle-background-color: transparent;
+    z-index: 10;
+    border: 0;
+    background: transparent;
+    cursor: crosshair;
+  }
+
+  .cv-node .cv-handle::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(32px * var(--cv-iz));
+    aspect-ratio: 1;
+    border: calc(1px * var(--cv-iz)) solid transparent;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    transition:
+      border-color var(--dur-fast) var(--ease),
+      background-color var(--dur-fast) var(--ease);
+  }
+
+  .cv-node .cv-handle:hover::before,
+  .cv-node .cv-handle.connectingto::before {
+    border-color: var(--accent-line);
+    background: var(--accent-bg);
+  }
+
+  .cv-node .cv-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(12px * var(--cv-iz));
+    aspect-ratio: 1;
+    border: calc(2px * var(--cv-iz)) solid var(--accent);
+    border-radius: 999px;
+    background: var(--surface);
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transition:
+      opacity var(--dur-fast) var(--ease),
+      width var(--dur-fast) var(--ease);
+    pointer-events: none;
+  }
+
+  .cv-node:hover .cv-handle::after,
+  .cv-node[data-selected] .cv-handle::after {
+    opacity: 1;
+  }
+
+  .cv-node .cv-handle:hover::after {
+    width: calc(16px * var(--cv-iz));
+  }
+
+  /* 框选的框与选中多张卡片之后的外框：用选中态的淡蓝（xyflow 的基础样式里它们没有颜色） */
+  .cv .react-flow__selection,
+  .cv .react-flow__nodesselection-rect {
+    border: 1px solid var(--accent-line);
+    border-radius: 6px;
+    background: var(--accent-bg);
+  }
+
+  .cv .react-flow__nodesselection-rect {
+    background: transparent;
+  }
+
+  /* 拖线经过：松手会连到这张卡片（落在卡片范围内即可，不必对准连接点） */
+  .cv-target .cv-node .cv-box {
+    border-color: var(--accent);
+  }
+}
+
+/* 不放进 @layer（同下）：连接点本体 2px，贴在卡片边框内侧，让线的锚点正好在卡片的边上 */
+.cv-node .cv-handle {
+  width: 2px;
+  height: auto;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cv-node .cv-handle.react-flow__handle-top,
+.cv-node .cv-handle.react-flow__handle-bottom {
+  transform: translate(-50%, 0);
+}
+
+.cv-node .cv-handle.react-flow__handle-left,
+.cv-node .cv-handle.react-flow__handle-right {
+  transform: translate(0, -50%);
+}
+
+/* 不放进 @layer（同上，库的缩放控件样式也不分层）：缩放的感应区与连接点的感应圈一样大，都是 32px。
+   角点：32px 的感应区，里面画 12px 的小圆点，悬停时画出同样大的圈（看得见的就是点得到的）；
+   四条边：32px 宽的感应带，中心线在卡片的边上，平时不画，悬停时中间一道强调线。
+   层级：边在卡片本体之上（10），角点在边之上（20）；中点处的连接点（10，在后）盖过边。 */
+.cv .cv-node .react-flow__resize-control.line {
+  z-index: 10;
+  border-width: 0;
+  background: transparent;
+}
+
+.cv-node .react-flow__resize-control.line.left,
+.cv-node .react-flow__resize-control.line.right {
+  width: calc(32px * var(--cv-iz));
+}
+
+.cv-node .react-flow__resize-control.line.top,
+.cv-node .react-flow__resize-control.line.bottom {
+  height: calc(32px * var(--cv-iz));
+}
+
+.cv-node .react-flow__resize-control.line::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+/* 内容溢出（NodeBody 打的 data-scroll）的节点：右边的缩放感应带原来骑在边上（32px，里侧 16px 压着滚动条），
+   选中后就拖不动滚动条。让带只留「边外 16px + 边里 2px」共 18px：库给它的 transform 是 translate(-50%, 0)，
+   宽度改 18 之后中心在边上，里侧就是 9px，所以再右移 7px（实测：左缘在边里 2px、右缘在边外 16px）；
+   悬停时画的强调线是带中间那道，它跟着带右移，补回 7px 让它仍落在边上 */
+.cv-node[data-scroll] .react-flow__resize-control.line.right {
+  width: calc(18px * var(--cv-iz));
+  translate: calc(7px * var(--cv-iz)) 0;
+}
+
+.cv-node[data-scroll] .react-flow__resize-control.line.right::after {
+  left: calc(50% - 7px * var(--cv-iz));
+}
+
+.cv-node .react-flow__resize-control.line.left::after,
+.cv-node .react-flow__resize-control.line.right::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(4px * var(--cv-iz));
+  transform: translateX(-50%);
+}
+
+.cv-node .react-flow__resize-control.line.top::after,
+.cv-node .react-flow__resize-control.line.bottom::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: calc(4px * var(--cv-iz)) solid transparent;
+  transform: translateY(-50%);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.cv-node .react-flow__resize-control.line.left:hover::after,
+.cv-node .react-flow__resize-control.line.right:hover::after {
+  background: var(--accent-line);
+}
+
+.cv-node .react-flow__resize-control.line.top:hover::after,
+.cv-node .react-flow__resize-control.line.bottom:hover::after {
+  border-top-color: var(--accent-line);
+}
+
+.cv-node .react-flow__resize-control.handle {
+  z-index: 20;
+  width: calc(32px * var(--cv-iz));
+  aspect-ratio: 1;
+  height: auto;
+  border: calc(1px * var(--cv-iz)) solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.cv-node .react-flow__resize-control.handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(12px * var(--cv-iz));
+  aspect-ratio: 1;
+  border: calc(2px * var(--cv-iz)) solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.cv-node .react-flow__resize-control.handle:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-bg);
+}
+
+/* 不放进 @layer：拖线时的预览线宽不随缩放变细（已有的连线见 CanvasEdge）。要压过库自带的 base.css（不分层）只能这样 */
+.cv .react-flow__connection-path {
+  vector-effect: non-scaling-stroke;
+}

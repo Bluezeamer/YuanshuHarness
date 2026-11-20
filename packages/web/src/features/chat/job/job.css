@@ -1,0 +1,113 @@
+/* 后台任务标签：一行头 + 命令 + 输出。类名一律 ch-jv- 前缀；
+   颜色、圆角、字号、动效只引用 ui/tokens.css；窄窗格按窗格宽度（@container pane）收。 */
+@layer components {
+  .ch-jv {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .ch-jv[data-phase="loading"],
+  .ch-jv[data-phase="missing"],
+  .ch-jv[data-phase="error"] {
+    padding: 16px;
+  }
+
+  /* ── 头：一行 ── */
+  .ch-jv-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ch-jv-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ch-jv-head [data-jv="state"][data-tone="failed"] {
+    color: var(--danger);
+  }
+
+  .ch-jv-meta {
+    flex: none;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  /* ── 分段：小标题 + 内容 ── */
+  .ch-jv-sec {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    min-width: 0;
+    padding: 12px 12px 0;
+  }
+
+  .ch-jv-sec-h {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-bottom: 6px;
+    color: var(--fg-3);
+  }
+
+  /* 命令：最多露这么高，更长的自己滚；原样换行显示，不横向滚 */
+  .ch-jv-code {
+    margin: 0;
+    max-height: 30vh;
+    min-height: 0;
+    padding: 8px 12px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    background: var(--surface-2);
+    color: var(--fg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* 输出：占满剩下的高度，自己滚 */
+  .ch-jv-out {
+    flex: 1 1 0;
+    min-height: 0;
+    padding-bottom: 12px;
+  }
+
+  .ch-jv-log-wrap {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .ch-jv-log {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    background: var(--surface-2);
+  }
+
+  .ch-jv-pre {
+    margin: 0;
+    padding: 8px 12px;
+    color: var(--fg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ch-jv-none {
+    margin: 0;
+    padding: 8px 12px;
+    color: var(--fg-3);
+  }
+}

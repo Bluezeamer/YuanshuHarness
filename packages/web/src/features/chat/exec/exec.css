@@ -1,0 +1,88 @@
+/* 执行体标签里的执行体对话面。类名一律 ch-ex- 前缀（借用 ui 的 u- 件）。
+   颜色、圆角、字号、动效只引用 ui/tokens.css；窄窗格按窗格宽度（@container pane）收。 */
+@layer components {
+  .ch-ex {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .ch-ex-state {
+    margin: 0;
+    padding: 16px;
+    color: var(--fg-3);
+  }
+
+  /* ── 头：一行 ── */
+  .ch-ex-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ch-ex-head .u-hc {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .ch-ex-nm {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-ex-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ch-ex-st {
+    flex: none;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .ch-ex-st[data-tone="run"] {
+    color: var(--ok-text);
+  }
+
+  .ch-ex-st[data-tone="failed"] {
+    color: var(--danger);
+  }
+
+  .ch-ex-ctx {
+    flex: none;
+    width: 96px;
+  }
+
+  @container pane (max-width: 400px) {
+    .ch-ex-ctx {
+      display: none;
+    }
+  }
+
+  /* ── 底部 ── */
+  .ch-ex-stopped {
+    flex: none;
+    margin: 0;
+    padding: 0 16px 8px;
+    color: var(--fg-3);
+  }
+
+  /* 输入栏：输入卡本体是 RichInput（input/input.css） */
+  .ch-ex-composer {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 12px 12px;
+  }
+}

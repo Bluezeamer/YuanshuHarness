@@ -1,0 +1,880 @@
+/* 组件对照页（/gallery）：用 ui/ 的组件按样张重搭创建弹窗、设置页、工作台。
+   只写布局，颜色取令牌，间距与高度取刻度；字样一律选 t-* 类。 */
+@layer components {
+  .gl {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--surface);
+  }
+
+  .gl-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: none;
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--side);
+  }
+
+  .gl-main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ---------- 创建弹窗 ---------- */
+  .gl-blank {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    background: var(--side);
+  }
+
+  .gl-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .gl-sep {
+    margin: 12px 0 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .gl-foot-hint {
+    margin-right: auto;
+  }
+
+  /* ---------- 设置页 ---------- */
+  .gl-settings {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+    height: 100%;
+  }
+
+  .gl-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 8px;
+    border-right: 1px solid var(--line);
+    background: var(--side);
+  }
+
+  .gl-nav-h {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    margin-bottom: 8px;
+    color: var(--fg-2);
+  }
+
+  .gl-scroll {
+    overflow: auto;
+  }
+
+  .gl-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px;
+  }
+
+  .gl-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+
+  .gl-bar2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 16px 0;
+  }
+
+  .gl-search {
+    width: 240px;
+  }
+
+  .gl-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .gl-grp {
+    margin-top: 32px;
+  }
+
+  .gl-grp:first-of-type {
+    margin-top: 8px;
+  }
+
+  .gl-ctl {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .gl-ctl > .u-select {
+    flex: 1;
+  }
+
+  .gl-ctl-slider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* ---------- 工作台 ---------- */
+  .gl-wb {
+    display: grid;
+    grid-template-columns: 252px 1fr;
+    height: 100%;
+  }
+
+  .gl-rail {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--line);
+    background: var(--side);
+  }
+
+  .gl-rail-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: none;
+    height: 44px;
+    padding: 0 8px 0 16px;
+  }
+
+  .gl-rail-list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 4px 8px 8px;
+  }
+
+  .gl-rail-f {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: none;
+    height: 44px;
+    padding: 0 8px 0 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .gl-agg {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-agg > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .gl-subs {
+    padding-left: 16px;
+  }
+
+  .gl-path {
+    padding: 0 8px 4px 32px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-stat {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 8px;
+  }
+
+  .gl-derived {
+    margin-left: 16px;
+  }
+
+  .gl-new {
+    color: var(--fg-3);
+  }
+
+  .gl-stage {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .gl-panes {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1.3fr) minmax(340px, 1fr);
+  }
+
+  .gl-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .gl-pane + .gl-pane {
+    border-left: 1px solid var(--line);
+  }
+
+  .gl-crumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .gl-crumb-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-files {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+  }
+
+  .gl-nochev {
+    width: 12px;
+  }
+
+  .gl-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-git {
+    width: 12px;
+    text-align: center;
+  }
+
+  .gl-git[data-git="M"] {
+    color: var(--warn-text);
+  }
+
+  .gl-git[data-git="U"] {
+    color: var(--ok-text);
+  }
+
+  .gl-time {
+    width: 52px;
+    text-align: right;
+  }
+
+  .gl-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: none;
+    height: 28px;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .gl-it {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-sepv {
+    height: 20px;
+    border-left: 1px solid var(--line-strong);
+  }
+
+  .gl-thread {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 24px 16px;
+  }
+
+  .gl-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .gl-user {
+    align-self: flex-end;
+    max-width: 85%;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: var(--side);
+  }
+
+  /* 工具调用组：一圈细线，行与行之间只有分隔线 */
+  .gl-steps {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .gl-steps > * + * {
+    border-top: 1px solid var(--line);
+  }
+
+  .gl-steps .u-lrow {
+    border-radius: 0;
+  }
+
+  .gl-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 8px;
+  }
+
+  .gl-step-arg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-out {
+    margin: 0;
+    padding: 8px 12px;
+    background: var(--side);
+    overflow: auto;
+  }
+
+  .gl-bad {
+    color: var(--danger);
+  }
+
+  .gl-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-live > .u-progress {
+    flex: 1;
+    max-width: 120px;
+  }
+
+  .gl-dock {
+    flex: none;
+    padding: 0 16px 16px;
+  }
+
+  .gl-comp {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .gl-comp-in {
+    border: 0;
+    resize: none;
+  }
+
+  .gl-comp-in:focus {
+    box-shadow: none;
+  }
+
+  .gl-comp-b {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-sp {
+    flex: 1;
+  }
+
+  /* ---------- 提示词与能力（B3）---------- */
+  .gl-studio {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .gl-subbar {
+    display: flex;
+    align-items: center;
+    flex: none;
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .gl-studio-main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .gl-page-wide {
+    max-width: 1360px;
+    padding-inline: 32px;
+  }
+
+  .gl-ed {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+  }
+
+  .gl-ed-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .gl-tog {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-sec-h {
+    padding: 12px 8px 4px;
+    color: var(--fg-3);
+  }
+
+  .gl-seg-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .gl-grip {
+    color: var(--fg-3);
+    cursor: grab;
+  }
+
+  .gl-cand-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 8px;
+  }
+
+  .gl-prev {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .gl-prev-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .gl-prev-sub {
+    margin-top: 12px;
+  }
+
+  .gl-pre {
+    max-height: 72vh;
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--side);
+    white-space: pre-wrap;
+  }
+
+  .gl-disk {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .gl-disk-t {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-disk-t > .t-aux {
+    margin-left: auto;
+  }
+
+  .gl-inline-act {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 12px;
+  }
+
+  .gl-md {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 24px;
+    margin-top: 16px;
+    align-items: start;
+  }
+
+  .gl-md-list,
+  .gl-md-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .gl-pickhost {
+    width: 360px;
+  }
+
+  .gl-pick {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .gl-pick-list,
+  .gl-pick-prev,
+  .gl-pick-disk {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gl-sum {
+    margin-top: 16px;
+  }
+
+  .gl-sum-open {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 4px 0 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--side);
+  }
+
+  /* ---------- 提示词树与右栏 ---------- */
+  .gl-tabp {
+    padding-top: 16px;
+  }
+
+  /* 左：段列表；中：这一段的卡片（信息量小，窄）；右：预览（占剩下的全部宽度） */
+  .gl-pw {
+    display: grid;
+    grid-template-columns: 184px 360px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .gl-pw[data-flat] {
+    grid-template-columns: 360px minmax(0, 1fr);
+  }
+
+  .gl-chain {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .gl-seg {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .gl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: 8px;
+  }
+
+  .gl-tr {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .gl-cap-d {
+    margin-left: 12px;
+  }
+
+  .gl-list[data-drop],
+  .gl-gbox[data-drop],
+  .u-lrow[data-drop] {
+    background: var(--accent-bg);
+  }
+
+  .gl-kids-f {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0 0;
+  }
+
+  .gl-empty {
+    padding: 8px 12px;
+  }
+
+  .gl-ed .u-lrow[data-skip] {
+    opacity: 0.5;
+  }
+
+  /* 分组：一个带头的容器，条件写在头上，卡片拖进来就归它 */
+  .gl-gbox {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+  }
+
+  .gl-gh-t {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 4px;
+  }
+
+  /* 分组里的一张：第一行「如果 [条件]」，第二行「则用 卡片」 */
+  .gl-case {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+  }
+
+  .gl-case-c,
+  .gl-case-u {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-case-k {
+    flex: none;
+    width: 56px;
+  }
+
+  .gl-case-r {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .gl-cond {
+    max-width: 240px;
+    justify-content: space-between;
+  }
+
+  .gl-cond[data-empty] {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .gl-cond-t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-condpop {
+    padding: 12px;
+  }
+
+  .gl-ce {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .gl-ce-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow: auto;
+  }
+
+  .gl-ce-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 24px;
+    margin-top: 4px;
+  }
+
+  .gl-d[data-t="add"] {
+    color: var(--ok-text);
+  }
+
+  .gl-d[data-t="del"] {
+    color: var(--danger);
+  }
+
+  .gl-md-act {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .gl-help {
+    margin-left: 8px;
+  }
+
+  .gl-cp {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .gl-cp-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gl-cp-act {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .gl-prev-tabs {
+    margin: 0 -4px;
+  }
+
+  /* 添加卡片的弹出页：卡片带内容预览，两列平铺 */
+  .gl-add {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .gl-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    max-height: 420px;
+    overflow: auto;
+  }
+
+  .gl-tile[data-selected] {
+    border-color: var(--accent);
+  }
+
+  .gl-tile[data-used] {
+    opacity: 0.55;
+  }
+
+  .gl-clamp {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: pre-wrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  /* 能力页 */
+  .gl-caps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 760px;
+  }
+
+  .gl-caps-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .gl-caps-body[data-off] {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .gl-caps-grp {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .gl-caps-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .gl-ck {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    color: var(--surface);
+  }
+
+  .gl-ck[data-on] {
+    border-color: var(--ink);
+    background: var(--ink);
+  }
+
+  /* 页框架对照页（列表页） */
+  .gl-note {
+    margin-bottom: 16px;
+  }
+
+  .gl-cardgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+}

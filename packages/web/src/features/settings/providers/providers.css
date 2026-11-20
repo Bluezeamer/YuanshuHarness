@@ -1,0 +1,379 @@
+/* 供应商与模型：详情里的几处版式与各个弹窗；颜色取令牌，间距 / 高度 / 圆角取刻度，字样一律在 TSX 里选 t-* 类。
+   外壳、左列表、详情头、保存条、区块小标题在 ../frame/frame.css。 */
+@layer components {
+  .pv-grow {
+    flex: 1;
+  }
+
+  /* 添加供应商弹窗里的字母块 */
+  .pv-tile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--fg-2);
+  }
+
+  .pv-tile[data-size="lg"] {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .pv-result {
+    margin-top: 12px;
+  }
+
+  .pv-note {
+    margin: 4px 0 8px;
+  }
+
+  .pv-ctl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pv-ctl > .u-inp {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pv-ctl-end {
+    justify-content: flex-end;
+  }
+
+  .pv-acct {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ---------- 模型 ---------- */
+  .pv-models {
+    margin-top: 4px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .pv-model {
+    border-top: 1px solid var(--line);
+  }
+
+  .pv-model:first-child {
+    border-top: 0;
+  }
+
+  .pv-model-search {
+    width: 200px;
+  }
+
+  .pv-model-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pv-model-none {
+    padding: 12px 16px;
+  }
+
+  .pv-more {
+    justify-content: center;
+    width: 100%;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .pv-add {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pv-add-h {
+    padding: 8px 8px 0;
+  }
+
+  .pv-add-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: auto;
+  }
+
+  .pv-add-list [aria-disabled] {
+    opacity: 0.5;
+  }
+
+  .pv-add-none {
+    padding: 16px 8px;
+    text-align: center;
+  }
+
+  .pv-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pv-form-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .pv-form-sw {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pv-form-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 36px;
+  }
+
+  /* ---------- 模型编辑：思考档位 ---------- */
+  .pv-levels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .pv-map {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .pv-map-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .pv-map-row {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ---------- 从端点获取 ---------- */
+  .pv-fetch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pv-fetch-retry {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
+  .pv-fetch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pv-fetch-list {
+    min-width: 0;
+    max-height: 288px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .pv-fetch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .pv-fetch-row:first-child {
+    border-top: 0;
+  }
+
+  .pv-fetch-id {
+    color: var(--fg-3);
+  }
+
+  /* ---------- 订阅登录 ---------- */
+  .pv-login {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pv-step {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pv-url {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 4px 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+
+  .pv-url-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pv-device {
+    display: grid;
+    place-items: center;
+    height: 44px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    letter-spacing: 0.24em;
+    user-select: all;
+  }
+
+  .pv-wait {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 24px 0;
+  }
+
+  .pv-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ---------- 凭据解析顺序 ---------- */
+  .pv-chain-wrap {
+    margin-top: 12px;
+  }
+
+  .pv-chain-sum {
+    margin: 0 0 8px;
+  }
+
+  .pv-chain {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    list-style: none;
+    overflow: hidden;
+  }
+
+  .pv-chain-step {
+    display: grid;
+    grid-template-columns: 24px minmax(120px, auto) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .pv-chain-step + .pv-chain-step {
+    border-top: 1px solid var(--line);
+  }
+
+  .pv-chain-step[data-effective] {
+    background: var(--hover);
+  }
+
+  .pv-chain-d {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- models.json 预览 ---------- */
+  .st-json-path {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .st-diff {
+    margin: 8px 0 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    list-style: none;
+    overflow: hidden;
+  }
+
+  .st-diff-row {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 4px 8px;
+    padding: 8px 12px;
+  }
+
+  .st-diff-row + .st-diff-row {
+    border-top: 1px solid var(--line);
+  }
+
+  .st-diff-row[data-op="add"] .st-diff-sign {
+    color: var(--ok-text);
+  }
+
+  .st-diff-row[data-op="remove"] .st-diff-sign {
+    color: var(--danger);
+  }
+
+  .st-diff-row[data-op="replace"] .st-diff-sign {
+    color: var(--warn-text);
+  }
+
+  .st-diff-val {
+    grid-column: 2;
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-json-live {
+    max-height: 420px;
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+    overflow: auto;
+  }
+}

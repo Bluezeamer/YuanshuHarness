@@ -1,0 +1,54 @@
+- paragraph [ref=e233]:
+  - text: Data are mid-year estimates from the United Nations and are for 2022 and 2023.
+  - superscript [ref=e234]:
+    - link "[2]" [ref=e235] [cursor=pointer]:
+      - /url: "#cite_note-UN-2"
+- table "List of countries and inhabited territories by total population. United Nations" [ref=e236]:
+  - caption [ref=e237]: List of countries and inhabited territories by total population. United Nations
+  - rowgroup [ref=e238]:
+    - row [ref=e239]:
+      - columnheader "Country or territory" [ref=e240] [cursor=pointer]
+      - columnheader "Population ( 1 July 2022 )" [ref=e241] [cursor=pointer]: Population( 1 July 2022 )
+      - columnheader "Population ( 1 July 2023 )" [ref=e242] [cursor=pointer]: Population( 1 July 2023 )
+      - columnheader "Change (%)" [ref=e243] [cursor=pointer]: Change(%)
+      - columnheader "UN continental region[1]" [ref=e244] [cursor=pointer]:
+        - link "UN continental region" [ref=e245]:
+          - /url: https://en.wikipedia.org/wiki/United_Nations_geoscheme
+          - text: UN continentalregion
+        - superscript [ref=e246]:
+          - link "[1]" [ref=e247]:
+            - /url: "#cite_note-UNregions-1"
+      - columnheader "UN statistical subregion[1]" [ref=e248] [cursor=pointer]:
+        - link "UN statistical subregion" [ref=e249]:
+          - /url: https://en.wikipedia.org/wiki/List_of_countries_and_territories_by_the_United_Nations_geoscheme
+          - text: UN statisticalsubregion
+        - superscript [ref=e250]:
+          - link "[1]" [ref=e251]:
+            - /url: "#cite_note-UNregions-1"
+  - rowgroup [ref=e252]:
+    - row [ref=e253]:
+      - cell [ref=e254]:
+        - link "World" [ref=e257] [cursor=pointer]:
+          - /url: https://en.wikipedia.org/wiki/World_population
+      - cell "8,021,407,192" [ref=e258]
+      - cell "8,091,734,930" [ref=e259]
+      - cell "+0.88%" [ref=e260]
+      - cell "–" [ref=e261]
+      - cell "–" [ref=e262]
+    - row [ref=e263]:
+      - cell [ref=e264]:
+        - link "India" [ref=e269] [cursor=pointer]:
+          - /url: https://en.wikipedia.org/wiki/India
+      - cell "1,425,423,212" [ref=e270]
+      - cell "1,438,069,596" [ref=e271]
+      - cell "+0.89%" [ref=e272]
+      - cell [ref=e273]:
+        - link "Asia" [ref=e274] [cursor=pointer]:
+          - /url: https://en.wikipedia.org/wiki/Asia
+      - cell [ref=e275]:
+        - link "Southern Asia" [ref=e276] [cursor=pointer]:
+          - /url: https://en.wikipedia.org/wiki/South_Asia
+    - row [ref=e277]:
+      - cell [ref=e278]:
+        - link "China" [ref=e283] [cursor=pointer]:
+          - /url: https://en.wikipedia.org/wiki/China

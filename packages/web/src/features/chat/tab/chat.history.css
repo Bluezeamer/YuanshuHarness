@@ -1,0 +1,113 @@
+/* B20 历史节点浮层：指令列表 + 树状视图。
+   浮层本体用 ui/Modal，行是标准 ListRow；这里只管列表的布局、树的折叠列与连接线。 */
+@layer components {
+  .ch-hist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 40vh;
+  }
+
+  .ch-hist-note {
+    padding: 12px 0;
+    color: var(--fg-3);
+  }
+
+  .ch-hist-err > div {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* ── 指令列表：序号 / 首行预览 / 时间、当前标记 ── */
+  .ch-hist-list,
+  .ch-hist-tree {
+    max-height: min(54vh, 520px);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .ch-hist-no {
+    flex: none;
+    min-width: 32px;
+  }
+
+  .ch-hist-time {
+    flex: none;
+  }
+
+  .ch-hist-prev {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 行尾的「当前」「N 个节点」徽标与时间隔开 */
+  .ch-hist-mark {
+    margin-left: 8px;
+  }
+
+  .ch-hist-time + .ch-hist-mark {
+    margin-left: 12px;
+  }
+
+  /* ── 树状视图：折叠列 + 连接线前缀 + 类型徽标 ── */
+  .ch-hist-trow {
+    display: flex;
+    align-items: center;
+  }
+
+  .ch-hist-fold {
+    display: flex;
+    flex: 0 0 24px;
+    justify-content: center;
+  }
+
+  .ch-hist-node {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ch-hist-prefix {
+    flex: none;
+    color: var(--line-strong);
+    white-space: pre;
+    user-select: none;
+  }
+
+  /* 当前分支（activePath）上的节点：文字取正色、连接线带一点蓝；旧分支退成次要灰；
+     「当前」节点靠行底色（ListRow 的 current）与徽标区分，文字不另着色 */
+  .ch-hist-trow .u-lrow-label {
+    color: var(--fg-3);
+  }
+
+  .ch-hist-trow[data-active] .u-lrow-label {
+    color: var(--fg);
+  }
+
+  .ch-hist-trow[data-active] .ch-hist-prefix {
+    color: color-mix(in oklch, var(--accent) 45%, var(--line-strong));
+  }
+
+  .ch-hist-kind {
+    flex: none;
+    min-width: 32px;
+    justify-content: center;
+  }
+
+  /* ── 页脚提示：主操作在右侧，提示文字靠左 ── */
+  .ch-hist-foot {
+    flex: 1;
+    min-width: 0;
+    margin-right: auto;
+    overflow: hidden;
+    color: var(--fg-3);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}

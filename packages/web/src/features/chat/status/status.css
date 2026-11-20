@@ -1,0 +1,262 @@
+/* 右侧状态：宽时常驻的一栏，窄时竖排标签 + 向左展开的卡片。 */
+@layer components {
+  .ch-status {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 24px;
+    width: 232px;
+    min-height: 0;
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--side);
+  }
+
+  .ch-sec {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ch-sec-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 28px;
+    padding: 0 8px;
+    color: var(--fg-3);
+  }
+
+  .ch-sec > :is(p, .ch-plan, .ch-goal-form, .ch-goal-act, .ch-run) {
+    margin: 0;
+    padding-inline: 8px;
+  }
+
+  .ch-dim {
+    color: var(--fg-3);
+  }
+
+  /* ---------- 目标 ---------- */
+  .ch-goal {
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ch-goal-act {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ch-goal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ch-goal-max {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ch-goal-max .u-inp {
+    width: 96px;
+  }
+
+  /* 出错信息或模型写的阻塞说明：可能很长，限高、可滚 */
+  .ch-goal-detail {
+    max-height: 72px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ch-goal-form .ch-goal-act {
+    justify-content: flex-end;
+    padding-inline: 0;
+  }
+
+  /* ---------- 计划 ---------- */
+  .ch-plan {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    list-style: none;
+  }
+
+  .ch-plan li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 20px;
+  }
+
+  .ch-plan li[data-done] {
+    color: var(--fg-3);
+  }
+
+  .ch-plan-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 16px;
+  }
+
+  /* ---------- 工作流：每次运行一段，阶段两行（名字 / 计数） ---------- */
+  .ch-run {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ch-sec > .ch-run + .ch-run {
+    margin-top: 8px;
+  }
+
+  .ch-run p {
+    margin: 0;
+  }
+
+  .ch-run-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ch-run-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 一行放不下时在两段之间换行，不在词中间断 */
+  .ch-nowrap {
+    white-space: nowrap;
+  }
+
+  .ch-phases {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ch-phases li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ch-phases .ch-plan-mark {
+    height: 20px;
+  }
+
+  .ch-phase-t {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* ---------- 子代理调用树：每个子节点前有一条折线接到父节点 ---------- */
+  .ch-tree,
+  .ch-kids {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ch-kids {
+    padding-left: 16px;
+  }
+
+  .ch-kid {
+    position: relative;
+  }
+
+  .ch-kids > .ch-kid::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -8px;
+    border-left: 1px solid var(--line-strong);
+  }
+
+  .ch-kids > .ch-kid:last-child::before {
+    bottom: auto;
+    height: 14px;
+  }
+
+  .ch-kids > .ch-kid::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: -8px;
+    width: 8px;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  /* 已结束的子代理：整行变淡，名字不再抢眼 */
+  .ch-dimrow .u-lrow-label {
+    color: var(--fg-3);
+  }
+
+  /* ---------- 窄时：竖排标签 + 向左展开的卡片 ---------- */
+  .ch-rail {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 36px;
+    padding-top: 16px;
+  }
+
+  .ch-rail .ch-rail-tab {
+    display: flex;
+    justify-content: center;
+    width: 28px;
+    height: auto;
+    padding: 8px 0;
+  }
+
+  .ch-rail-in {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ch-rail-label {
+    writing-mode: vertical-rl;
+  }
+
+  /* 与标签之间留 8 的空隙，用 padding 连成一块，鼠标移过去不会收 */
+  .ch-rail-pop {
+    position: absolute;
+    top: 12px;
+    right: 100%;
+    z-index: 20;
+    padding-right: 8px;
+  }
+
+  .ch-rail-card {
+    width: 288px;
+    max-height: 70vh;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--sh-pop);
+    overflow-y: auto;
+  }
+}

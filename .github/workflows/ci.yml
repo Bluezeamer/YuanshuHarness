@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 只读：公开仓库上任何人的 PR 都会触发本流水线，不给写权限，也不引用 secret。
+permissions:
+  contents: read
+
+# 逻辑都在 scripts/check.sh 里，本地与 CI 跑同一份；这里只把它的阶段拆成并行的作业。
+# 同一个 PR 再推送时取消还在跑的旧流水线。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 类型、lint、单测、构建、装包冒烟。
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.19.0
+      # 环境准备：装上 package.json 锁定版本的 pnpm。不用 corepack：Node 22.19.0 自带的 0.34.0
+      # 装不了 pnpm 12，Node 25 起也不再自带。
+      - run: npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+      - run: scripts/check.sh core
+
+  # 真机验收：真 Server + 假模型 + 真 Chromium。阶段清单与每段的脚本在 scripts/check.sh 里。
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [ui-settings, ui-chat, ui-workspace, ui-canvas, ui-mobile, browser]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.19.0
+      - run: npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+      - run: pnpm install --frozen-lockfile
+      # Chromium 本体与系统库；脚本经 scripts/lib/playwright.mjs 用服务端依赖的 playwright-core 驱动它。
+      - run: pnpm --filter yuanshu-harness-server exec playwright-core install --with-deps chromium
+      - run: scripts/check.sh ${{ matrix.stage }}
+
+  # 镜像冒烟：构建 Docker 镜像并真的跑起来。
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.19.0
+      - run: npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+      - run: scripts/check.sh image
+
+  # 作业名固定为 check：主干保护的必需检查按此名配置，只需要这一个。
+  # 上面任何一个作业失败、被取消或被跳过，它都失败。
+  check:
+    if: always()
+    needs: [core, verify, image]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.core.result }}" = success ] \
+            && [ "${{ needs.verify.result }}" = success ] \
+            && [ "${{ needs.image.result }}" = success ]

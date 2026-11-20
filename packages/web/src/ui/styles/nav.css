@@ -1,0 +1,256 @@
+/* 页签、表格、分隔条。 */
+@layer components {
+  /* 页签：40 高，间距 24，选中是一条滑动的墨色下划线；选中不改字重 */
+  .u-tabs {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    height: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .u-tablist {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 24px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .u-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    color: var(--fg-2);
+    white-space: nowrap;
+    transition: color var(--dur-fast) var(--ease);
+  }
+
+  .u-tab:hover,
+  .u-tab[aria-selected="true"] {
+    color: var(--fg);
+  }
+
+  .u-tab-ink {
+    position: absolute;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ink);
+    transition:
+      left 220ms var(--ease),
+      width 220ms var(--ease);
+  }
+
+  .u-tabs-r {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding-left: 16px;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 900px) {
+    .u-tablist {
+      gap: 16px;
+    }
+
+    .u-tab-n,
+    .u-tabs-r {
+      display: none;
+    }
+  }
+
+  /* 窗格头标签条：36 高，选中标签顶上一道墨色线、底色与内容面相同；标题区宽度固定 */
+  .u-strip {
+    display: flex;
+    align-items: stretch;
+    flex: none;
+    height: 36px;
+    padding-right: 8px;
+    border-bottom: 1px solid var(--line);
+    background: var(--side);
+  }
+
+  .u-strip-list {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .u-strip-tab {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px 0 12px;
+    border-right: 1px solid var(--line);
+    color: var(--fg-2);
+    transition:
+      background var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  .u-strip-tab:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  .u-strip-tab[data-on] {
+    background: var(--surface);
+    color: var(--fg);
+  }
+
+  .u-strip-tab[data-on]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    border-top: 2px solid var(--ink);
+  }
+
+  .u-strip-tab:is(:hover, :focus-within, [data-on]) .u-reveal {
+    opacity: 1;
+  }
+
+  .u-strip-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 100%;
+    text-align: left;
+  }
+
+  .u-strip-main:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .u-strip-main svg {
+    flex: none;
+    color: var(--icon);
+  }
+
+  /* 固定的标题宽度：布局级数字，只在这里写一次 */
+  .u-strip-title {
+    width: 84px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .u-strip-tab[data-temp] .u-strip-title {
+    font-style: italic;
+  }
+
+  .u-strip-add {
+    align-self: center;
+    margin-left: 4px;
+  }
+
+  /* 表格：列宽用百分比 + fixed 布局，任何宽度下都贴合容器，不出现横向滚动 */
+  .u-tblwrap {
+    overflow-x: auto;
+  }
+
+  .u-tbl {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .u-th {
+    padding: 0 12px 8px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .u-td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  .u-th[data-align="end"],
+  .u-td[data-align="end"] {
+    text-align: right;
+  }
+
+  .u-td[data-mono="true"] {
+    color: var(--fg-3);
+  }
+
+  .u-td[data-truncate="true"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .u-tbl tbody tr:not(.u-tr-detail):hover {
+    background: var(--hover);
+  }
+
+  .u-tr-detail > td {
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--side);
+    text-align: left;
+  }
+
+  /* 分隔条：7px 热区，中线只在悬停、聚焦或拖动时显色 */
+  .u-split {
+    position: relative;
+    flex: 0 0 auto;
+    touch-action: none;
+    outline: none;
+  }
+
+  .u-split[data-orientation="vertical"] {
+    width: 8px;
+    cursor: col-resize;
+  }
+
+  .u-split[data-orientation="horizontal"] {
+    height: 8px;
+    cursor: row-resize;
+  }
+
+  .u-split::after {
+    content: "";
+    position: absolute;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .u-split[data-orientation="vertical"]::after {
+    top: 0;
+    bottom: 0;
+    left: 2px;
+    width: 4px;
+  }
+
+  .u-split[data-orientation="horizontal"]::after {
+    left: 0;
+    right: 0;
+    top: 2px;
+    height: 4px;
+  }
+
+  .u-split:hover::after,
+  .u-split:focus-visible::after,
+  .u-split[data-dragging="true"]::after {
+    opacity: 0.5;
+  }
+}

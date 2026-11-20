@@ -1,0 +1,14 @@
+/* 组件样式汇总。使用方先 import "./tokens.css"（含 Tailwind），再 import 本文件。 */
+@import "./type.css";
+@import "./styles/motion.css";
+@import "./styles/controls.css";
+@import "./styles/chips.css";
+@import "./styles/toggles.css";
+@import "./styles/fields.css";
+@import "./styles/select.css";
+@import "./styles/surfaces.css";
+@import "./styles/tree.css";
+@import "./styles/overlay.css";
+@import "./styles/image-viewer.css";
+@import "./styles/nav.css";
+@import "./styles/tiling.css";

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!-- 软键盘弹出时缩小布局视口（Chrome 108+），输入框留在文档流里不被遮住 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <title>元枢</title>
+    <link rel="manifest" href="/m/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- 给 iOS 留的：添加到主屏幕用的图标与名字 -->
+    <link rel="apple-touch-icon" href="/m/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="元枢" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/mobile/main.tsx"></script>
+  </body>
+</html>

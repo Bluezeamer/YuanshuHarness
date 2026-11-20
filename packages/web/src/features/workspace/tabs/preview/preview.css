@@ -1,0 +1,663 @@
+/* 文件预览标签：只用 ui/tokens.css 的令牌；主机色 --tone 由窗格传入。 */
+.ws-pv {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+@layer components {
+  /* 工具条（一行）：左 = 「预览 / 编辑」切换（有渲染态才有）+ 文件信息，右 = 复制路径 / 下载 / 保存区。
+     切换与保存区由 TextView、CodeEditor portal 进 lead / tail 两个槽位。 */
+  .ws-pv-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 8px 0 12px;
+    min-width: 0;
+  }
+
+  .ws-pv-lead,
+  .ws-pv-tail {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ws-pv-lead:empty,
+  .ws-pv-tail:empty {
+    display: none;
+  }
+
+  .ws-pv-meta {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: 4px;
+    overflow: hidden;
+    color: var(--fg-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ws-pv-gap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ws-pv-dirty {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+    color: var(--warn-text);
+  }
+
+  .ws-pv-note-bar {
+    flex: none;
+    margin: 0 12px 8px;
+  }
+
+  @container pane (max-width: 400px) {
+    .ws-pv-meta {
+      display: none;
+    }
+  }
+}
+.ws-pv-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ws-pv-note {
+  padding: 12px 12px;
+  color: var(--meta);
+}
+.ws-pv-note-bad {
+  padding: 12px 12px;
+}
+
+/* 代码：行号用伪元素画，复制时不带行号 */
+.ws-pv-code {
+  margin: 0;
+  padding: 6px 0 24px;
+  list-style: none;
+  min-width: 100%;
+  width: max-content;
+}
+.ws-pv-code li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: 8px;
+  padding-right: 12px;
+  white-space: pre;
+}
+.ws-pv-code li::before {
+  content: attr(data-n);
+  text-align: right;
+  color: var(--meta);
+  user-select: none;
+}
+.ws-pv-code li:hover {
+  background: var(--surface-2);
+}
+
+/* Markdown：外观在 features/markdown/prose.css（容器同时带 md-prose t-doc），这里只管预览标签里的版心 */
+.ws-pv-md {
+  max-width: 72ch;
+  padding: 16px 16px 32px;
+}
+.ws-pv-img-ph {
+  color: var(--meta);
+}
+.ws-pv-mermaid {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.ws-pv-mermaid-err {
+  margin: 8px 0;
+}
+
+/* 图片 */
+.ws-pv-imgbox {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100%;
+  padding: 12px;
+  background: var(--surface-2);
+}
+.ws-pv-imgbox img {
+  /* 基准 = 窗格宽度与原尺寸（--nat-w，图片载入后由 ImageView 写入）里较小的，再乘标签缩放（--tab-zoom）。
+     用 auto 边距居中而不是 place-items: center：放大溢出时后者会把左边裁掉、滚不到。 */
+  width: calc(min(var(--nat-w, 100000) * 1px, 100%) * var(--tab-zoom, 1));
+  /* 全局的 img { max-width: 100% } 会把放大后的图封回窗格宽度 */
+  max-width: none;
+  height: auto;
+  margin: auto;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* PDF */
+.ws-pv-pdf {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+/* 目录栏 + 连续滚动区 */
+.ws-pv-pdfshell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.ws-pv-pdfnav {
+  flex: none;
+  width: 220px;
+  overflow: auto;
+  padding: 6px 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ws-pv-pdfnav-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-pv-pdfnav-item {
+  justify-content: flex-start;
+  width: 100%;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+.ws-pv-pdfnav-item[data-active] {
+  color: var(--accent-text);
+  background: var(--accent-bg);
+}
+.ws-pv-pdfbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ws-pv-pdfpage {
+  margin-right: auto;
+  color: var(--meta);
+}
+.ws-pv-pdfscale {
+  min-width: 38px;
+  text-align: center;
+  color: var(--meta);
+}
+.ws-pv-pdfbody {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-2);
+  overflow: auto;
+}
+/* 连续滚动：每页一张纸，纵向排列，页间留缝 */
+.ws-pv-pdfpagebox {
+  position: relative;
+  margin: 0 auto 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  box-shadow: var(--elev-lg);
+  overflow: hidden;
+}
+/* 还没渲染的页显示页号，避免整片空白以为坏了 */
+.ws-pv-pdfpage-n {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--meta);
+}
+.ws-pv-pdfpagebox canvas {
+  display: block;
+}
+/* 文字层：透明文字叠在画布上，只为了能选取复制 */
+.ws-pv-text {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+}
+.ws-pv-text :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.ws-pv-text ::selection {
+  background: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+/* ── 富内容：docx / 表格 / 幻灯片 / epub / json / html ── */
+.ws-pv-rich {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+.ws-pv-rich-in {
+  height: 100%;
+  min-height: 0;
+}
+/* Ctrl+滚轮缩放的当前比例，非 100% 时才出现 */
+.ws-pv-zoom-badge {
+  position: sticky;
+  bottom: 8px;
+  left: 100%;
+  float: right;
+  margin: 0 8px 8px 0;
+  border-radius: var(--r-pill);
+}
+.ws-pv-doc,
+.ws-pv-ppt,
+.ws-pv-sheet {
+  /* 四周留白：正文直接贴边视觉上很难看 */
+  padding: 16px 16px 24px;
+  min-height: 100%;
+  /* 页面是纸，外面用不同底色分层 */
+  background: var(--surface-2);
+}
+.ws-pv-doc-body {
+  /* docx-preview 自带分页样式，这里只兜住背景色，别让白纸在暗色里发光 */
+  background: var(--surface);
+  color: var(--fg);
+}
+.ws-pv-doc-body :is(.docx-wrapper, .docx) {
+  background: transparent;
+  padding: 0;
+}
+.ws-pv-doc-body .docx-wrapper > section.docx {
+  margin: 0 auto 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+}
+.ws-pv-ppt-fit,
+.ws-pv-epub-fit {
+  /* 库按固定像素排版，整体缩放要贴着左上角对齐 */
+  transform-origin: 0 0;
+  width: max-content;
+  margin: 0 auto;
+}
+.ws-pv-ppt-body {
+  width: max-content;
+}
+/* 库把 wrapper 背景写死成纯黑（还会给固定高度+内部滚动），这里统一改回来 */
+.ws-pv-ppt-body .pptx-preview-wrapper {
+  background: transparent;
+  height: auto;
+  overflow: visible;
+}
+/* 每页之间留点缝，页本身给个浅色底便于看出边界 */
+.ws-pv-ppt-body .pptx-preview-slide-wrapper {
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+.ws-pv-epub {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ws-pv-epub-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ws-pv-epub-at {
+  color: var(--meta);
+  font-variant-numeric: tabular-nums;
+}
+.ws-pv-epub-fit {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+.ws-pv-epub-body {
+  width: max-content;
+  height: 44px;
+}
+.ws-pv-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.ws-pv-tab[aria-selected="true"] {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+.ws-pv-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+.ws-pv-grid {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ws-pv-grid td {
+  padding: 4px 8px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-pv-grid tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+.ws-pv-json {
+  height: 100%;
+  overflow: hidden;
+}
+/* 文本类外壳：预览 / 源码切换条 + 内容区 */
+.ws-pv-tv {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ws-pv-tv-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 内容区里的渲染件（iframe / svg / markdown）都要撑满，否则 iframe 会退回默认 150px 高 */
+.ws-pv-tv-body > * {
+  flex: 1;
+  min-height: 0;
+}
+/* 源码态里 CodeMirror 自己滚动 */
+.ws-pv-tv-body > div {
+  height: 100%;
+}
+/* markdown 渲染态：父级是 overflow:hidden，自己不滚就会被直接裁掉（表现为「没有滚动条、下半截看不见」） */
+.ws-pv-tv-body > .ws-pv-md {
+  overflow: auto;
+  max-width: none;
+}
+/* SVG 渲染态：居中、留白，别贴着边 */
+.ws-pv-svgb {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  padding: 16px;
+  background: var(--surface-2);
+  overflow: auto;
+}
+.ws-pv-svgb img {
+  /* 基准 = 宽度铺满窗格、高度按比例（矢量图放大不糊），再乘标签缩放；溢出时从左上角起可滚 */
+  width: calc(100% * var(--tab-zoom, 1));
+  max-width: none;
+  height: auto;
+  margin: auto;
+}
+/* HTML 内嵌预览：标签缩放用 CSS zoom 乘在 iframe 上（页面视口按比例变窄，像浏览器的页面缩放）；
+   百分比尺寸不受 zoom 影响，所以盒子始终铺满内容区 */
+.ws-pv-html-frame {
+  display: block;
+  flex: none; /* 高度由 height 定，不走 .ws-pv-tv-body > * 的 flex: 1 */
+  width: 100%;
+  height: 100%;
+  zoom: var(--tab-zoom, 1);
+  border: 0;
+  background: var(--surface);
+  user-select: none; /* 上层文档里的选区扫过 iframe 时，浏览器会把整个框涂成选中色 */
+}
+
+/* ── 文本编辑器（CodeMirror）与保存条 ── */
+.ws-pv-edit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ws-pv-edit-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* ── 冲突对话框：逐行差异 ── */
+.ws-pv-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: 56vh;
+}
+
+/* ── 冲突合并：整篇 CodeMirror + 顶部说明 + 底部操作 ── */
+.ws-pv-merge3 {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+.ws-pv-merge3-hint {
+  margin: 0;
+  color: var(--meta);
+}
+.ws-pv-merge3-body {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  overflow: hidden;
+}
+/* CodeMirror 自己撑满并滚动 */
+.ws-pv-merge3-body .cm-editor {
+  height: 100%;
+}
+.ws-pv-merge3-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.ws-pv-merge3-sp {
+  flex: 1;
+}
+
+/* 逐块「采纳 / 退回」：CodeMirror 自带 .cm-chunkButtons button 是白字白底，
+   这里用更高优先级覆盖成看得见的样式 */
+.cm-chunkButtons button.ws-pv-merge3-btn {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.cm-chunkButtons button.ws-pv-merge3-btn.is-accept {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.cm-chunkButtons button.ws-pv-merge3-btn.is-reject {
+  color: var(--meta);
+}
+
+.cm-chunkButtons button.ws-pv-merge3-btn:hover {
+  background: var(--surface-2);
+}
+/* 冲突弹层切到合并时占满：卡片换成竖向 flex，内容区吃掉剩余高度（只作用于合并弹层） */
+.u-mcard.ws-pv-merge-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.u-mcard.ws-pv-merge-modal .u-mbody {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ws-pv-merge-modal .ws-pv-conflict {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+}
+
+.ws-pv-diff {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  color: inherit;
+}
+.ws-pv-diff-line {
+  display: flex;
+  gap: 6px;
+  padding: 0 6px;
+  white-space: pre;
+}
+.ws-pv-diff-line[data-kind="add"] {
+  background: var(--surface-3);
+  color: var(--fg);
+}
+.ws-pv-diff-line[data-kind="del"] {
+  background: var(--surface-3);
+  color: var(--danger);
+}
+.ws-pv-diff-n {
+  flex: none;
+  width: 3ch;
+  text-align: right;
+  color: var(--meta);
+  user-select: none;
+}
+.ws-pv-diff-t {
+  min-width: 0;
+}
+.ws-pv-plain {
+  margin: 0;
+  padding: 8px 8px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+/* ── 改动 diff 标签 ── */
+.ws-df {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+  color: var(--fg);
+}
+.ws-df-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.ws-df-turn {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--meta);
+}
+.ws-df-name {
+  flex: none;
+}
+.ws-df-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--meta);
+}
+.ws-df-note {
+  padding: 12px 12px;
+  color: var(--meta);
+}
+.ws-df-note-bad {
+  padding: 12px 12px;
+}
+.ws-df-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0 24px;
+  color: inherit;
+}
+.ws-df-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  white-space: pre;
+}
+.ws-df-n {
+  flex: none;
+  width: 4ch;
+  text-align: right;
+  color: var(--meta);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.ws-df-t {
+  min-width: 0;
+}
+.ws-df-row[data-kind="add"] {
+  background: var(--surface-2);
+}
+.ws-df-row[data-kind="add"] .ws-df-t {
+  color: var(--accent-ink);
+}
+.ws-df-row[data-kind="del"] {
+  background: var(--surface-2);
+}
+.ws-df-row[data-kind="del"] .ws-df-t {
+  color: var(--danger);
+}
+.ws-df-row[data-kind="hunk"] {
+  background: var(--surface-3);
+  color: var(--meta);
+}
+.ws-df-row[data-kind="meta"] {
+  color: var(--meta);
+}
