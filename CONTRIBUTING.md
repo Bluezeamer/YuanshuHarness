@@ -12,7 +12,7 @@
 
 ## 开发环境
 
-- Node ≥ 22.19；pnpm（版本由根 `package.json` 的 `packageManager` 锁定，装任何 ≥ 10 的 pnpm 都会自动切换到它）。
+- Node ≥ 22.19（CI 固定用 22.19.0；本机用更新的 Node 时，测试可能在 CI 上才暴露差异，例如 jsdom 里 `Response.blob()` 返回的类随 Node 版本而变）；pnpm（版本由根 `package.json` 的 `packageManager` 锁定，装任何 ≥ 10 的 pnpm 都会自动切换到它）。
 - `pnpm install --frozen-lockfile` 装依赖。
 - 跑真浏览器验收脚本要装 Chromium：`pnpm --filter yuanshu-harness-server exec playwright-core install chromium`（网络受限时先设 `PLAYWRIGHT_DOWNLOAD_HOST` 指向镜像）。
 - 镜像冒烟需要 Docker。

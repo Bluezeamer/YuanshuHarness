@@ -119,8 +119,10 @@ test("笔记（canvas 形态）：图片走画布接口，地址相对 .canvas/�
     "fetch",
     vi.fn(async (url: string) => {
       fetched.push(url);
-      return new Response(new Blob(["x"], { type: "image/png" }), {
+      // 不用 new Response(new Blob(...))：jsdom 的 Blob 没有 stream()，Node 22 直接抛错，Node 24 悄悄当成字符串
+      return new Response("x", {
         status: 200,
+        headers: { "content-type": "image/png" },
       });
     }),
   );

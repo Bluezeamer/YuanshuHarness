@@ -217,8 +217,9 @@ test("getThumb：失败给 null，成功给 Blob", async () => {
   expect(await getThumb("tok", "w", "p1")).toBeNull();
 
   fetchMock.mockResolvedValueOnce(new Response("jpeg", { status: 200 }));
+  // 不比 instanceof Blob：jsdom 环境里全局的 Blob 与 Response.blob() 给的不一定是同一个类，随 Node 版本变
   const blob = await getThumb("tok", "w", "p1");
-  expect(blob).toBeInstanceOf(Blob);
+  expect(await blob?.text()).toBe("jpeg");
   expect(fetchMock.mock.calls[2]?.[0]).toBe(
     "/api/v1/workspaces/w/browser/pages/p1/thumb",
   );

@@ -12,16 +12,16 @@ beforeEach(() => {
   if (typeof localStorage !== "undefined") localStorage.clear();
 });
 
-// jsdom 没有实现 object URL：附件缩略图与上传预览用固定 URL 即可（真浏览器走原生实现）。
-if (typeof URL.createObjectURL !== "function") {
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    writable: true,
-    value: () => "blob:test",
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    writable: true,
-    value: () => {},
-  });
-}
+// object URL 一律打桩成固定 URL（真浏览器走原生实现）。不能用「没有才打桩」的判断：jsdom 自己没有，
+// 但 Node 自带的 URL.createObjectURL 只认 Node 的 Blob，而这里全局的 Blob 是 jsdom 的，哪个版本的 Node 让
+// Response.blob() 回哪一种也不同（22 回 Node 的，24 回 jsdom 的）——放着原生实现，用例就随 Node 版本变红。
+Object.defineProperty(URL, "createObjectURL", {
+  configurable: true,
+  writable: true,
+  value: () => "blob:test",
+});
+Object.defineProperty(URL, "revokeObjectURL", {
+  configurable: true,
+  writable: true,
+  value: () => {},
+});

@@ -35,3 +35,5 @@ description: 元枢 Harness 的收尾与验收：改完代码后跑哪些检查�
 - 在仓库根目录跑 `npx vitest` 会扫进 `node_modules` 里的第三方测试；一律在对应包里跑，或用 `pnpm --filter`。
 - 注释或字符串里写 `#` 加 3–8 个十六进制字符（如 `#0042`、`#fff`），色值守卫会当成颜色而红。
 - 写文件用绝对路径：相对路径会随 shell 的当前目录漂到别的包里，单目录跑测试看不出来。
+- **前端测试要在 `engines` 声明的最低 Node（现为 22.19.0）上也跑一遍**：CI 固定这个版本，本机常是更新的。jsdom 里全局 `Blob` 是 jsdom 的，`Response.blob()`、`new Response(blob)`、`URL.createObjectURL` 在不同 Node 版本表现不同，只在新版本上绿的测试会到 CI 才红。本机没有时：`npm install --prefix <临时目录> node@22.19.0`，再用 `<临时目录>/node_modules/node/bin/node node_modules/vitest/vitest.mjs run`（只能跑 web；server 的原生模块是按本机 Node 编译的）。
+- **测试别对本机的 shell 提示符、列目录顺序、吞吐量做假设**：CI 的登录 shell 提示符带几百字符的 OSC 转义序列，`readdir` 不保证字典序，共享 runner 比开发机慢几倍。断言不变量，等待用「看到标记」而不是「看末尾 N 个字符」。

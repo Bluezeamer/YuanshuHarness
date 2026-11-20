@@ -12,7 +12,7 @@ Thanks for helping with Yuanshu. This guide covers how to get a change into the 
 
 ## Development environment
 
-- Node ≥ 22.19 and pnpm. The exact pnpm version is pinned by `packageManager` in the root `package.json`; any pnpm ≥ 10 will switch to it automatically.
+- Node ≥ 22.19 (CI pins 22.19.0; if you develop on a newer Node, a test can pass locally and fail in CI, e.g. the class `Response.blob()` returns under jsdom depends on the Node version) and pnpm. The exact pnpm version is pinned by `packageManager` in the root `package.json`; any pnpm ≥ 10 will switch to it automatically.
 - Install dependencies with `pnpm install --frozen-lockfile`.
 - The real-browser verification scripts need Chromium: `pnpm --filter yuanshu-harness-server exec playwright-core install chromium` (set `PLAYWRIGHT_DOWNLOAD_HOST` to a mirror first if your network needs one).
 - The image smoke test needs Docker.
