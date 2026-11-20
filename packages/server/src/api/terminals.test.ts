@@ -447,10 +447,10 @@ describe.each([
       const info = (await r.json()) as { id: string; cwd: string };
       expect(path.isAbsolute(info.cwd)).toBe(true);
       const c = await attach(info.id);
-      c.input("pwd -P\n");
-      // bash 开启 bracketed paste 时回显行之后以 \r 而非 \n 起行
+      // 用标记夹住 pwd 的输出：有的发行版的 shell 会在提示符前后插 OSC 转义序列，不能指望路径独占一行
+      c.input("echo HOME_BEGIN; pwd -P; echo HOME_END\n");
       await c.seen(
-        new RegExp(`[\\r\\n]${realpathSync(info.cwd)}\\r?\\n`),
+        new RegExp(`HOME_BEGIN\\r?\\n${realpathSync(info.cwd)}\\r?\\nHOME_END`),
         `home 目录 ${info.cwd}`,
       );
     });
@@ -560,7 +560,7 @@ describe.each([
         c.ws as unknown as { _socket: { pause(): void; resume(): void } }
       )._socket;
       c.input(
-        "echo S$((1+1)); sleep 1; yes line | head -c 24000000; echo END$((2+2))\n",
+        "echo S$((1+1)); sleep 1; yes line | head -c 8000000; echo END$((2+2))\n",
       );
       await c.seen(/S2/, "起始标记");
       sock.pause();

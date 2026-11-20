@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -231,7 +232,16 @@ describe.each(pairs)("传输 %s", (_name, srcEnv, dstEnv, enabled) => {
         (e) => e,
       );
       expect(err.code).toBe("copy_failed");
-      expect(err.completed).toEqual([path.join(dst, "a.bin")]);
+      // 先传 a.bin 还是先碰 sub/b.txt 取决于文件系统的列目录顺序（不保证字典序）：
+      // 不假设顺序，只断言不变量——报告为已完成的都真在目标里，失败的那个不在报告里也不在目标里
+      expect(err.completed.length).toBeLessThanOrEqual(1);
+      for (const done of err.completed) {
+        expect(done).toBe(path.join(dst, "a.bin"));
+        expect(readFileSync(done).length).toBe(4);
+      }
+      expect(existsSync(path.join(dst, "a.bin"))).toBe(
+        err.completed.length === 1,
+      );
       expect(err.message).toContain("未回滚");
       expect(readdirSync(path.join(dst, "sub"))).toEqual([]);
     },
