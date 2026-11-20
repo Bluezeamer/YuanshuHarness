@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://github.com/Bluezeamer/YuanshuHarness/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Bluezeamer/YuanshuHarness/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-18181b"></a>
-  <img alt="Node >= 22.19" src="https://img.shields.io/badge/node-%E2%89%A5%2022.19-18181b">
+  <img alt="Node 22.19 或更高" src="https://img.shields.io/badge/node-%E2%89%A5%2022.19-18181b">
   <img alt="状态：早期" src="https://img.shields.io/badge/status-early-18181b">
 </p>
 

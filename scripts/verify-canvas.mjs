@@ -3045,9 +3045,13 @@ async function main() {
         await sleep(400);
       };
       // 文件管理器的当前目录：回到 work（上一级），那里有 outside-notes.md 与 proj2
-      const crumbUp = fm.locator(".ws-fm-crumb button", { hasText: "work" });
-      if ((await crumbUp.count()) > 0) {
-        await crumbUp.first().click();
+      // 面包屑每一级都是按钮，而路径里可能还有别的叫 work 的目录（GitHub runner 的工作目录就是 /home/runner/work/…）：
+      // 要精确匹配名字，并取最深的那一个，不能用子串匹配加 first()
+      const crumbWork = fm.locator(".ws-fm-crumb button", {
+        hasText: /^work$/,
+      });
+      if ((await crumbWork.count()) > 0) {
+        await crumbWork.last().click();
         await sleep(800);
       }
       await dragFmInto("outside-notes.md");
@@ -3071,10 +3075,7 @@ async function main() {
         JSON.stringify(editorText2.slice(-200)),
       );
       // 文件管理器退回 work：后面的「落点样式」检查还要拖 work 下的 outside-notes.md
-      await fm
-        .locator(".ws-fm-crumb button", { hasText: "work" })
-        .first()
-        .click();
+      await crumbWork.last().click();
       await sleep(800);
       // 还原，免得后面的步骤带着没保存的改动
       await page
