@@ -60,8 +60,14 @@ class TermClient {
   resize(cols: number, rows: number) {
     this.ws.send(JSON.stringify({ type: "resize", cols, rows }));
   }
-  seen(re: RegExp, label: string) {
-    return waitFor(() => re.test(this.output), label, 10_000);
+  // 超时时带上终端输出的末尾：CI 上失败时看不到现场，只有「等待超时」没法判断是慢还是内容不对
+  async seen(re: RegExp, label: string) {
+    try {
+      await waitFor(() => re.test(this.output), label, 10_000);
+    } catch (err) {
+      const tail = JSON.stringify(this.output.slice(-400));
+      throw new Error(`${(err as Error).message}（输出末尾 ${tail}）`);
+    }
   }
   close() {
     this.ws.terminate();
@@ -445,7 +451,7 @@ describe.each([
       // bash 开启 bracketed paste 时回显行之后以 \r 而非 \n 起行
       await c.seen(
         new RegExp(`[\\r\\n]${realpathSync(info.cwd)}\\r?\\n`),
-        "home 目录",
+        `home 目录 ${info.cwd}`,
       );
     });
 
