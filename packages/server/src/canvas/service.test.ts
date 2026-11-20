@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -56,6 +57,22 @@ describe("CanvasService：主机名", () => {
 });
 
 describe("CanvasService", () => {
+  test("close 先把还在去抖的提交冲掉：退出时没有提交悬在半空，也不会丢来源", async () => {
+    const dir = tmp();
+    const svc = new CanvasService({
+      env: (id) => (id === "local" ? new LocalEnv() : null),
+      commitDelayMs: 60_000,
+    });
+    await svc.repo("local", dir).createBoard("x");
+    await svc.close();
+    const log = execFileSync(
+      "git",
+      ["-C", path.join(dir, ".canvas"), "log", "--format=%s"],
+      { encoding: "utf8" },
+    );
+    expect(log).toContain("x.canvas");
+  });
+
   test("同一对 (envId, 目录) 复用同一个仓库实例", () => {
     const svc = service();
     const dir = tmp();

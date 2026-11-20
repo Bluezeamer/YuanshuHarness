@@ -118,11 +118,11 @@ export class CanvasService {
     await this.peek(envId, projectDir)?.mirror?.settle(timeoutMs);
   }
 
-  /** 退出前：尽量把没推的推完，再停掉后台推送。 */
+  /** 退出前：先把还在去抖的提交冲掉（它会改副本），再尽量把没推的推完，最后停掉后台推送。 */
   async close(timeoutMs = 3000): Promise<void> {
-    const mirrors = [...this.entries.values()].flatMap((e) =>
-      e.mirror ? [e.mirror] : [],
-    );
+    const entries = [...this.entries.values()];
+    await Promise.allSettled(entries.map((e) => e.repo.settle()));
+    const mirrors = entries.flatMap((e) => (e.mirror ? [e.mirror] : []));
     await Promise.allSettled(mirrors.map((m) => m.settle(timeoutMs)));
     for (const m of mirrors) m.close();
   }
