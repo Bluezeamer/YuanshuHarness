@@ -551,16 +551,17 @@ describe.each([
     test("慢客户端：积压过半暂停读取，追上后恢复；连接与 shell 都保留", async () => {
       await launch({}, { maxBufferedBytes: 1024 * 1024 });
       const { id, c } = await open();
-      // 只在末尾留一小段，避免对几十 MB 的输出反复跑正则。
+      // 只在末尾留一小段，避免对几十 MB 的输出反复跑正则。窗口要盖得住提示符：新版 systemd 的登录 shell
+      // 每个提示符前后会输出几百字符的 OSC 转义序列，END4 之后紧跟着它，窗口太小就把 END4 挤出去了。
       let tail = "";
       c.ws.on("message", (raw: Buffer, isBinary: boolean) => {
-        if (isBinary) tail = (tail + raw.toString("utf8")).slice(-200);
+        if (isBinary) tail = (tail + raw.toString("utf8")).slice(-4000);
       });
       const sock = (
         c.ws as unknown as { _socket: { pause(): void; resume(): void } }
       )._socket;
       c.input(
-        "echo S$((1+1)); sleep 1; yes line | head -c 8000000; echo END$((2+2))\n",
+        "echo S$((1+1)); sleep 1; yes line | head -c 8000000; echo END$((2+2)); printf '%0400d' 0\n",
       );
       await c.seen(/S2/, "起始标记");
       sock.pause();
